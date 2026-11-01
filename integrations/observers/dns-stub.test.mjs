@@ -616,27 +616,38 @@ test('dns-stub L8: a stall right after the final mark never lets the run-end win
   const client = createSocket('udp4'); client.on('error', () => {}); t.after(() => client.close());
   await new Promise(resolve => client.connect(o.port, '127.0.0.1', resolve));
   const hold = ms => { const began = performance.now(); while (performance.now() - began < ms); };
-  const send = (n, tag) => { for (let i = 0; i < n; i++) client.send(encodeQuery({ id: 1, labels: [`${tag}${i}`, 'stall', 'example'] })); };
-  // Where the OS grants the buffer the stub asks for (macOS), none of these bursts can be dropped.
-  const full = o.udpRecvBuffer().udp4 >= DNS_STUB_LIMITS.udpRecvBufferBytes;
+  const query = (tag, i) => encodeQuery({ id: 1, labels: [`${tag}${i}`, 'stall', 'example'] });
+  const send = (n, tag) => { for (let i = 0; i < n; i++) client.send(query(tag, i)); };
+  // The receive buffer the OS reports for the stub's 4 MiB request. Where it is at least that, none of these bursts can be
+  // dropped: macOS grants 4 MiB and charges a small query about 192 bytes; Linux, where net.core.rmem_max allows (hosted CI),
+  // sets 4 MiB and reports twice that, the limit it charges each datagram against (about 900 bytes for a small query).
+  const granted = o.udpRecvBuffer().udp4, full = granted >= DNS_STUB_LIMITS.udpRecvBufferBytes;
+  // The fewest queries of a burst whose weight in one busy period, as the stub counts it (UDP loss, dns-stub.mjs: each query's
+  // length plus udpDatagramCost), reaches half the reported buffer: from there the stub must read the period as a possible drop.
+  // The big burst is sized from it, a tenth past: 2,176 queries where 4 MiB is reported (macOS), 4,351 where 8 MiB is (Linux).
+  // A fixed count is past half on one and under it on the other (3,000 was, and read complete on Linux, correctly).
+  const limitOf = tag => { let n = 0; for (let sum = 0; 2 * sum < granted; n++) sum += query(tag, n).length + DNS_STUB_LIMITS.udpDatagramCost; return n; };
+  const bursts = [[500, 's'], [Math.ceil(1.1 * limitOf('b')), 'b']];
+  t.diagnostic(`udp4 receive buffer: ${granted} bytes reported; bursts of ${bursts.map(([n]) => n).join(' and ')}`);
   // The lookups the stub has recorded since a mark (a gap window reads them without waiting).
   const readSince = async mark => (await o.collect(mark, await o.mark(), { gap: true })).lookups.length;
-  for (const n of [500, 3000]) {
+  for (const [n, tag] of bursts) {
+    const past = n >= limitOf(tag), label = `${n} (${past ? 'past' : 'under'} half of ${granted} bytes)`;
     const from = await o.mark();
-    send(n, `q${n}-`);
+    send(n, tag);
     const to = await o.mark();
     hold(150 + 100);
     const w = await o.collect(from, to, { gap: true, final: true });
-    assert.deepEqual([w.coverage, w.reason, w.lookups.length], ['partial', 'dns-query-after-final-mark', 0], `${n} queued at the final mark`);
+    assert.deepEqual([w.coverage, w.reason, w.lookups.length], ['partial', 'dns-query-after-final-mark', 0], `${label} queued at the final mark`);
     // The wait read them, and each was counted in its socket's busy period: the next window holds them, and a burst past half
-    // the granted buffer (about 1,970 small queries at 4 MiB) still reads as a possible drop. A loaded machine may still be
-    // reading them when the wait reaches its cap, so the next window is taken once the stub has read every one the kernel kept.
+    // the granted buffer still reads as a possible drop. A loaded machine may still be reading them when the wait reaches its
+    // cap, so the next window is taken once the stub has read every one the kernel kept.
     await readAll(() => readSince(to), n);
     const next = await o.collect(to, await o.mark(), { gap: true });
-    if (next.coverage === 'complete') assert.equal(next.lookups.length, n, `${n} queued: complete only with every one recorded`);
-    if (full) assert.equal(next.lookups.length, n, `${n} read after the mark`);
-    if (n > 2500) assert.deepEqual([next.coverage, next.reason], ['partial', 'dns-possible-drop-query'], `${n} in one busy period`);
-    else if (full) assert.deepEqual([next.coverage, next.reason], ['complete', null], `${n} in one busy period`);
+    if (next.coverage === 'complete') assert.equal(next.lookups.length, n, `${label}: complete only with every one recorded`);
+    if (full) assert.equal(next.lookups.length, n, `${label} read after the mark`);
+    if (past) assert.deepEqual([next.coverage, next.reason], ['partial', 'dns-possible-drop-query'], `${label} in one busy period`);
+    else if (full) assert.deepEqual([next.coverage, next.reason], ['complete', null], `${label} in one busy period`);
   }
   // The drain, resumed in an I/O callback (the reply to a lookup was just read) right after a stall: before it says quiescent it
   // reads what was queued, where one turn would have looked before any fresh poll.
