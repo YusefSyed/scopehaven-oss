@@ -171,16 +171,16 @@ test('pg-snapshot: explicit limits: a server statement timeout, a stalled server
 });
 
 
-// ---- Review round 1 (PG-SNAPSHOT-REVIEW-2026-10-06.md): each case failed on f1e81ff4 ----
+// ---- Declared tables, row-level security, row identity and connection limits ----
 const rowsAt = (...rows) => ({ snapshot: '800:800:', tables: { Chat: rows } });
 const updated = (at, ...rows) => ({ snapshot: at, tables: { Chat: rows } });
 
-test('review H1: a table name declared twice (two schemas) is refused, never silently collapsed', async t => {
+test('a table name declared twice (two schemas) is refused, never silently collapsed', async t => {
   const server = await scriptedDb(t, []);
   assert.throws(() => observerOn(server, { tables: [{ table: 'Chat', key: 'id' }, { table: 'Chat', key: 'id', schema: 'audit' }] }), /Each table name is declared once per observer/);
 });
 
-test('review H2: row-level security is switched off for the mark, so a filtered role fails instead of reading short', async t => {
+test('row-level security is switched off for the mark, so a filtered role fails instead of reading short', async t => {
   const log = [];
   const server = await scriptedDb(t, [rowsAt(['c1', '700', 'h1']), rowsAt(['c1', '700', 'h1'])], log);
   const o = observerOn(server); const from = await o.mark(), to = await o.mark();
@@ -191,14 +191,14 @@ test('review H2: row-level security is switched off for the mark, so a filtered 
   assert.deepEqual([filtered.coverage, filtered.reason], ['failed', 'permission-denied']);
 });
 
-test('review H2 (c, d): a selected row absent at either mark is never exact (insert-update-delete inside the window, or a selector typo)', async t => {
+test('a selected row absent at either mark is never exact (insert-update-delete inside the window, or a selector typo)', async t => {
   // The connector watches every row a check names, typos included.
   const watched = { watchedResources: ['Chat/c1', 'Chat/c9', 'chat/c1'] };
-  // (c) c9 was inserted, updated and deleted inside the window: absent at both marks.
+  // c9 was inserted, updated and deleted inside the window: absent at both marks.
   const churned = await window(t, rowsAt(['c1', '700', 'h1']), updated('806:806:', ['c1', '700', 'h1']), watched);
   assert.notEqual(evaluateEffectAssertion(none('Chat/c9'), [churned]).verdict, 'pass');
   assert.equal(evaluateEffectAssertion(none('Chat/c1'), [churned]).verdict, 'pass', 'a watched row seen at both marks is still exact');
-  // (d) a typo in the selector ("chat/c1") while c1 really was updated.
+  // A typo in the selector ("chat/c1") while c1 really was updated.
   const typo = await window(t, rowsAt(['c1', '700', 'h1']), updated('806:806:', ['c1', '804', 'h2']), watched);
   assert.notEqual(evaluateEffectAssertion(none('chat/c1'), [typo]).verdict, 'pass');
   assert.equal(evaluateEffectAssertion(none('Chat/c1'), [typo]).verdict, 'fail');
@@ -208,12 +208,12 @@ test('review H2 (c, d): a selected row absent at either mark is never exact (ins
   assert.notEqual(evaluateEffectAssertion(none('Chat/c1'), [await collectWindow(unwatched, from, to)]).verdict, 'pass');
 });
 
-test('review H3: only heap tables are read; xmin 0 or 1 and a replaced table (new oid) are never exact', async t => {
+test('only heap tables are read; xmin 0 or 1 and a replaced table (new oid) are never exact', async t => {
   for (const [relkind, am] of [['f', ''], ['v', ''], ['r', 'columnar'], ['m', 'heap']]) {
     const w = await window(t, { ...rowsAt(['c1', '0', 'h1']), relations: { Chat: [['16384', relkind, am]] } }, rowsAt(['c1', '0', 'h1']));
     assert.deepEqual([w.coverage, w.reason], ['failed', 'relation-not-heap-table'], `${relkind}/${am}`);
   }
-  // Rows that cannot be identified across the marks fail the window, with no events (review R3 H1).
+  // Rows that cannot be identified across the marks fail the window, with no events.
   const zero = await window(t, rowsAt(['c1', '0', 'h1']), updated('806:806:', ['c1', '0', 'h1']));
   assert.deepEqual([zero.coverage, zero.reason, zero.events.length], ['failed', 'invalid-row-version', 0]); assert.notEqual(evaluateEffectAssertion(none('Chat/c1'), [zero]).verdict, 'pass');
   const swapped = await window(t, rowsAt(['c1', '700', 'h1']), { ...updated('806:806:', ['c1', '700', 'h1']), relations: { Chat: [['99999', 'r', 'heap']] } });
@@ -227,7 +227,7 @@ test('review H3: only heap tables are read; xmin 0 or 1 and a replaced table (ne
   assert.deepEqual([missing.coverage, missing.reason], ['failed', 'table-missing']);
 });
 
-test('review lows: standby refused, search_path pinned and names schema-qualified, xmin wraparound coincidence is ambiguous', async t => {
+test('standby refused, search_path pinned and names schema-qualified, xmin wraparound coincidence is ambiguous', async t => {
   const standby = await window(t, { ...rowsAt(['c1', '700', 'h1']), recovery: 'true' }, rowsAt(['c1', '700', 'h1']));
   assert.deepEqual([standby.coverage, standby.reason], ['failed', 'standby-refused']);
   const log = [];
@@ -243,7 +243,7 @@ test('review lows: standby refused, search_path pinned and names schema-qualifie
   assert.equal(evaluateEffectAssertion(none('Chat/c2'), [wrapped]).verdict, 'pass', 'a row whose xmin is outside the window ids stays exact');
 });
 
-test('review lows: trust, md5 (by default), weak SCRAM iterations and an echoed SCRAM nonce are refused', async t => {
+test('trust, md5 (by default), weak SCRAM iterations and an echoed SCRAM nonce are refused', async t => {
   const login = async (auth, extra = {}) => pgConnect({ host: '127.0.0.1', port: (await fakePostgres(t, { auth })).port, database: 'app', user: USER, password: PASSWORD, ...extra });
   await assert.rejects(login('trust'), e => e.code === 'authentication-not-challenged');
   await assert.rejects(login('md5'), e => e.code === 'md5-authentication-refused');
@@ -252,7 +252,7 @@ test('review lows: trust, md5 (by default), weak SCRAM iterations and an echoed 
   (await login('scram')).close();
 });
 
-test('review lows: a malformed ErrorResponse never hangs, and only a valid SQLSTATE surfaces', async t => {
+test('a malformed ErrorResponse never hangs, and only a valid SQLSTATE surfaces', async t => {
   let answer = { rawError: Buffer.from('Cabc') }; // a field with no NUL terminator
   const server = await fakePostgres(t, { onQuery: () => answer });
   const client = await pgConnect({ host: '127.0.0.1', port: server.port, database: 'app', user: USER, password: PASSWORD });
@@ -264,7 +264,7 @@ test('review lows: a malformed ErrorResponse never hangs, and only a valid SQLST
   client.close();
 });
 
-test('review lows: a connect that never completes settles at the connect timeout (wedged listener)', { skip: process.platform === 'win32' }, async t => {
+test('a connect that never completes settles at the connect timeout (wedged listener)', { skip: process.platform === 'win32' }, async t => {
   const listener = spawn(process.execPath, ['-e', "const s=require('net').createServer(()=>{});s.listen({port:0,host:'127.0.0.1',backlog:1},()=>console.log(s.address().port))"], { stdio: ['ignore', 'pipe', 'inherit'] });
   const fillers = [];
   t.after(() => { for (const f of fillers) f.destroy(); try { process.kill(listener.pid, 'SIGCONT'); } catch {} listener.kill('SIGKILL'); });
@@ -281,7 +281,7 @@ test('review lows: a connect that never completes settles at the connect timeout
   assert.ok(Date.now() - started < 3000, `settled after ${Date.now() - started} ms`);
 });
 
-test('review lows: retained marks are bounded, and the client row cap never exceeds the observer limit', async t => {
+test('retained marks are bounded, and the client row cap never exceeds the observer limit', async t => {
   const state = { snapshot: '800:800:', tables: { Chat: [['c1', '700', 'h1']], Message: [] } };
   // md5 (opted in here only) keeps 130 logins fast; the observer itself always uses SCRAM.
   const fast = options => pgConnect({ ...options, allowMd5: true });
@@ -299,7 +299,7 @@ test('review lows: retained marks are bounded, and the client row cap never exce
   assert.ok(maxRows > 0 && maxRows <= 250000, `client maxRows ${maxRows}`);
 });
 
-// Review round 2, H-A: presence is checked for a string row selector; a prefix or table-wide
+// Presence is checked for a string row selector; a prefix or table-wide
 // selector is exact only on a quiescent window (no transaction completed or in progress).
 const prefix = value => ({ kind: 'effect.none', select: { source: 'sql-snapshot', name: 'Chat', operation: 'update', resource: { prefix: value } } });
 test('pg-snapshot: a prefix or table-wide selector never passes over changes it could not see (A/B/C)', async t => {
@@ -365,7 +365,7 @@ test('pg-snapshot: partitions and inheritance children must be verified heap tab
   assert.deepEqual([pr.coverage, pr.reason], ['failed', 'relation-unverified']);
 });
 
-// Review round 3 (R4). H1: a window whose rows cannot be identified across the marks reports no
+// A window whose rows cannot be identified across the marks reports no
 // committed effect, so it never decides a presence check or makes backend evidence observed.
 const updateExists = resource => ({ kind: 'effect.exists', select: { source: 'sql-snapshot', name: 'Chat', operation: 'update', ...(resource ? { resource } : {}) } });
 const anyExists = operation => ({ kind: 'effect.exists', select: { source: 'sql-snapshot', name: 'Chat', operation } });
@@ -375,20 +375,20 @@ function neverObserved(w, assertion, label) {
   assert.equal(backendObserved(decisions), false, `${label}: backend evidence must not read observed`);
   assert.equal(w.events.length, 0, `${label}: no events`);
 }
-test('R4 H1: identity failures (key tie flip, non-unique key, stray tableoid, oid swap, xmax regression, detach, attach) report no effect', async t => {
+test('identity failures (key tie flip, non-unique key, stray tableoid, oid swap, xmax regression, detach, attach) report no effect', async t => {
   const part = { relations: { Chat: [['16384', 'p', '']] }, descendants: { Chat: [['17001', 'r', 'heap'], ['17002', 'r', 'heap']] } };
   const inh = { descendants: { Chat: [['17001', 'r', 'heap']] } };
   const cases = [
-    // R1: c1 in the parent and in a child; no write, only the tie order flips.
-    ['R1 tie flip', { snapshot: '800:800:', ...inh, tables: { Chat: [['c1', '700', 'h1', '16384'], ['c1', '701', 'h2', '17001']] } }, { snapshot: '800:800:', ...inh, tables: { Chat: [['c1', '701', 'h2', '17001'], ['c1', '700', 'h1', '16384']] } }, updateExists('Chat/c1'), 'duplicate-key'],
-    // R1c: a non-unique declared key; a real write elsewhere reorders the rows.
-    ['R1c non-unique key', rowsAt(['c1', '700', 'h1'], ['c1', '701', 'h2']), updated('806:806:', ['c1', '701', 'h2'], ['c1', '700', 'h1']), updateExists('Chat/c1'), 'duplicate-key'],
-    ['R2 stray tableoid', { snapshot: '800:800:', ...part, tables: { Chat: [['c1', '700', 'h1', '17001']] } }, { snapshot: '806:806:', ...part, tables: { Chat: [['c1', '805', 'h1', '99999']] } }, updateExists('Chat/c1'), 'relation-unverified'],
-    ['R3 oid swap', rowsAt(['c1', '700', 'h1']), { ...updated('806:806:', ['c1', '805', 'h1']), relations: { Chat: [['99999', 'r', 'heap']] } }, updateExists('Chat/c1'), 'relation-unverified'],
-    ['R4 xmax regressed', rowsAt(['c1', '700', 'h1']), updated('790:790:', ['c1', '785', 'h1']), updateExists('Chat/c1'), 'xmax-regressed'],
-    ['R5 detach', { snapshot: '800:800:', ...part, tables: { Chat: [['c1', '700', 'h1', '17001'], ['c2', '701', 'h2', '17002']] } }, { snapshot: '801:801:', relations: part.relations, descendants: { Chat: [['17001', 'r', 'heap']] }, tables: { Chat: [['c1', '700', 'h1', '17001']] } }, anyExists('delete'), 'relation-unverified'],
-    ['R6 attach', { snapshot: '800:800:', relations: part.relations, descendants: { Chat: [['17001', 'r', 'heap']] }, tables: { Chat: [['c1', '700', 'h1', '17001']] } }, { snapshot: '801:801:', ...part, tables: { Chat: [['c1', '700', 'h1', '17001'], ['c9', '650', 'h9', '17002']] } }, anyExists('insert'), 'relation-unverified'],
-    // L-d: a stray row at the start mark only.
+    // c1 in the parent and in a child; no write, only the tie order flips.
+    ['tie flip', { snapshot: '800:800:', ...inh, tables: { Chat: [['c1', '700', 'h1', '16384'], ['c1', '701', 'h2', '17001']] } }, { snapshot: '800:800:', ...inh, tables: { Chat: [['c1', '701', 'h2', '17001'], ['c1', '700', 'h1', '16384']] } }, updateExists('Chat/c1'), 'duplicate-key'],
+    // A non-unique declared key; a real write elsewhere reorders the rows.
+    ['non-unique key', rowsAt(['c1', '700', 'h1'], ['c1', '701', 'h2']), updated('806:806:', ['c1', '701', 'h2'], ['c1', '700', 'h1']), updateExists('Chat/c1'), 'duplicate-key'],
+    ['stray tableoid', { snapshot: '800:800:', ...part, tables: { Chat: [['c1', '700', 'h1', '17001']] } }, { snapshot: '806:806:', ...part, tables: { Chat: [['c1', '805', 'h1', '99999']] } }, updateExists('Chat/c1'), 'relation-unverified'],
+    ['oid swap', rowsAt(['c1', '700', 'h1']), { ...updated('806:806:', ['c1', '805', 'h1']), relations: { Chat: [['99999', 'r', 'heap']] } }, updateExists('Chat/c1'), 'relation-unverified'],
+    ['xmax regressed', rowsAt(['c1', '700', 'h1']), updated('790:790:', ['c1', '785', 'h1']), updateExists('Chat/c1'), 'xmax-regressed'],
+    ['detach', { snapshot: '800:800:', ...part, tables: { Chat: [['c1', '700', 'h1', '17001'], ['c2', '701', 'h2', '17002']] } }, { snapshot: '801:801:', relations: part.relations, descendants: { Chat: [['17001', 'r', 'heap']] }, tables: { Chat: [['c1', '700', 'h1', '17001']] } }, anyExists('delete'), 'relation-unverified'],
+    ['attach', { snapshot: '800:800:', relations: part.relations, descendants: { Chat: [['17001', 'r', 'heap']] }, tables: { Chat: [['c1', '700', 'h1', '17001']] } }, { snapshot: '801:801:', ...part, tables: { Chat: [['c1', '700', 'h1', '17001'], ['c9', '650', 'h9', '17002']] } }, anyExists('insert'), 'relation-unverified'],
+    // A stray row at the start mark only.
     ['start-only stray', { snapshot: '800:800:', ...part, tables: { Chat: [['c1', '700', 'h1', '17001'], ['c2', '701', 'h2', '99999']] } }, { snapshot: '806:806:', ...part, tables: { Chat: [['c1', '805', 'h1', '17001']] } }, updateExists('Chat/c1'), 'relation-unverified'],
   ];
   for (const [label, before, after, assertion, reason] of cases) {
@@ -399,7 +399,7 @@ test('R4 H1: identity failures (key tie flip, non-unique key, stray tableoid, oi
   }
 });
 
-test('R4 H1: a table whose content changed under an unchanged xmin reports none of its changes; the validator refuses events for a violated table', async t => {
+test('a table whose content changed under an unchanged xmin reports none of its changes; the validator refuses events for a violated table', async t => {
   const w = await window(t, rowsAt(['c1', '700', 'h1'], ['c2', '701', 'h2']), updated('806:806:', ['c1', '700', 'h9'], ['c2', '805', 'h2']));
   assert.equal(w.exact[0].violated, true);
   neverObserved(w, updateExists('Chat/c2'), 'content under same xmin');
@@ -408,7 +408,7 @@ test('R4 H1: a table whose content changed under an unchanged xmin reports none 
   assert.throws(() => validateWindow(forged), e => e.code === 'violated-table-events');
 });
 
-test('R4 H2: a temporary child of another session or a partition being detached concurrently is never read, so it fails the mark', async t => {
+test('a temporary child of another session or a partition being detached concurrently is never read, so it fails the mark', async t => {
   const rows = [['c1', '700', 'h1', '16384']];
   for (const [label, child] of [['temp child', ['17001', 'r', 'heap', 't', 'false']], ['detach pending', ['17001', 'r', 'heap', 'p', 'true']]]) {
     const d = { descendants: { Chat: [child] } };
@@ -418,13 +418,13 @@ test('R4 H2: a temporary child of another session or a partition being detached 
       assert.notEqual(evaluateEffectAssertion(none('Chat/c1'), [w]).verdict, 'pass');
     }
   }
-  // An unlogged child is refused (R7 N2): crash recovery empties it without a new file node.
+  // An unlogged child is refused: crash recovery empties it without a new file node.
   const unlogged = { descendants: { Chat: [['17001', 'r', 'heap', 'u', 'false']] } };
   const u = await window(t, { snapshot: '800:800:', ...unlogged, tables: { Chat: rows } }, { snapshot: '806:806:', ...unlogged, tables: { Chat: rows } });
   assert.deepEqual([u.coverage, u.reason], ['failed', 'unlogged-table']);
 });
 
-test('R4 M1: a window whose end mark is not after its start mark fails (zero-length or reversed)', async t => {
+test('a window whose end mark is not after its start mark fails (zero-length or reversed)', async t => {
   const server = await scriptedDb(t, [rowsAt(['c1', '700', 'h1']), updated('806:806:', ['c1', '805', 'h1'])]);
   const o = observerOn(server);
   const a = await o.mark(), b = await o.mark();
@@ -436,7 +436,7 @@ test('R4 M1: a window whose end mark is not after its start mark fails (zero-len
   assert.equal((await collectWindow(o, a, b)).coverage, 'net-only');
 });
 
-test('R4 L-b: a partitioned table recorded with the heap access method (PostgreSQL 17) is accepted; other access methods are not', async t => {
+test('a partitioned table recorded with the heap access method (PostgreSQL 17) is accepted; other access methods are not', async t => {
   const rows = [['c1', '700', 'h1', '17001']];
   const ok = { relations: { Chat: [['16384', 'p', 'heap']] }, descendants: { Chat: [['17000', 'p', 'heap'], ['17001', 'r', 'heap']] } };
   const w = await window(t, { snapshot: '800:800:', ...ok, tables: { Chat: rows } }, { snapshot: '806:806:', ...ok, tables: { Chat: [['c1', '805', 'h1', '17001']] } });
@@ -447,14 +447,14 @@ test('R4 L-b: a partitioned table recorded with the heap access method (PostgreS
   }
 });
 
-test('R4 L-e: xmax is compared as a number across a digit-width boundary', async t => {
+test('xmax is compared as a number across a digit-width boundary', async t => {
   const down = await window(t, { snapshot: '1000:1000:', tables: { Chat: [['c1', '700', 'h1']] } }, { snapshot: '999:999:', tables: { Chat: [['c1', '700', 'h1']] } });
   assert.deepEqual([down.coverage, down.reason], ['failed', 'xmax-regressed']);
   const up = await window(t, { snapshot: '999:999:', tables: { Chat: [['c1', '700', 'h1']] } }, { snapshot: '1000:1000:', tables: { Chat: [['c1', '700', 'h1']] } });
   assert.equal(up.coverage, 'net-only'); assert.equal(evaluateEffectAssertion(none('Chat/c1'), [up]).verdict, 'pass');
 });
 
-test('R4 L-f: up to 10000 descendants are read; more fail the mark as too-many-descendants', async t => {
+test('up to 10000 descendants are read; more fail the mark as too-many-descendants', async t => {
   const many = n => ({ descendants: { Chat: Array.from({ length: n }, (_, i) => [String(20000 + i), 'r', 'heap']) } });
   const rows = [['c1', '700', 'h1', '16384']];
   const okWindow = await window(t, { snapshot: '800:800:', ...many(10000), tables: { Chat: rows } }, { snapshot: '806:806:', ...many(10000), tables: { Chat: rows } });
@@ -463,9 +463,9 @@ test('R4 L-f: up to 10000 descendants are read; more fail the mark as too-many-d
   assert.deepEqual([tooMany.coverage, tooMany.reason], ['failed', 'too-many-descendants']);
 });
 
-// Review round 4 (R5). H-1: DDL cannot commit between a mark's snapshot and its scan, and a rewrite
+// DDL cannot commit between a mark's snapshot and its scan, and a rewrite
 // between marks never reads as an update of every row.
-test('R5 H-1: each table is locked before the snapshot; output-affecting settings are pinned; the descendant query reads persistence and detach state', async t => {
+test('each table is locked before the snapshot; output-affecting settings are pinned; the descendant query reads persistence and detach state', async t => {
   const all = [];
   const server = await scriptedDb(t, [rowsAt(['c1', '700', 'h1'])], all);
   await observerOn(server).mark();
@@ -482,7 +482,7 @@ test('R5 H-1: each table is locked before the snapshot; output-affecting setting
   assert.ok(log.some(s => /pg_relation_filenode/.test(s)), 'current file nodes are read after the scan');
 });
 
-test('R5 H-1: a table rewritten between the marks fails the window with no events; one rewritten during a mark fails the mark', async t => {
+test('a table rewritten between the marks fails the window with no events; one rewritten during a mark fails the mark', async t => {
   const rows = [['c1', '700', 'h1'], ['c2', '701', 'h2']];
   // ALTER COLUMN TYPE between the marks: every row has a new xmin and the file node changed.
   const w = await window(t, rowsAt(...rows), { ...updated('806:806:', ['c1', '805', 'h1'], ['c2', '805', 'h2']), filenodes: { 16384: '99001' } });
@@ -498,19 +498,19 @@ test('R5 H-1: a table rewritten between the marks fails the window with no event
   assert.deepEqual([during.coverage, during.reason], ['failed', 'relation-rewritten']);
 });
 
-test('R5 L-2: duplicate or NULL keys at one mark only, xmin 1, and an overflowing ambiguous list never pass', async t => {
+test('duplicate or NULL keys at one mark only, xmin 1, and an overflowing ambiguous list never pass', async t => {
   const cases = [
-    ['P10 end-only duplicate', rowsAt(['c1', '700', 'h1'], ['c2', '701', 'h2']), updated('806:806:', ['c1', '700', 'h1'], ['c1', '805', 'h9']), 'duplicate-key'],
-    ['P11 start-only duplicate', rowsAt(['c1', '700', 'h1'], ['c1', '701', 'h2']), updated('806:806:', ['c1', '805', 'h1']), 'duplicate-key'],
-    ['P11 start-only NULL key', rowsAt(['c1', '700', 'h1'], [null, '701', 'h2']), updated('806:806:', ['c1', '700', 'h1']), 'duplicate-key'],
-    ['P14 xmin 1', rowsAt(['c1', '1', 'h1']), updated('806:806:', ['c1', '1', 'h1']), 'invalid-row-version'],
+    ['end-only duplicate', rowsAt(['c1', '700', 'h1'], ['c2', '701', 'h2']), updated('806:806:', ['c1', '700', 'h1'], ['c1', '805', 'h9']), 'duplicate-key'],
+    ['start-only duplicate', rowsAt(['c1', '700', 'h1'], ['c1', '701', 'h2']), updated('806:806:', ['c1', '805', 'h1']), 'duplicate-key'],
+    ['start-only NULL key', rowsAt(['c1', '700', 'h1'], [null, '701', 'h2']), updated('806:806:', ['c1', '700', 'h1']), 'duplicate-key'],
+    ['xmin 1', rowsAt(['c1', '1', 'h1']), updated('806:806:', ['c1', '1', 'h1']), 'invalid-row-version'],
   ];
   for (const [label, before, after, reason] of cases) {
     const w = await window(t, before, after);
     assert.deepEqual([w.coverage, w.reason], ['failed', reason], label);
     assert.notEqual(evaluateEffectAssertion(none('Chat/c1'), [w]).verdict, 'pass', label);
   }
-  // P19: 10001 frozen (ambiguous) rows; the watched one sorts last, beyond a 10000-entry list. The overflow makes the table violated.
+  // 10001 frozen (ambiguous) rows; the watched one sorts last, beyond a 10000-entry list. The overflow makes the table violated.
   const keys = Array.from({ length: 10001 }, (_, i) => `k${String(i).padStart(5, '0')}`);
   const server = await scriptedDb(t, [{ snapshot: '800:800:', tables: { Chat: keys.map(k => [k, '700', 'h']) } }, { snapshot: '806:806:', tables: { Chat: keys.map(k => [k, '2', 'h']) } }]);
   const o = observerOn(server, { watchedResources: ['Chat/k10000'] });
@@ -519,22 +519,22 @@ test('R5 L-2: duplicate or NULL keys at one mark only, xmin 1, and an overflowin
   assert.notEqual(evaluateEffectAssertion(none('Chat/k10000'), [w]).verdict, 'pass');
 });
 
-test('R5 L-1: a gap basis names the violated table', async t => {
+test('a gap basis names the violated table', async t => {
   const w = await window(t, rowsAt(['c1', '700', 'h1']), updated('806:806:', ['c1', '700', 'h9']));
   const v = evaluateEffectAssertion(none('Chat/c1'), [w]);
   assert.equal(v.verdict, 'missing'); assert.match(v.basis, /Chat violated/);
 });
 
-// Review round 5 (R6). H-A: a key whose text changes without a new row version is never a delete plus insert.
-test('R6 H-A: a key that changes without a new row version fails the window (renamed column, renamed enum label); honest inserts are unaffected', async t => {
+// A key whose text changes without a new row version is never a delete plus insert.
+test('a key that changes without a new row version fails the window (renamed column, renamed enum label); honest inserts are unaffected', async t => {
   const start = rowsAt(['c1', '700', 'h1'], ['c2', '701', 'h2']);
-  // K1: RENAME COLUMN swap between the marks: the column layout changed.
+  // RENAME COLUMN swap between the marks: the column layout changed.
   const swapped = await window(t, start, { ...updated('806:806:', ['zz1', '700', 'h1'], ['zz2', '701', 'h2']), attributes: { 16384: [['1', 'alt', '25', 'false'], ['2', 'id', '25', 'false']] } });
   assert.deepEqual([swapped.coverage, swapped.reason, swapped.events.length], ['failed', 'columns-changed', 0]);
-  // K3: an enum label renamed (same layout): the "new" key carries a row version committed before the start mark.
+  // An enum label renamed (same layout): the "new" key carries a row version committed before the start mark.
   const relabelled = await window(t, start, updated('806:806:', ['c1', '700', 'h1'], ['c9', '701', 'h2']));
   assert.deepEqual([relabelled.coverage, relabelled.reason, relabelled.events.length], ['failed', 'key-without-new-version', 0]);
-  neverObserved(relabelled, anyExists('delete'), 'K3');
+  neverObserved(relabelled, anyExists('delete'), 'renamed enum label');
   // Honest inserts: a new id after the start xmax, one in progress at the start (xip), the newest writer at the start (pg_locks),
   // and a subtransaction in progress at the start: below the start xmax and absent from xip (pg_current_snapshot lists
   // top-level ids only), but holding its own transactionid lock.
@@ -551,36 +551,36 @@ test('R6 H-A: a key that changes without a new row version fails the window (ren
   assert.deepEqual([frozen.coverage, frozen.reason], ['failed', 'key-without-new-version']);
 });
 
-test('R6 H-A: the client pins client_encoding to UTF8 at startup', async t => {
+test('the client pins client_encoding to UTF8 at startup', async t => {
   const startups = [];
   const server = await scriptedDb(t, [rowsAt(['c1', '700', 'h1'])], [], { startups });
   await observerOn(server).mark();
   assert.equal(startups[0].client_encoding, 'UTF8');
 });
 
-test('R6 H-B: a descendant the mark does not hold a lock on fails the mark (it joined during the lock wait)', async t => {
+test('a descendant the mark does not hold a lock on fails the mark (it joined during the lock wait)', async t => {
   const inh = { descendants: { Chat: [['17010', 'r', 'heap'], ['17011', 'r', 'heap']] } };
   const rowsInh = [['c1', '700', 'h1', '16384'], ['c2', '701', 'h2', '17010']];
-  // L1: at the end mark, 17010 is listed by the snapshot but not locked; its rows can leave before the scan.
+  // At the end mark, 17010 is listed by the snapshot but not locked; its rows can leave before the scan.
   const end = await window(t, { snapshot: '800:800:', ...inh, tables: { Chat: rowsInh } }, { snapshot: '806:806:', ...inh, locked: ['16384', '17011'], tables: { Chat: [rowsInh[0]] } });
   assert.deepEqual([end.coverage, end.reason, end.events.length], ['failed', 'descendant-not-locked', 0]);
-  // L3: the same at the start mark.
+  // The same at the start mark.
   const begin = await window(t, { snapshot: '800:800:', ...inh, locked: ['16384', '17011'], tables: { Chat: [rowsInh[0]] } }, { snapshot: '806:806:', ...inh, tables: { Chat: rowsInh } });
   assert.deepEqual([begin.coverage, begin.reason], ['failed', 'descendant-not-locked']);
   // The parent itself unlocked fails too.
   const parent = await window(t, { ...rowsAt(['c1', '700', 'h1']), locked: [] }, rowsAt(['c1', '700', 'h1']));
   assert.deepEqual([parent.coverage, parent.reason], ['failed', 'descendant-not-locked']);
-  // R7 N4 (B05): only this backend's locks count. Another session holding the late child does not lock it for this mark.
+  // Only this backend's locks count. Another session holding the late child does not lock it for this mark.
   const others = await window(t, { snapshot: '800:800:', ...inh, tables: { Chat: rowsInh } }, { snapshot: '806:806:', ...inh, locked: ['16384', '17011'], otherLocks: ['17010'], tables: { Chat: [rowsInh[0]] } });
   assert.deepEqual([others.coverage, others.reason], ['failed', 'descendant-not-locked']);
 });
 
-test('R6 M-A: a server restart between the marks fails the window (a crash resets unlogged tables without a new file node)', async t => {
+test('a server restart between the marks fails the window (a crash resets unlogged tables without a new file node)', async t => {
   const w = await window(t, rowsAt(['c1', '700', 'h1'], ['c2', '701', 'h2']), { ...updated('806:806:'), serverStart: '2026-10-06 09:00:00+00' });
   assert.deepEqual([w.coverage, w.reason, w.events.length], ['failed', 'server-restarted', 0]);
 });
 
-test('R6 L-A: every declared table is locked before the snapshot; a descendant rewritten during a mark fails it', async t => {
+test('every declared table is locked before the snapshot; a descendant rewritten during a mark fails it', async t => {
   const log = [];
   const server = await scriptedDb(t, [{ snapshot: '800:800:', tables: { Chat: [['c1', '700', 'h1']], Msg: [['m1', '700', 'h1']] }, relations: { Chat: [['16384', 'r', 'heap']], Msg: [['16390', 'r', 'heap']] } }], log);
   await observerOn(server, { tables: [{ table: 'Chat', key: 'id' }, { table: 'Msg', key: 'id' }] }).mark();
@@ -592,7 +592,7 @@ test('R6 L-A: every declared table is locked before the snapshot; a descendant r
   assert.deepEqual([w.coverage, w.reason], ['failed', 'relation-rewritten']);
 });
 
-// ---- R7: the round-6 review (N1 permutations, N1 key types, N2 unlogged tables, N4 survivors). ----
+// ---- Key permutations, key types, unlogged tables, layouts and id widths. ----
 const E = 4294967296; // 2^32: snapshots carry 64-bit ids; xmin and pg_locks carry their low 32 bits.
 // Neither a presence nor an absence check is decided by a failed window.
 const inconclusiveBoth = (w, label) => {
@@ -601,17 +601,17 @@ const inconclusiveBoth = (w, label) => {
   neverObserved(w, updateExists('Chat/c1'), label);
 };
 
-test('R7 N1: key texts permuted between rows with no row written fail the window; honest key changes and updates do not', async t => {
+test('key texts permuted between rows with no row written fail the window; honest key changes and updates do not', async t => {
   const start = rowsAt(['c1', '700', 'h1'], ['c2', '701', 'h2'], ['c3', '702', 'h3']);
-  // KS1: labels c1 and c2 swapped (three RENAME VALUEs): no key is new, each now carries the other row's version.
+  // Labels c1 and c2 swapped (three RENAME VALUEs): no key is new, each now carries the other row's version.
   const swapped = await window(t, start, updated('806:806:', ['c1', '701', 'h2'], ['c2', '700', 'h1'], ['c3', '702', 'h3']));
   assert.deepEqual([swapped.coverage, swapped.reason, swapped.events.length], ['failed', 'key-without-new-version', 0]);
-  inconclusiveBoth(swapped, 'KS1');
-  // KS2: a three-way rotation.
+  inconclusiveBoth(swapped, 'swap');
+  // A three-way rotation.
   const rotated = await window(t, start, updated('806:806:', ['c1', '702', 'h3'], ['c2', '700', 'h1'], ['c3', '701', 'h2']));
   assert.deepEqual([rotated.coverage, rotated.reason, rotated.events.length], ['failed', 'key-without-new-version', 0]);
-  inconclusiveBoth(rotated, 'KS2');
-  // KS1b: a swap alongside an honest update of a third row in the same window.
+  inconclusiveBoth(rotated, 'rotation');
+  // A swap alongside an honest update of a third row in the same window.
   const mixed = await window(t, start, updated('806:806:', ['c1', '701', 'h2'], ['c2', '700', 'h1'], ['c3', '803', 'h9']));
   assert.deepEqual([mixed.coverage, mixed.reason, mixed.events.length], ['failed', 'key-without-new-version', 0]);
   // Honest: an update of c1, a key-changing UPDATE (c2 becomes c9 with a new version), in the same window.
@@ -629,7 +629,7 @@ test('R7 N1: key texts permuted between rows with no row written fail the window
   assert.ok(frozen.exact[0].ambiguousResources.includes('Chat/c1'));
 });
 
-test('R7/R8 N1: a key whose text is not fixed by its stored bytes fails the mark (output not immutable, virtual, not a column)', async t => {
+test('a key whose text is not fixed by its stored bytes fails the mark (output not immutable, virtual, not a column)', async t => {
   const rows = [['c1', '700', 'h1']];
   // attributes: [attnum, attname, atttypid, attisdropped, attgenerated?]; types add to the fake's built-in TYPE_OUTPUTS.
   const key = (typid, gen) => ({ 16384: [['1', 'id', typid, 'false', ...(gen ? [gen] : [])]] });
@@ -660,7 +660,7 @@ test('R7/R8 N1: a key whose text is not fixed by its stored bytes fails the mark
   }
 });
 
-test('R7 N2: an unlogged or temporary declared table, or an unlogged descendant, fails the mark', async t => {
+test('an unlogged or temporary declared table, or an unlogged descendant, fails the mark', async t => {
   const rows = [['c1', '700', 'h1']];
   for (const [label, state, reason] of [
     ['unlogged table', { relations: { Chat: [['16384', 'r', 'heap', '16384', 'u']] } }, 'unlogged-table'],
@@ -671,46 +671,46 @@ test('R7 N2: an unlogged or temporary declared table, or an unlogged descendant,
   }
 });
 
-test('R7 N4: every column of every relation is part of the layout (a descendant, attnum 1, a retype)', async t => {
+test('every column of every relation is part of the layout (a descendant, attnum 1, a retype)', async t => {
   const rows = [['c1', '700', 'h1']];
-  // C02/C05: a column of a descendant renamed between the marks.
+  // A column of a descendant renamed between the marks.
   const inh = { descendants: { Chat: [['17010', 'r', 'heap']] } };
   const childLayout = name => ({ 17010: [['1', 'id', '25', 'false'], ['2', name, '25', 'false']] });
   const child = await window(t, { snapshot: '800:800:', ...inh, attributes: childLayout('note'), tables: { Chat: rows } }, { snapshot: '806:806:', ...inh, attributes: childLayout('memo'), tables: { Chat: rows } });
   assert.deepEqual([child.coverage, child.reason], ['failed', 'columns-changed']);
-  // C07: the first column (attnum 1) renamed, the key being the second.
+  // The first column (attnum 1) renamed, the key being the second.
   const first = name => ({ 16384: [['1', name, '25', 'false'], ['2', 'id', '25', 'false']] });
   const one = await window(t, { ...rowsAt(...rows), attributes: first('v') }, { ...updated('806:806:', ...rows), attributes: first('w') });
   assert.deepEqual([one.coverage, one.reason], ['failed', 'columns-changed']);
-  // C04: a retype with the same name and no rewrite (text to varchar).
+  // A retype with the same name and no rewrite (text to varchar).
   const typed = typid => ({ 16384: [['1', 'id', typid, 'false']] });
   const retyped = await window(t, { ...rowsAt(...rows), attributes: typed('25') }, { ...updated('806:806:', ...rows), attributes: typed('1043') });
   assert.deepEqual([retyped.coverage, retyped.reason], ['failed', 'columns-changed']);
 });
 
-test('R7 N4: ids are compared at their own width in any epoch (A04, A10, A11, A12)', async t => {
+test('ids are compared at their own width in any epoch', async t => {
   const start = (snapshot, extra = {}) => ({ snapshot, tables: { Chat: [['c1', '700', 'h1'], ['c2', '701', 'h2']] }, ...extra });
   const end = (snapshot, ...more) => updated(snapshot, ['c1', '700', 'h1'], ['c2', '701', 'h2'], ...more);
-  // A04: the first id after the start mark (equal to its xmax) is a new id.
+  // The first id after the start mark (equal to its xmax) is a new id.
   const firstNew = await window(t, start('800:800:'), end('806:806:', ['c3', '800', 'h3']));
   assert.deepEqual([firstNew.coverage, firstNew.events.map(e => e.operation)], ['net-only', ['insert']]);
-  // Epoch 1: xip holds 64-bit ids (A12), pg_locks 32-bit ids (A11).
+  // Epoch 1: xip holds 64-bit ids, pg_locks 32-bit ids.
   const inXip = await window(t, start(`${E + 799}:${E + 800}:${E + 799}`), end(`${E + 806}:${E + 806}:`, ['c3', '799', 'h3']));
   assert.deepEqual([inXip.coverage, inXip.events.map(e => e.operation)], ['net-only', ['insert']], 'epoch 1, in xip');
   const subxact = await window(t, start(`${E + 795}:${E + 800}:${E + 795}`, { writers: '{795,797}' }), end(`${E + 806}:${E + 806}:`, ['c3', '797', 'h3']));
   assert.deepEqual([subxact.coverage, subxact.events.map(e => e.operation)], ['net-only', ['insert']], 'epoch 1, subtransaction');
-  // A10: a new key whose 32-bit version equals the end xmax's low bits is from the previous epoch: already committed.
+  // A new key whose 32-bit version equals the end xmax's low bits is from the previous epoch: already committed.
   const old = await window(t, start(`${E + 800}:${E + 800}:`), end(`${E + 806}:${E + 806}:`, ['c9', '806', 'h3']));
   assert.deepEqual([old.coverage, old.reason], ['failed', 'key-without-new-version']);
 });
 
-test('R8 P05/R09: an unlogged relation anywhere in the tree, and a permutation in any declared table, fail the window', async t => {
+test('an unlogged relation anywhere in the tree, and a permutation in any declared table, fail the window', async t => {
   const rows = [['c1', '700', 'h1']];
-  // P05: the unlogged relation is not the first descendant.
+  // The unlogged relation is not the first descendant.
   const tree = { descendants: { Chat: [['17001', 'r', 'heap', 'p', 'false'], ['17002', 'r', 'heap', 'p', 'false'], ['17003', 'r', 'heap', 'u', 'false']] } };
   const deep = await window(t, { snapshot: '800:800:', ...tree, tables: { Chat: rows } }, { snapshot: '806:806:', ...tree, tables: { Chat: rows } });
   assert.deepEqual([deep.coverage, deep.reason], ['failed', 'unlogged-table']);
-  // R09: two declared tables; the keys are permuted in the second.
+  // Two declared tables; the keys are permuted in the second.
   const two = { tables: [{ table: 'Chat', key: 'id' }, { table: 'Msg', key: 'id' }], watchedResources: ['Chat/c1', 'Msg/m1'] };
   const rel = { relations: { Chat: [['16384', 'r', 'heap']], Msg: [['16390', 'r', 'heap']] } };
   const chat = [['c1', '700', 'h1']];
@@ -723,8 +723,8 @@ test('R8 P05/R09: an unlogged relation anywhere in the tree, and a permutation i
   assert.deepEqual([honest.coverage, honest.events.map(e => `${e.operation} ${e.resource}`)], ['net-only', ['update Msg/m1']]);
 });
 
-test('R8 follow-up: a refused key in the second declared table (its own name and type), system-column keys and unknown types are refused', async t => {
-  // D06/X09: the second table Msg is keyed by an aclitem column ref, beside a text column named like the first table's key.
+test('a refused key in the second declared table (its own name and type), system-column keys and unknown types are refused', async t => {
+  // The second table Msg is keyed by an aclitem column ref, beside a text column named like the first table's key.
   // Its twins m1 and m2 share an xmin; m2 is updated and the role names swapped, so m1's key now sits on the untouched twin.
   const rel = { relations: { Chat: [['16384', 'r', 'heap']], Msg: [['16390', 'r', 'heap']] } };
   const attributes = { 16384: [['1', 'id', '25', 'false']], 16390: [['1', 'id', '25', 'false'], ['2', 'ref', '1033', 'false']] };
@@ -736,7 +736,7 @@ test('R8 follow-up: a refused key in the second declared table (its own name and
   const msg = (kind, resource) => ({ kind, select: { source: 'sql-snapshot', name: 'Msg', operation: 'update', resource } });
   assert.equal(evaluateEffectAssertion(msg('effect.none', 'Msg/m1'), [w]).verdict, 'observer-failure');
   neverObserved(w, msg('effect.exists', 'Msg/m2'), 'second table');
-  // X06: system columns (attnum < 0) are not keys, though their outputs are immutable. xmax changes on SELECT ... FOR UPDATE
+  // System columns (attnum < 0) are not keys, though their outputs are immutable. xmax changes on SELECT ... FOR UPDATE
   // with no new row version; ctid moves on any update; cmin is per command.
   const system = { 16384: [['-5', 'xmax', '28', 'false'], ['-1', 'ctid', '27', 'false'], ['-3', 'cmin', '29', 'false'], ['1', 'id', '25', 'false']] };
   for (const key of ['xmax', 'ctid', 'cmin']) {
@@ -782,11 +782,11 @@ test('the fake server answers 42601 to key-type and layout statements it does no
   assert.equal(answers.length, 8);
 });
 
-// NC9 item 2: without actorCapture the observer is byte-for-byte main's (fbb7c189, before the actor join): every statement it
+// Without actorCapture the observer is byte-for-byte what it was before the actor join: every statement it
 // sends, in order, and every window and record it returns, over three marks with an update, an insert, a delete and a revert.
-// The digest was computed with this same scenario at fbb7c189's pg-snapshot.mjs. Only the clock is normalised.
+// The digest was computed with this same scenario on pg-snapshot.mjs before the actor join. Only the clock is normalised.
 const SNAPSHOT_MAIN_DIGEST = 'aa33ad7134e0c95098d7ea832062272ec6f4cce19fe794084bdfe5454347940a';
-test('without actorCapture, pg-snapshot sends and returns exactly what main\'s pg-snapshot did (NC9 item 2 pin)', async t => {
+test('without actorCapture, pg-snapshot sends and returns exactly what it did before the actor join', async t => {
   const sent = [];
   // start() reads the first state; the marks read the other three.
   const states = [rowsAt(['c1', '700', 'h1'], ['c2', '701', 'h2']), rowsAt(['c1', '700', 'h1'], ['c2', '701', 'h2']), { snapshot: '805:805:', tables: { Chat: [['c1', '803', 'h3'], ['c3', '804', 'h4']] } },

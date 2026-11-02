@@ -35,7 +35,7 @@ versions wrap them:
 
 - `scopehaven-model-path-gate/1` is the gate-plus-tap configuration recorded with each
   run: the upstream kind and the hold rules.
-- `scopehaven-model-path-run/2` (round 2; `/1` records are not accepted) holds:
+- `scopehaven-model-path-run/2` (`/1` records are not accepted) holds:
   - the sequence run, unchanged;
   - the tap window of the run, between two tap marks, with the tap session, the head
     at the end mark and the number of frames up to it;

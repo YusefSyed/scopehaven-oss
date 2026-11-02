@@ -146,7 +146,7 @@ before(async () => {
   lab = await createHttpLab({ build: 'baseline' });
   await writeFile(join(workspace, 'profiles/lab-baseline.json'), JSON.stringify({ schemaVersion: 1, targets: [makeLabProfile(lab.origin, 'lab-baseline')] }));
   await writeFile(join(workspace, 'profiles/lab-repaired.json'), JSON.stringify({ schemaVersion: 1, targets: [makeLabProfile(lab.origin, 'lab-repaired')] }));
-  // CMP-ROE-01: the lab's own record authorizes these runs, as `./scopehaven lab` writes it.
+  // The lab's own authorization record covers these runs, as `./scopehaven lab` writes it.
   await writeFile(join(workspace, 'profiles/lab.authorization.json'), JSON.stringify(makeLabAuthorization(lab.origin)));
   // Minimal environment: the pinned node first on PATH (setup-node's role on GitHub), the launcher pinned via SCOPEHAVEN_NODE.
   baseEnv = { PATH: `${dirname(node)}:/usr/bin:/bin`, HOME: scratch, TMPDIR: scratch, SCOPEHAVEN_NODE: node,
@@ -296,8 +296,8 @@ async function countingTarget(t, { status = 200 } = {}) {
 }
 const actionLog = result => result.logs.map(log => `${log.stdout ?? ''}${log.stderr ?? ''}`).join('\n');
 
-test('a configured target without a covering authorization record stops in the prepare step, before the wait or any request (CMP-ROE-01)', async t => {
-  // M1 of an earlier review: the wait step used to send its GET before assess checked the record. The prepare step
+test('a configured target without a covering authorization record stops in the prepare step, before the wait or any request', async t => {
+  // The wait step used to send its GET before assess checked the record. The prepare step
   // now checks it, so with wait-url set and no covering record, nothing connects to the target.
   const target = await countingTarget(t), waitInputs = { 'wait-url': `${target.origin}/admin/purge-cache`, 'wait-timeout-seconds': '5' };
   const day = 86400000, at = ms => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -336,7 +336,7 @@ test('a configured target without a covering authorization record stops in the p
 });
 
 test('a wait-url whose origin the record does not cover is refused in the prepare step, before any request, even on another configured target', async t => {
-  // R2-m1 of an earlier review: the profile file holds two configured targets, http-lab at A (which the record covers) and
+  // The profile file holds two configured targets, http-lab at A (which the record covers) and
   // app-b at B (which no record covers). With wait-url at B, the wait would have sent its GET to B.
   const a = await countingTarget(t), b = await countingTarget(t);
   const profile = `${a.prefix}-and-b.json`;
@@ -356,7 +356,7 @@ test('a wait-url whose origin the record does not cover is refused in the prepar
   assert.equal(b.arrivals.length, 0);
 });
 
-test('H1 step 2 on the reviewed #451: a forwarded target\'s record is checked in the prepare step, before the wait, and one that does not name the destination contacts nothing', async t => {
+test('a forwarded target\'s record is checked in the prepare step, before the wait, and one that does not name the destination contacts nothing', async t => {
   const target = await countingTarget(t), profile = `${target.prefix}-forwarded.json`;
   await writeFile(join(workspace, profile), JSON.stringify({ schemaVersion: 1, targets: [{ ...makeLabProfile(target.origin, 'lab-baseline'), targetContext: 'operator-forwarded', targetLabel: 'Lab staging (forwarded)' }] }));
   const waitInputs = { 'wait-url': `${target.origin}/health`, 'wait-timeout-seconds': '5' };
@@ -403,7 +403,7 @@ test('wait-for sends nothing once --until has passed, and reads --until only as 
   assert.match(cli.stderr, /authorization refused \(authorization-window-ended\)/);
   assert.equal(target.arrivals.length, 0);
   assert.equal(parseUntil('2026-10-07T00:00:01.5Z'), Date.parse('2026-10-07T00:00:01.500Z'));
-  // Read as the record's instants are (R2-n4): no 02-31 rolled over to March, no hour 24 read as the next day.
+  // Read as the record's instants are: no 02-31 rolled over to March, no hour 24 read as the next day.
   for (const text of ['', 'now', '2026-10-07', '2026-10-07T00:00:00+00:00', '2026-10-07T00:00:00.1234Z', 1791331200000, '2026-02-31T00:00:00Z', '2026-10-07T24:00:00Z', '2026-10-07T23:60:00Z']) assert.throws(() => parseUntil(text), /--until must be/, String(text));
   assert.equal((await run(node, [join(here, 'wait-for.mjs'), '--url', `${target.origin}/health`, '--until', ''], { env: baseEnv })).code, 2);
   assert.equal(target.arrivals.length, 0);
@@ -467,13 +467,13 @@ test('fail-on decisions', () => {
   assert.equal(decide({ run: null, failOn: 'never' }).decision, 'fail', 'setup errors fail even with never');
   assert.equal(decide({ run: view({}), assessExit: 2, failOn: 'never' }).decision, 'fail');
   assert.equal(decide({ run: view({}), gateRequested: true, gate: null, failOn: 'fail' }).reason, 'gate-unavailable');
-  // Review: without a baseline, CI must still fail where the gate would (hard reasons computed from the run).
+  // Without a baseline, CI must still fail where the gate would (hard reasons computed from the run).
   const runOf = (results, extra = {}) => normalizeRun({ id: '00000000-0000-4000-8000-000000000001', requiredControlIds: ['ctl'], results, ...extra });
   const inconclusiveControl = runOf([{ id: 'ctl', severity: 'control', status: 'inconclusive' }, { id: 'idor', severity: 'critical', status: 'inconclusive' }]);
   assert.deepEqual(decide({ run: inconclusiveControl, failOn: 'fail', assessExit: 1 }), { decision: 'fail', reason: 'required-controls-not-passed' });
   const unproven = runOf([{ id: 'ctl', severity: 'control', status: 'pass' }], { identityEvidence: { actors: [{ actorId: 'a', established: false }] } });
   assert.deepEqual(decide({ run: unproven, failOn: 'fail' }), { decision: 'fail', reason: 'identity-not-established' });
-  // Round 2 review: every security check inconclusive with a passing control still fails.
+  // Every security check inconclusive with a passing control still fails.
   const noEvidence = runOf([{ id: 'ctl', severity: 'control', status: 'pass' }, { id: 'idor', severity: 'critical', status: 'inconclusive' }], { identityEvidence: { actors: [{ actorId: 'a', established: true }] } });
   assert.equal(decide({ run: noEvidence, failOn: 'fail', assessExit: 1 }).decision, 'fail');
   // Required controls fail closed.
@@ -648,7 +648,7 @@ test('summary.mjs: policy cells are escaped, redacted and bounded', () => {
   assert.match(markdown, /56 more gated cells are in policy-diff\.json in the evidence artifact\./);
 });
 
-// A new gap where every cell is already unknown (PR362 review, open question 1): no cell changes, yet the diff is gated.
+// A new gap where every cell is already unknown: no cell changes, yet the diff is gated.
 const standingGap = { source: '0001.sql', line: 3, scope: '*', reason: 'procedural code (a DO block, EXECUTE or a called function) is not evaluated', identity: { subject: 'do $$ begin perform refresh(); end $$' } };
 const newGap = { source: '0002.sql', line: 1, scope: '*', reason: 'client_encoding is set other than UTF8', identity: { subject: "set client_encoding = 'SJIS'" } };
 const gapMatrix = gaps => buildMatrix({ application: 'app', layer: 'postgres-rls', sources: [], gaps,
@@ -846,7 +846,7 @@ async function modelServedLab(t) {
   ] });
   const profile = async build => { const path = join(workspace, `stub-profile-${build}.json`); await writeFile(path, JSON.stringify({ schemaVersion: 1, targets: [target(build)] })); return path; };
   const tapEnv = { [OWNED_TAP_ENV.upstream]: `http://127.0.0.1:${model.address().port}`, [OWNED_TAP_ENV.port]: String(tapPort), [OWNED_TAP_ENV.ollamaTags]: 'false' };
-  // CMP-ROE-01: the record covers the application and the owned tap's model upstream, which the run forwards to.
+  // The authorization record covers the application and the owned tap's model upstream, which the run forwards to.
   const authorization = writeTestAuthorization(join(workspace, `stub-authorization-${tapPort}.json`), target('any'), { origins: [tapEnv[OWNED_TAP_ENV.upstream]] });
   return { state, profile, tapEnv, tapPort, authorization, modelOrigin: `http://127.0.0.1:${model.address().port}` };
 }
@@ -1052,7 +1052,7 @@ test('summary.mjs report-only never relaxes a setup error, an errored check, an 
   for (const other of [gate(1, 'ended'), gate(1, 'unrecognized'), gate(1, null), null])
     assert.deepEqual(decideReportOnly({ decision: 'fail', reason: 'gate-checks-failed' }, { ...on, gateRequested: true, gate: other }), { decision: 'fail', reason: 'gate-checks-failed', state: 'not-applied' }, JSON.stringify(other));
   for (const marked of ['false', '', 'TRUE']) assert.deepEqual(decideReportOnly(failed, { reportOnly: 'applied', marked }), { ...failed, state: 'not-applied' }, marked);
-  // Review of 9421eb9b, finding 1: a gate that exited 2, or an assess exit other than 0 or 1, is never relaxed, whatever the run-level reason.
+  // A gate that exited 2, or an assess exit other than 0 or 1, is never relaxed, whatever the run-level reason.
   assert.deepEqual(decideReportOnly(failed, { ...on, gateRequested: true, gate: gate(2) }), { ...failed, state: 'applied' });
   assert.deepEqual(decideReportOnly(failed, { ...on, gateRequested: true, gate: gate(0) }), { ...failed, state: 'applied' });
   assert.deepEqual(decideReportOnly({ decision: 'fail', reason: 'assessment-not-clean' }, { ...on, assessExit: 137 }), { decision: 'fail', reason: 'assessment-not-clean', state: 'applied' });
@@ -1069,7 +1069,7 @@ test('summary.mjs report-only never relaxes a setup error, an errored check, an 
   assert.match(relaxed.markdown, /^## Scopehaven assessment\n\n> \*\*REPORT-ONLY RUN\*\* through 2026-11-30 \(UTC\)\./);
   assert.equal(buildReport({ ...base, requireModelIdentity: 'true' }).reason, 'model-identity-baseline-required');
   assert.equal(buildReport({ ...base, failOnPolicyDiff: 'true' }).reason, 'policy-diff-not-requested');
-  // The reviewer's case end to end: an errored baseline makes the gate exit 2 while the current run has a failed check.
+  // The same case end to end: an errored baseline makes the gate exit 2 while the current run has a failed check.
   const gateExit2 = { schemaVersion: 1, reportOnly: { mode: 'report-only', state: 'applied' }, outcome: 'config-or-runtime-error', exitCode: 2, reasons: ['runner-error'], current: { runId: runInput.id }, comparison: null };
   assert.deepEqual([buildReport({ ...base, gateInput: gateExit2, gateState: 'ok' }).decision, buildReport({ ...base, gateInput: gateExit2, gateState: 'ok' }).reason], ['fail', 'checks-failed']);
   assert.equal(buildReport({ ...base, assessExit: 2 }).reason, 'assessment-setup-error');
@@ -1082,7 +1082,7 @@ test('summary.mjs report-only never relaxes a setup error, an errored check, an 
   assert.equal(buildReport({ runInput, env: {} }).reportOnly, 'off');
   assert.doesNotMatch(buildReport({ runInput, env: {} }).markdown, /REPORT-ONLY|Report-only/);
 });
-// self-test (LQ item 5): --self-test on assess and the gate (docs/SELF-TEST.md). A check that cannot fail fails the job though
+// self-test: --self-test on assess and the gate (docs/SELF-TEST.md). A check that cannot fail fails the job though
 // every check passed; the counts are unchanged and the report goes into the evidence artifact.
 test('self-test: true runs the known-negative self-test first; a check that cannot fail fails the job, assess or gate, with unchanged counts', async () => {
   assert.equal(action.inputs['self-test'].default, 'false', 'off unless the operator opts in');
@@ -1119,7 +1119,7 @@ test('self-test: true runs the known-negative self-test first; a check that cann
   } finally { lab.setBuild('baseline'); }
 });
 
-// single-identity (NC2 item 1, docs/ONBOARDING.md "Two identities by default"): assess refuses a tenant-scoped profile with
+// single-identity (docs/ONBOARDING.md "Two identities by default"): assess refuses a tenant-scoped profile with
 // fewer than two identities in distinct declared tenants (exit 2) before anything is sent, unless the input waives it.
 test('single-identity: assess refuses a one-identity tenant-scoped profile unless the input waives it; an invalid value stops in prepare', async () => {
   assert.equal(action.inputs['single-identity'].default, 'false', 'off unless the operator opts in');

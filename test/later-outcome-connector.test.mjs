@@ -1,6 +1,6 @@
-// Later outcomes PR-2 end to end with an injected feed observer, a fake transport and a virtual clock: the connector runs the stage, the
-// run validator recomputes it, the lifecycle accepts a change check it withheld (ADDENDUM-R1 M5), and compareRuns credits a repair over
-// a later failure only on a signed success (B2). No socket: the provider feed itself is tested over a loopback stub elsewhere.
+// The later-outcome stage end to end with an injected feed observer, a fake transport and a virtual clock: the connector runs the stage, the
+// run validator recomputes it, the lifecycle accepts a change check it withheld, and compareRuns credits a repair over
+// a later failure only on a signed success. No socket: the provider feed itself is tested over a loopback stub elsewhere.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
@@ -84,9 +84,9 @@ test('later stage end to end: a bounced expected email fails the check and its s
   validateHttpRunEvidence(silent);
 });
 
-test('later stage M4: a run whose feed record carries provider-feed/5 keeps its records inert when validated by this build', async () => {
+test('later stage: a run whose feed record carries provider-feed/5 keeps its records inert when validated by this build', async () => {
   const r = await run(profile(checks), () => ['failed']);
-  // Recorded as the PR-1 build would: label /5, and every verdict as without the stage.
+  // Recorded as a provider-feed/5 build would: label /5, and every verdict as without the stage.
   const old = await run(profile(checks), () => []);
   const v5 = structuredClone(old);
   v5.observers[0].collector = { ...v5.observers[0].collector, label: 'provider-feed/5' };
@@ -95,7 +95,7 @@ test('later stage M4: a run whose feed record carries provider-feed/5 keeps its 
   assert.equal(row(v5, 'CASE').status, 'pass');
 });
 
-test('later stage B2: a repair over a later failure is credited only on a signed success; anything weaker reads unverified', async () => {
+test('later stage: a repair over a later failure is credited only on a signed success; anything weaker reads unverified', async () => {
   const baseline = await run(profile(checks), to => to === VIP ? ['failed'] : ['succeeded']);
   assert.equal(row(baseline, 'CASE').status, 'fail');
   const signed = await run(profile(checks), () => ['succeeded']);
@@ -123,9 +123,9 @@ test('later stage B2: a repair over a later failure is credited only on a signed
   assert.equal(digest(baseline.observers), digest(signed.observers));
 });
 
-// M5: SUSPEND is an allowed-use change check (lifecycle) whose own clause expects the suspension email; the provider later bounces it.
+// SUSPEND is an allowed-use change check (lifecycle) whose own clause expects the suspension email; the provider later bounces it.
 // The stage withholds the control (tagged); its post-change check was sent and reads change-not-attributed; the run stays valid.
-test('later stage M5: a lifecycle change check whose email later bounces keeps the run valid; the post-change check reads change-not-attributed', async () => {
+test('later stage: a lifecycle change check whose email later bounces keeps the run valid; the post-change check reads change-not-attributed', async () => {
   const p = { ...profile([]), actors: { admin: { principalId: 'admin-1', credentialEnv: 'SCOPEHAVEN_TARGET_A', identityValue: 'admin' }, carol: { principalId: 'carol-1', credentialEnv: 'SCOPEHAVEN_TARGET_C', identityValue: 'carol' } },
     requiredControlIds: ['ADMIN-ME', 'CAROL-ME', 'CAROL-NOTES', 'SUSPEND'], lifecycle: [{ changeCheckId: 'SUSPEND', actorId: 'carol', after: 'refused' }],
     checks: [me('ADMIN-ME', 'admin'), me('CAROL-ME', 'carol'),
@@ -145,7 +145,7 @@ test('later stage M5: a lifecycle change check whose email later bounces keeps t
   assert.ok(!row(ok, 'REUSE').assertions.some(a => a.name === PRECONDITION_ASSERTION));
 });
 
-test('later stage, review MAJOR 1: a clause judged again on a partial window reads missing and the run\'s backend row is decided again, so the run validates', async () => {
+test('later stage: a clause judged again on a partial window reads missing and the run\'s backend row is decided again, so the run validates', async () => {
   const one = [checks[0]];
   const r = await run(profile(one), () => ['failed'], { coverage: 'partial' });
   const effect = assertionOf(r, 'CASE', /^Observed effect 1/);
@@ -158,7 +158,7 @@ test('later stage, review MAJOR 1: a clause judged again on a partial window rea
   validateHttpRunEvidence(ok);
 });
 
-test('later stage, review MINOR 2: an app-log admission applies first, so a repair over it reads unverified as before (baseline-fail-app-admitted)', async t => {
+test('later stage: an app-log admission applies first, so a repair over it reads unverified as before (baseline-fail-app-admitted)', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-later-admission-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const path = join(dir, 'actions.jsonl');
   const log = { id: 'actions', use: 'admission', log: { file: { path } }, fields: { action: '/event', outcome: '/result', actor: '/actor', target: '/to' }, outcomes: { committed: ['ok'], error: ['error'] },

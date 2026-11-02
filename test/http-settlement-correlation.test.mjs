@@ -1,4 +1,4 @@
-// Correlated and per-check settlement (fast-loop fix W2, src/http-settlement.mjs): pure decisions over synthetic
+// Correlated and per-check settlement (src/http-settlement.mjs): pure decisions over synthetic
 // windows, scripted end-to-end runs, and full runs against the owned practice app with its loopback egress recorder
 // (integrations/core-practice/app.mjs, fixture options forwardCorrelation and correlationContext). No model, no provider.
 // Every allowed behaviour below sits beside the forbidden or fail-closed behaviour next to it.
@@ -44,7 +44,7 @@ const perCheck = (rows, { barriers = barriersFor(rows), declaredPairs = declared
 const runMode = { mode: 'run', tokens, declared };
 const A = 'POST /hooks/bob/admin', B = 'POST /hooks/alice/member';
 
-test('W2 forbidden (lead direction of 2026-10-10): a later check\'s own exact count over its own-token send releases nothing; per-check and run-mode correlation read as run-level settlement', () => {
+test('forbidden: a later check\'s own exact count over its own-token send releases nothing; per-check and run-mode correlation read as run-level settlement', () => {
   const same = rows => {
     const legacy = settlementFindings(rows, gapsFor(rows));
     assert.deepEqual(settlementFindings(rows, gapsFor(rows), perCheck(rows)), legacy);
@@ -62,16 +62,16 @@ test('W2 forbidden (lead direction of 2026-10-10): a later check\'s own exact co
   assert.deepEqual(same(two), [['effect-outside-window'], ['effect-ambiguous-attribution']]);
 });
 
-test('W2 forbidden: a later effect.only expected entry (an upper bound) never releases an earlier absence, nor does an exact count beside it', () => {
+test('forbidden: a later effect.only expected entry (an upper bound) never releases an earlier absence, nor does an exact count beside it', () => {
   const k = () => rowOf([none()], [win()]);
   const onlyN = (resource, n) => ({ kind: 'effect.only', expect: [{ select: sel(resource), count: n }], allow: [], sources: ['http-egress'] });
   const findings = rows => settlementFindings(rows, gapsFor(rows), perCheck(rows));
-  // ADV2 (count 1): the later window holds one send tagged to the later check. It may be k's deferred send stamped
+  // Count 1: the later window holds one send tagged to the later check. It may be k's deferred send stamped
   // with the flushing request's token while the later check sent nothing (0 is within "at most 1"), so k stays withheld.
   const one = [k(), rowOf([onlyN(B, 1)], [win([ev(B, T(1))])])];
   assert.equal(one[1].effects[0].verdict, 'pass');
   assert.deepEqual(findings(one), [['effect-outside-window'], [null]]);
-  // ADV1 (count 3): the later check's own send plus k's late send, both stamped with the later token. The later check
+  // Count 3: the later check's own send plus k's late send, both stamped with the later token. The later check
   // skipped nothing it was required to send, and its entry still passes (2 is within "at most 3"): no release.
   const genuine = ev(B, T(1)), stale = ev(B, T(1));
   const adv1 = [k(), rowOf([onlyN(B, 3)], [win([genuine, stale])])];
@@ -99,11 +99,11 @@ test('W2 forbidden: a later effect.only expected entry (an upper bound) never re
   assert.deepEqual(findings(besideB)[0], ['effect-outside-window'], 'the exact count\'s own-token send releases nothing');
 });
 
-test('W2 forbidden: a later count unsettled by its own later records releases nothing (its own late tagged send, an untagged later fit, another row\'s token, an unobserved later window)', () => {
+test('forbidden: a later count unsettled by its own later records releases nothing (its own late tagged send, an untagged later fit, another row\'s token, an unobserved later window)', () => {
   // k: an absence on B. j: a host-wide exact count of 1 that passed in its own window over one send to B carrying j's token.
   const findings = (rows, gaps = gapsFor(rows), barriers) => settlementFindings(rows, gaps, perCheck(rows, barriers ? { barriers } : {}));
   const setup = () => [rowOf([none(B)], [win()]), rowOf([count(null, 1)], [win([ev(B, T(1))])])];
-  // Repro (review HIGH on 6bd3e6a): j's own token on a later send to A, in the tail. Judged with it, j's count is 2, not 1:
+  // j's own token on a later send to A, in the tail. Judged with it, j's count is 2, not 1:
   // the send to B may be k's late send stamped with j's token while j's genuine send came late. k must stay withheld.
   const late = setup();
   assert.deepEqual(late.map(r => r.effects[0].verdict), ['pass', 'pass']);
@@ -129,7 +129,7 @@ test('W2 forbidden: a later count unsettled by its own later records releases no
   assert.deepEqual(findings(unseen, [[win()], [win()], [win([], 'partial')]]), [['effect-outside-window'], ['effect-ambiguous-attribution']]);
 });
 
-test('W2 forbidden: later counts that settled themselves do not chain a release back to an earlier absence; a settled count beside an unsettled clause releases nothing', () => {
+test('forbidden: later counts that settled themselves do not chain a release back to an earlier absence; a settled count beside an unsettled clause releases nothing', () => {
   const findings = rows => settlementFindings(rows, gapsFor(rows), perCheck(rows));
   // k, then j and m each with an exact count of 1 over its own tagged send: every later send still withholds what it fits.
   const chain = [rowOf([none()], [win()]), rowOf([count(null, 1)], [win([ev(B, T(1))])]), rowOf([count(null, 1)], [win([ev(A, T(2))])])];
@@ -145,7 +145,7 @@ test('W2 forbidden: later counts that settled themselves do not chain a release 
   assert.deepEqual(settlementFindings(mixed, [[win()], [win()], [win([ev(A)])]], perCheck(mixed)), [['effect-outside-window'], ['effect-ambiguous-attribution', 'effect-outside-window']]);
 });
 
-test('W2 forbidden: nothing is released by an untagged, unattributed or undeclared send, one inside the horizon or outside the later check\'s own window, or one no passing clause counted exactly', () => {
+test('forbidden: nothing is released by an untagged, unattributed or undeclared send, one inside the horizon or outside the later check\'s own window, or one no passing clause counted exactly', () => {
   const k = () => rowOf([none()], [win()]);
   const withLater = (events, clause = count(null, 1)) => [k(), rowOf([clause], [win(events)])];
   const firstFinding = (rows, options) => settlementFindings(rows, options?.gaps ?? gapsFor(rows), options?.correlation ?? perCheck(rows))[0][0];
@@ -156,7 +156,7 @@ test('W2 forbidden: nothing is released by an untagged, unattributed or undeclar
   assert.equal(firstFinding(rows, { correlation: perCheck(rows, { declaredPairs: new Set() }) }), 'effect-outside-window', 'undeclared pair');
   assert.equal(firstFinding(withLater([ev(B, T(1)), ev(B, T(1))])), 'effect-outside-window', 'the later count failed (2, expected 1)');
   const unbounded = withLater([ev(B, T(1))], exists());
-  assert.deepEqual(settlementFindings(unbounded, gapsFor(unbounded), perCheck(unbounded)), [['effect-outside-window'], ['effect-ambiguous-attribution']], 'test 10: exists does not release, and the event it rests on withholds the earlier pass, so it stays ambiguous');
+  assert.deepEqual(settlementFindings(unbounded, gapsFor(unbounded), perCheck(unbounded)), [['effect-outside-window'], ['effect-ambiguous-attribution']], 'exists does not release, and the event it rests on withholds the earlier pass, so it stays ambiguous');
   // (ii) a token of an earlier row, in a later window (and that earlier row's count, judged with it, fails).
   const three = [rowOf([count(A, 1)], [win([ev(A, T(0))])]), k(), rowOf([count(null, 1)], [win([ev(A, T(0))])])];
   const found = settlementFindings(three, gapsFor(three), perCheck(three));
@@ -164,24 +164,24 @@ test('W2 forbidden: nothing is released by an untagged, unattributed or undeclar
   assert.deepEqual(found, [['effect-correlated-late'], ['effect-outside-window'], ['effect-correlated-elsewhere']]);
   // (i) inside k's horizon (its barrier), or in a gap after it instead of the later check's own window.
   const own = withLater([ev(B, T(1))]);
-  assert.equal(firstFinding(own, { correlation: perCheck(own, { barriers: [[win([ev(B, T(1))])], [win()]] }) }), 'effect-outside-window', 'test 8: a later token inside the barrier');
+  assert.equal(firstFinding(own, { correlation: perCheck(own, { barriers: [[win([ev(B, T(1))])], [win()]] }) }), 'effect-outside-window', 'a later token inside the barrier');
   assert.equal(firstFinding(own, { gaps: [[win()], [win([ev(B, T(1))])], [win()]] }), 'effect-outside-window', 'a later token in the gap after the barrier');
   // The same event object handed in twice (in the later check's own window and in k's barrier) is still inside k's horizon.
   const shared = ev(B, T(1)), twice = [k(), rowOf([count(null, 1)], [win([shared])])];
   assert.equal(firstFinding(twice, { correlation: perCheck(twice, { barriers: [[win([shared])], [win()]] }) }), 'effect-outside-window', 'one event in the barrier and the later window');
-  // Mixed (test 6): the later check's tagged send plus one untagged send it also counted, or one from an undeclared observer.
+  // Mixed: the later check's tagged send plus one untagged send it also counted, or one from an undeclared observer.
   const mixed = [k(), rowOf([count(null, 2)], [win([ev(B, T(1)), ev(B)])])];
   assert.equal(mixed[1].effects[0].verdict, 'pass');
   assert.equal(firstFinding(mixed), 'effect-outside-window', 'an untagged send beside the tagged one');
   const second = [rowOf([none()], [win(), otherWin()]), rowOf([count(null, 1)], [win([ev(B, T(1))]), otherWin([ev(B, T(1), OTHER_INST)])])];
   assert.deepEqual(second.map(r => r.effects[0].verdict), ['pass', 'pass']);
   assert.equal(firstFinding(second), 'effect-outside-window', 'a send recorded by an undeclared observer');
-  // Forged or stale token (test 7): a later check's token on an event that check has no exact count for.
+  // Forged or stale token: a later check's token on an event that check has no exact count for.
   const stale = [k(), rowOf([none(B)], [win([ev(A, T(1))])])];
   assert.equal(firstFinding(stale), 'effect-outside-window');
 });
 
-test('W2 R1: a send carrying a check\'s own token after its window withholds a decided absence (boundary, never a fail) and only tags a control; in its horizon too; a fit that cannot fail withholds', () => {
+test('late own token: a send carrying a check\'s own token after its window withholds a decided absence (boundary, never a fail) and only tags a control; in its horizon too; a fit that cannot fail withholds', () => {
   const rows = () => [rowOf([none(A)], [win()]), rowOf([none(B)], [win()])];
   // In the next check's window, a gap, the tail, or (per check) the barrier: the clause judged with it would fail.
   for (const [where, place] of [['next window', r => { r[1] = rowOf([none(B)], [win([ev(A, T(0))])]); }], ['gap', (r, g) => { g[1] = [win([ev(A, T(0))])]; }], ['tail', (r, g) => { g[2] = [win([ev(A, T(0))])]; }]]) {
@@ -190,14 +190,14 @@ test('W2 R1: a send carrying a check\'s own token after its window withholds a d
     assert.deepEqual(settlementFindings(r, g, perCheck(r))[0], ['effect-correlated-late'], `per check, ${where}`);
   }
   const r = rows();
-  assert.deepEqual(settlementFindings(r, gapsFor(r), perCheck(r, { barriers: [[win([ev(A, T(0))])], [win()]] }))[0], ['effect-correlated-late'], 'test 3: inside the horizon');
-  // The finding withholds a boundary pass (lead direction of 2026-10-10: the token alone never fails), tags a control,
+  assert.deepEqual(settlementFindings(r, gapsFor(r), perCheck(r, { barriers: [[win([ev(A, T(0))])], [win()]] }))[0], ['effect-correlated-late'], 'inside the horizon');
+  // The finding withholds a boundary pass (the token alone never fails), tags a control,
   // and never touches a fail.
   const decided = decideEffects([none(A)], [win()]);
   const boundary = applySettlement(decided, ['effect-correlated-late'], 'boundary'), control = applySettlement(decided, ['effect-correlated-late'], 'control');
   assert.deepEqual([boundary[0].verdict, boundary[0].settlement], ['inconclusive', 'effect-correlated-late']);
   assert.ok(boundary[0].basis.endsWith(SETTLEMENT_BASIS['effect-correlated-late']));
-  assert.deepEqual([control[0].verdict, control[0].settlement], ['pass', 'effect-correlated-late'], 'test 11: a control gets the tag only');
+  assert.deepEqual([control[0].verdict, control[0].settlement], ['pass', 'effect-correlated-late'], 'a control gets the tag only');
   for (const reason of ['effect-correlated-late-unsettled', 'effect-correlated-elsewhere']) assert.deepEqual(applySettlement(decided, [reason], 'boundary')[0].verdict, 'inconclusive', `${reason} withholds, never fails`);
   const failed = decideEffects([none(A)], [win([ev(A)])]);
   assert.deepEqual(applySettlement(failed, ['effect-correlated-late'], 'boundary'), failed);
@@ -212,12 +212,12 @@ test('W2 R1: a send carrying a check\'s own token after its window withholds a d
   const onlyRow = () => [rowOf([only(B)], [win([ev(B, T(0))])])];
   assert.deepEqual(settlementFindings(onlyRow(), [[win()], [win([ev(A, T(0))])]], runMode), [['effect-correlated-late']]);
   assert.deepEqual(settlementFindings(onlyRow(), [[win()], [win([ev(B, T(0))])]], runMode), [['effect-correlated-late-unsettled']]);
-  // A control row's R1 is a tag only (test 11), recomputed the same way.
+  // A control row's late own-token finding is a tag only, recomputed the same way.
   const ctl = [rowOf([none(A)], [win()], 'control')];
   assert.deepEqual(settlementFindings(ctl, [[win()], [win([ev(A, T(0))])]], runMode), [['effect-correlated-late']]);
 });
 
-test('W2 R2 and ambiguity: a pass resting on another check\'s token is withheld; a later send that fits an earlier check\'s selector stays ambiguous whatever its token', () => {
+test('another check\'s token and ambiguity: a pass resting on another check\'s token is withheld; a later send that fits an earlier check\'s selector stays ambiguous whatever its token', () => {
   assert.deepEqual(settlementFindings([rowOf([exists()], [win([ev(B, OTHER)])])], [[win()], [win()]], runMode), [['effect-correlated-elsewhere']]);
   assert.deepEqual(settlementFindings([rowOf([exists()], [win([ev(B, OTHER), ev(B, T(0))])])], [[win()], [win()]], runMode), [[null]], 'one own send keeps an exists');
   assert.deepEqual(settlementFindings([rowOf([exists()], [win([ev(B)])])], [[win()], [win()]], runMode), [[null]], 'an untagged send never counts as elsewhere');
@@ -228,8 +228,8 @@ test('W2 R2 and ambiguity: a pass resting on another check\'s token is withheld;
   const unmet = [rowOf([exists(A)], [win()]), rowOf([exists()], [win([ev(A, T(1))])])];
   assert.equal(unmet[0].effects[0].verdict, 'fail');
   assert.deepEqual(settlementFindings(unmet, gapsFor(unmet), perCheck(unmet))[1], ['effect-ambiguous-attribution']);
-  // One that passed may have sent twice, its second send stamped late with the later check's token (lead direction of
-  // 2026-10-10: no token makes a fitting send unambiguous; the former P3 release is removed).
+  // One that passed may have sent twice, its second send stamped late with the later check's token (no token
+  // makes a fitting send unambiguous).
   const met = [rowOf([exists(A)], [win([ev(A, T(0))])]), rowOf([count(null, 1)], [win([ev(A, T(1))])])];
   assert.deepEqual(settlementFindings(met, gapsFor(met), perCheck(met)), [[null], ['effect-ambiguous-attribution']]);
   // Another check's token (OTHER) is read first and withholds too, also on a control; no token releases the pass.
@@ -244,7 +244,7 @@ test('W2 R2 and ambiguity: a pass resting on another check\'s token is withheld;
   assert.deepEqual(settlementFindings(notOwn, gapsFor(notOwn), perCheck(notOwn))[1], ['effect-ambiguous-attribution']);
 });
 
-test('W2 fail closed: a partial or failed window after the barrier, or the barrier itself, still withholds (settlement-unobserved); malformed options are refused', () => {
+test('fail closed: a partial or failed window after the barrier, or the barrier itself, still withholds (settlement-unobserved); malformed options are refused', () => {
   const rows = [rowOf([none(A)], [win()])];
   for (const coverage of ['partial', 'failed']) {
     assert.deepEqual(settlementFindings(rows, [[win()], [win([], coverage)]], perCheck(rows)), [['settlement-unobserved']], `tail ${coverage}`);
@@ -257,9 +257,9 @@ test('W2 fail closed: a partial or failed window after the barrier, or the barri
   assert.deepEqual(SETTLEMENT_REASONS.slice(0, 3), ['effect-outside-window', 'effect-ambiguous-attribution', 'settlement-unobserved']);
 });
 
-// Test 5: with no tag on any event, correlated settlement (run mode, or per check with clean barriers) reads exactly as
+// With no tag on any event, correlated settlement (run mode, or per check with clean barriers) reads exactly as
 // run-level settlement does, over generated rows, clauses, events and coverage.
-test('W2 property: without tags, correlated settlement equals run-level settlement (run mode and per check)', () => {
+test('property: without tags, correlated settlement equals run-level settlement (run mode and per check)', () => {
   let state = 20261010;
   const rand = n => { state = (state * 1103515245 + 12345) % 2147483648; return state % n; };
   const resources = [A, B, 'POST /hooks/carol/member'];
@@ -276,7 +276,7 @@ test('W2 property: without tags, correlated settlement equals run-level settleme
   }
 });
 
-test('W2 tokens: sent rows only, effect rows by run order; a row that was not sent or timed out before sending has none', () => {
+test('tokens: sent rows only, effect rows by run order; a row that was not sent or timed out before sending has none', () => {
   const sent = (id, requestId, extra = {}) => ({ id, status: 'pass', trace: [{ data: { requestId, requestAttempted: true, transportOutcome: 'complete', ...extra } }] });
   const a = sent('A', '11111111-2222-4333-8444-555555555555'), b = sent('B', 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'), c = sent('C', 'ffffffff-ffff-4fff-8fff-ffffffffffff', { requestAttempted: false, transportOutcome: 'not-sent' });
   const t = settlementTokens([a, b, c, { id: 'N', status: 'not_applicable', trace: [{ data: {} }] }], [b]);
@@ -285,7 +285,7 @@ test('W2 tokens: sent rows only, effect rows by run order; a row that was not se
 });
 
 // ---------------------------------------------------------------------------
-// Profile validation (test 14).
+// Profile validation.
 const PAY = 'api.pay.example';
 const sinkObserver = (extra = {}) => ({ id: 'sink', type: 'egress-recorder', port: 40999, routing: 'proxy', destinations: [{ host: PAY, paths: ['/v1/refunds', '/v1/coupons'], correlation: { header: 'traceparent' } }], witness: { actorId: 'member', method: 'GET', path: '/ping', host: 'witness.scopehaven.invalid' }, settleMs: 250, quietMs: 150, ...extra });
 const refundSel = { source: 'http-egress', operation: 'send', name: PAY, resource: 'POST /v1/refunds' };
@@ -302,7 +302,7 @@ function scriptedProfile({ correlation = { header: 'traceparent' }, settlement =
     ] };
 }
 const invalid = (profile, pattern) => assert.throws(() => validateTargetFile({ schemaVersion: 1, targets: [profile] }), pattern);
-test('W2 profile validation: correlation needs a recording destination and the same header; per-check needs correlation and a bounded barrier total', () => {
+test('profile validation: correlation needs a recording destination and the same header; per-check needs correlation and a bounded barrier total', () => {
   assert.doesNotThrow(() => validateTargetFile({ schemaVersion: 1, targets: [scriptedProfile()] }));
   assert.doesNotThrow(() => validateTargetFile({ schemaVersion: 1, targets: [scriptedProfile({ settlement: { mode: 'run' } })] }));
   assert.doesNotThrow(() => validateTargetFile({ schemaVersion: 1, targets: [scriptedProfile({ correlation: { header: 'x-request-id' }, observers: [sinkObserver({ destinations: [{ host: PAY, correlation: { header: 'x-request-id' } }] })] })] }));
@@ -351,7 +351,7 @@ function scripted(queue, { marks } = {}) {
 }
 const refund = tokenPath => t => ({ events: [{ resource: 'POST /v1/refunds', ...(tokenPath ? { correlation: { settlementToken: t(tokenPath) } } : {}) }] });
 const empty = () => ({ events: [] });
-test('W2 scripted: every sent check carries the header and probes do not; a barrier is marked at least the largest settle after each effect check; the /2 record is recomputed', async () => {
+test('scripted: every sent check carries the header and probes do not; a barrier is marked at least the largest settle after each effect check; the /2 record is recomputed', async () => {
   const p = scriptedProfile(), suite = createRegistry({ profiles: [p], env: {} }).exportSuite(p.id), marks = [];
   // Collect order: NO-SEND's window, REFUND-OWN's window, then the three gaps, then the two barriers.
   const s = scripted([empty, refund('/refund'), empty, empty, empty, empty, empty], { marks });
@@ -388,7 +388,7 @@ test('W2 scripted: every sent check carries the header and probes do not; a barr
   assert.ok(!plainRun.limitations.some(l => l.startsWith('Correlation:')));
 });
 
-test('W2 scripted tamper: a dropped barrier, an edited record or mode, a /1 relabel, a malformed token and a token of a row that was not sent are refused', async () => {
+test('scripted tamper: a dropped barrier, an edited record or mode, a /1 relabel, a malformed token and a token of a row that was not sent are refused', async () => {
   const use = { id: 'USE-REFUND', title: 'Acts on the refund', category: 'Collateral', severity: 'high', actorId: 'member', method: 'POST', path: '/refunds/{{refundId}}/note', body: {}, evidenceRequirement: 'backend', assertions: [{ kind: 'status.equals', expected: 201 }],
     precondition: [{ name: 'refundId', type: 'id', createdBy: 'member' }], effects: [{ kind: 'effect.none', select: refundSel }] };
   const p = scriptedProfile({ extraChecks: [use] }), suite = createRegistry({ profiles: [p], env: {} }).exportSuite(p.id);
@@ -425,7 +425,7 @@ test('W2 scripted tamper: a dropped barrier, an edited record or mode, a /1 rela
   const refundEvent = c => c.results.find(r => r.id === 'REFUND-OWN').trace[1].data.windows[0].events[0];
   refused(edit(c => { refundEvent(c).correlation.settlementToken = 'NOT-A-TOKEN'; }), 'settlement-correlation');
   refused(edit(c => { refundEvent(c).correlation.settlementToken = notSent.trace[0].data.requestId.replace(/-/g, ''); }), 'settlement-correlation');
-  // Round 4: a token on an event from a pair that does not record one is refused (the recorder never writes it there).
+  // A token on an event from a pair that does not record one is refused (the recorder never writes it there).
   // The refund send carries its own token; once the record stops declaring its pair, that token is refused before any suite check.
   assert.match(refundEvent(run).correlation.settlementToken ?? '', /^[0-9a-f]{32}$/);
   refused(moved, 'settlement-correlation');
@@ -462,7 +462,7 @@ const row = (run, id) => run.results.find(r => r.id === id);
 const clause = (run, id, i = 0) => row(run, id).trace[1].data.effects[i];
 
 for (const header of ['traceparent', 'x-request-id']) {
-  test(`W2 practice forbidden (${header}): a forwarded token does not release a host-wide prohibition before an allowed send; per-check reads as run-level settlement, and the validator and gate agree`, async t => {
+  test(`practice forbidden (${header}): a forwarded token does not release a host-wide prohibition before an allowed send; per-check reads as run-level settlement, and the validator and gate agree`, async t => {
     const { app, profile, run } = await assess(t, { forwardCorrelation: header }, compose(hostWide, correlate(header)));
     assert.deepEqual(run.counts, { pass: 13, fail: 0, inconclusive: 1, error: 0, not_applicable: 0 });
     assert.deepEqual([row(run, 'BOB-DELETE-ADMIN-NOTE').status, clause(run, 'BOB-DELETE-ADMIN-NOTE').settlement], ['inconclusive', 'effect-outside-window']);
@@ -473,7 +473,7 @@ for (const header of ['traceparent', 'x-request-id']) {
     validateHttpRunEvidence(run, { expectedSuite: suiteOf(profile, app.env) });
     assert.equal(summarizeGate({ candidate: run, expectedSuite: suiteOf(profile, app.env) }).exitCode, 1);
   });
-  test(`W2 practice allowed (${header}): with checks' effects pinned apart, the clean build passes every check under per-check correlation, and the validator and gate agree`, async t => {
+  test(`practice allowed (${header}): with checks' effects pinned apart, the clean build passes every check under per-check correlation, and the validator and gate agree`, async t => {
     const { app, profile, run } = await assess(t, { forwardCorrelation: header }, correlate(header));
     assert.deepEqual(run.counts, { pass: 14, fail: 0, inconclusive: 0, error: 0, not_applicable: 0 });
     validateHttpRunEvidence(run, { expectedSuite: suiteOf(profile, app.env) });
@@ -481,7 +481,7 @@ for (const header of ['traceparent', 'x-request-id']) {
   });
 }
 
-test('W2 practice forbidden: without forwarding, or in run mode, the same clean build keeps today\'s withholding', async t => {
+test('practice forbidden: without forwarding, or in run mode, the same clean build keeps today\'s withholding', async t => {
   const silent = await assess(t, { forwardCorrelation: false }, compose(hostWide, correlate()));
   assert.deepEqual([row(silent.run, 'BOB-DELETE-ADMIN-NOTE').status, clause(silent.run, 'BOB-DELETE-ADMIN-NOTE').settlement], ['inconclusive', 'effect-outside-window']);
   assert.deepEqual([row(silent.run, 'ALICE-DELETE-OWN').status, clause(silent.run, 'ALICE-DELETE-OWN').settlement], ['pass', 'effect-ambiguous-attribution']);
@@ -491,7 +491,7 @@ test('W2 practice forbidden: without forwarding, or in run mode, the same clean 
   validateHttpRunEvidence(runLevel.run, { expectedSuite: suiteOf(runLevel.profile, runLevel.app.env) });
 });
 
-test('W2 practice late send: a refused delete whose deferred webhook carries its own token is withheld, never failed on the token; a later check whose own absence it fits fails in its own window', async t => {
+test('practice late send: a refused delete whose deferred webhook carries its own token is withheld, never failed on the token; a later check whose own absence it fits fails in its own window', async t => {
   const build = { refusedCommit: LATE_TRIGGERS['next-window'], forwardCorrelation: 'traceparent' };
   const { app, profile, run } = await assess(t, build, correlate());
   assert.equal(row(run, 'BOB-DELETE-ADMIN-NOTE').trace[1].data.windows[0].events.length, 0, 'nothing in its own window');
@@ -508,7 +508,7 @@ test('W2 practice late send: a refused delete whose deferred webhook carries its
   validateHttpRunEvidence(prefix.run);
 });
 
-test('W2 practice stale token: a deferred webhook stamped with the flushing request\'s token never releases the refused check; an exact count that sees it fails', async t => {
+test('practice stale token: a deferred webhook stamped with the flushing request\'s token never releases the refused check; an exact count that sees it fails', async t => {
   const stale = await assess(t, { refusedCommit: LATE_TRIGGERS['next-window'], forwardCorrelation: 'traceparent', correlationContext: 'current' }, correlate());
   assert.deepEqual([row(stale.run, 'BOB-DELETE-ADMIN-NOTE').status, clause(stale.run, 'BOB-DELETE-ADMIN-NOTE').settlement], ['inconclusive', 'effect-outside-window']);
   validateHttpRunEvidence(stale.run, { expectedSuite: suiteOf(stale.profile, stale.app.env) });
@@ -521,10 +521,10 @@ test('W2 practice stale token: a deferred webhook stamped with the flushing requ
 });
 
 // ---------------------------------------------------------------------------
-// Lead direction of 2026-10-10 (review round 3 on b5c47db): a rule that releases a withheld result needs positive,
+// A rule that releases a withheld result needs positive,
 // unambiguous evidence, and the token the application writes is never that evidence on its own. Correlation can only
 // make settlement stricter: it never fails a pass and never releases what run-level settlement withholds.
-test('W2 lead direction (HIGH P3 repro): an earlier absence that failed or was inconclusive keeps a later check\'s own-token send ambiguous', () => {
+test('a token never releases: an earlier absence that failed or was inconclusive keeps a later check\'s own-token send ambiguous', () => {
   const findings = rows => settlementFindings(rows, gapsFor(rows), perCheck(rows));
   const failed = [rowOf([none(A)], [win([ev(A, T(0))])]), rowOf([count(null, 1)], [win([ev(A, T(1))])])];
   assert.deepEqual(failed.map(r => r.effects[0].verdict), ['fail', 'pass']);
@@ -542,7 +542,7 @@ test('W2 lead direction (HIGH P3 repro): an earlier absence that failed or was i
   assert.deepEqual(findings(apart), [[null], [null]]);
 });
 
-test('W2 lead direction (MEDIUM P3 repro): an earlier check with only a positive clause keeps a later own-token send ambiguous (a stale-stamped duplicate of its send)', () => {
+test('a token never releases: an earlier check with only a positive clause keeps a later own-token send ambiguous (a stale-stamped duplicate of its send)', () => {
   const findings = rows => settlementFindings(rows, gapsFor(rows), perCheck(rows));
   for (const first of [exists(A), count(A, 1)]) {
     const rows = [rowOf([first], [win([ev(A, T(0))])]), rowOf([count(null, 1)], [win([ev(A, T(1))])])];
@@ -551,7 +551,7 @@ test('W2 lead direction (MEDIUM P3 repro): an earlier check with only a positive
   }
 });
 
-test('W2 lead direction (MEDIUM R1 repro): a late send carrying a check\'s own token withholds its boundary pass and never fails it; a control only carries the tag', () => {
+test('a token never fails: a late send carrying a check\'s own token withholds its boundary pass and never fails it; a control only carries the tag', () => {
   const rows = [rowOf([none(A)], [win()]), rowOf([none(B)], [win()])];
   const gaps = [[win()], [win([ev(A, T(0))])], [win()]];
   assert.deepEqual(settlementFindings(rows, gaps, runMode)[0], ['effect-correlated-late']);
@@ -567,7 +567,7 @@ test('W2 lead direction (MEDIUM R1 repro): a late send carrying a check\'s own t
   for (const reason of SETTLEMENT_REASONS) assert.deepEqual(applySettlement(failedClause, [reason], 'boundary'), failedClause, reason);
 });
 
-test('W2 lead direction (P1 removed): a later check\'s exact count over its own-token send never releases an earlier absence', () => {
+test('a token never releases: a later check\'s exact count over its own-token send never releases an earlier absence', () => {
   const findings = rows => settlementFindings(rows, gapsFor(rows), perCheck(rows));
   const rows = [rowOf([none()], [win()]), rowOf([count(null, 1)], [win([ev(B, T(1))])])];
   assert.deepEqual(findings(rows), [['effect-outside-window'], ['effect-ambiguous-attribution']]);
@@ -581,7 +581,7 @@ test('W2 lead direction (P1 removed): a later check\'s exact count over its own-
 // Over generated rows, clauses, events (own, later, earlier, other-row, unknown and missing tokens; declared and
 // undeclared observers) and coverage, in run mode and per check (barriers with events too): every clause that run-level
 // settlement withholds is withheld, and correlation never turns a finding into a fail.
-test('W2 lead direction property: correlated settlement is never more permissive than run-level settlement', () => {
+test('property: correlated settlement is never more permissive than run-level settlement', () => {
   // mulberry32 (exact 32-bit integer steps), so every draw uses well-mixed bits.
   let state = 20261010;
   const rand = n => { state = (state + 0x6d2b79f5) | 0; let t = Math.imul(state ^ (state >>> 15), 1 | state); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return (((t ^ (t >>> 14)) >>> 0) % n); };
@@ -607,7 +607,7 @@ test('W2 lead direction property: correlated settlement is never more permissive
       }));
     }
   }
-  // Not vacuous: the generator reaches every correlated reason, and the cases P1, P3 and R1 used to decide.
+  // Not vacuous: the generator reaches every correlated reason, and the cases earlier, more permissive rules decided.
   const reached = [...seen.keys()].join('\n');
   for (const reason of ['effect-correlated-late', 'effect-correlated-late-unsettled', 'effect-correlated-elsewhere']) assert.match(reached, new RegExp(`per check: [a-z-]+ -> ${reason}$`, 'm'), reason);
   assert.match(reached, /^per check: effect-outside-window -> effect-outside-window$/m);
@@ -615,7 +615,7 @@ test('W2 lead direction property: correlated settlement is never more permissive
   assert.match(reached, /^per check: null -> null$/m);
 });
 
-test('W2 lead direction: late own-token events read out of time order (a later barrier before a gap) or repeated in two windows are judged without throwing, and withhold', () => {
+test('late own-token events read out of time order (a later barrier before a gap) or repeated in two windows are judged without throwing, and withhold', () => {
   // An effect.only clause is judged again over its windows plus its late own-token events (only.mjs validates seq order).
   const onlyFirst = () => rowOf([only(B)], [win([ev(B, T(0))])]);
   // later(0) reads B(0), row 1's window, B(1), then the gaps: B(1)'s event (higher seq) comes before the gap's (lower seq).
@@ -645,12 +645,12 @@ test('W2 lead direction: late own-token events read out of time order (a later b
 });
 
 // ---------------------------------------------------------------------------
-// Review round 4 (lead direction of 2026-10-10): the token the application forwards is its own value, so it is stored in
+// The token the application forwards is its own value, so it is stored in
 // event.correlation.settlementToken, which no selector or pairing pin reads. A traceId-pinned clause reads the same with
 // or without it, pairing never releases a withheld absence on it, and a correlated target refuses a traceId selector an
 // egress recorder could see. APP is a well-formed value the application chose (derived, never a connector token).
 const APP = [...T(5)].reverse().join('').replace(/^./, 'e');
-test('W2 round 4 forbidden (pairing, HIGH repro): an app-forwarded value never shows a traceId pin, so a withheld absence stays withheld', () => {
+test('forbidden (pairing): an app-forwarded value never shows a traceId pin, so a withheld absence stays withheld', () => {
   const pinned = { ...sel(), traceId: APP };
   const target = { actors: { member: { principalId: 'member-1' } }, checks: [
     { id: 'CTRL', severity: 'control', actorId: 'member', effects: [{ kind: 'effect.exists', select: pinned }] },
@@ -679,7 +679,7 @@ test('W2 round 4 forbidden (pairing, HIGH repro): an app-forwarded value never s
     { id: 'BND', actorId: 'member', role: 'boundary', effects: decideEffects([{ kind: 'effect.none', select: resPinned }], bw, { role: 'boundary' }), windows: bw }];
   assert.deepEqual(pairingFindings(rows, selectorPairs(rt)), [[null], [null]]);
 });
-test('W2 round 4 forbidden (selectors, HIGH repro): a traceId pin reads the same with or without the app value, in settlement too', () => {
+test('forbidden (selectors): a traceId pin reads the same with or without the app value, in settlement too', () => {
   const pinned = { ...sel(), traceId: APP };
   for (const kind of ['effect.exists', 'effect.count']) {
     const clause = kind === 'effect.count' ? { kind, select: pinned, expected: 1 } : { kind, select: pinned };
@@ -691,7 +691,7 @@ test('W2 round 4 forbidden (selectors, HIGH repro): a traceId pin reads the same
   rows[1].windows = [win([ev(A, T(0))])];
   assert.equal(settlementFindings(rows, gapsFor(rows), runMode)[0][0], 'effect-correlated-late');
 });
-test('W2 round 4 forbidden (contract): a correlated target refuses a traceId selector an egress recorder could see; the same clause without correlation is accepted', () => {
+test('forbidden (contract): a correlated target refuses a traceId selector an egress recorder could see; the same clause without correlation is accepted', () => {
   const traced = (select, kind = 'effect.none') => ({ id: 'TRACED', title: 'Traced', category: 'Collateral', severity: 'high', actorId: 'member', method: 'POST', path: '/traced', body: {}, evidenceRequirement: 'backend', assertions: [{ kind: 'status.equals', expected: 201 }],
     effects: [kind === 'effect.only' ? { kind, allow: [select], sources: ['http-egress'] } : { kind, select }] });
   const egressSel = { ...refundSel, traceId: APP }, noSource = { operation: 'send', name: PAY, traceId: APP };
@@ -700,15 +700,15 @@ test('W2 round 4 forbidden (contract): a correlated target refuses a traceId sel
     invalid(scriptedProfile({ settlement: { mode: 'run' }, extraChecks: [check] }), /correlation-token-not-selectable/);
     assert.ok(why);
   }
-  // Allowed, adjacent: the same clause on a target without correlation (main behaviour: it selects nothing there, and pairing withholds it).
+  // Allowed, adjacent: the same clause on a target without correlation (it selects nothing there, and pairing withholds it).
   const plainObserver = sinkObserver({ destinations: [{ host: PAY, paths: ['/v1/refunds', '/v1/coupons'] }] });
   assert.doesNotThrow(() => validateTargetFile({ schemaVersion: 1, targets: [scriptedProfile({ correlation: null, settlement: null, observers: [plainObserver], extraChecks: [traced(egressSel)] })] }));
-  // And a correlated target without a traceId selector is accepted (test 14 above).
+  // And a correlated target without a traceId selector is accepted (profile validation above).
   assert.doesNotThrow(() => validateTargetFile({ schemaVersion: 1, targets: [scriptedProfile()] }));
 });
 
-test('W2 round 5 (exported text matches the code): a late own-token send withholds an absence clause only when it fits that clause; one that fits none withholds nothing on its token', () => {
-  // The review repro: effect.none on A passed in its own window; the tail holds one committed send to B carrying T(0).
+test('exported text matches the code: a late own-token send withholds an absence clause only when it fits that clause; one that fits none withholds nothing on its token', () => {
+  // An effect.none on A passed in its own window; the tail holds one committed send to B carrying T(0).
   for (const [label, opts] of [['run mode', () => runMode], ['per check', r => perCheck(r)]]) {
     const apart = [rowOf([none(A)], [win()])];
     assert.equal(apart[0].effects[0].verdict, 'pass');

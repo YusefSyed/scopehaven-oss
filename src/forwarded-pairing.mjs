@@ -1,6 +1,6 @@
-// Operator-forwarded staging (H1 step 2): a forwarder that answers or alters one route itself (a deny rule on
+// Operator-forwarded staging: a forwarder that answers or alters one route itself (a deny rule on
 // /admin/*, credentials stripped on that route, an auth gate that answers everything) makes a boundary check on
-// that route read pass with every login proven (integrations/forwarded/README.md, review K1 and K2). What catches
+// that route read pass with every login proven (integrations/forwarded/README.md). What catches
 // it is a required allowed-use control on the same route, through the same forwarder, that passed: the forwarder
 // that denies or strips the forbidden request denies or strips the allowed one too.
 //
@@ -16,7 +16,7 @@
 // for example), pairs only with the identical path (its recorded requestPathHash).
 // What no single run can show stays the operator's statement in the authorization record: the wrong upstream
 // serving the same accounts, a response cache kept across runs, a gate that refuses only signed-out requests.
-// A remote target reached directly (H1 step 3) has the same exposure: a CDN, WAF or gateway in front of it can answer
+// A remote target reached directly has the same exposure: a CDN, WAF or gateway in front of it can answer
 // a route itself. Its unpaired passes are remote-pass-unpaired.
 import { pathSegments } from './http-rests-on.mjs';
 

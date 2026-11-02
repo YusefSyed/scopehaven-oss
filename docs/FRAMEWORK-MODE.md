@@ -74,7 +74,7 @@ Framework mode is available but outside the tested modes of this release ([KNOWN
 A pair is not comparable when:
 
 - **The request changed**: another scenario, so another suite hash.
-- **The template commit changed**: it is part of the suite, until the suite identity can flag a migration between runs (LQ N13's catalog fingerprint). A fix is a variant of the pinned commit (`--variant`).
+- **The template commit changed**: it is part of the suite, until the suite identity can flag a migration between runs (a catalog fingerprint). A fix is a variant of the pinned commit (`--variant`).
 - **The scripted model persona changed** (stub id or digest, in the profile hash): a change in the model's behaviour is not a repair of the application, as HTTP mode withholds a repair the model made.
 - **The measuring side changed**: ScopeHaven's adapter file, the framework name or ScopeHaven's harness code digest (adapter version), the seeds (fixture) or the evaluator.
 - **A tool was removed**: the candidate agent lacks a tool the baseline agent had, or the tool the planned fault targets. Removing a tool is not a repair.
@@ -92,7 +92,7 @@ Proved in `integrations/frameworks/vr1.test.mjs`:
 - **The billing shape's fix, run end to end:** this uses the fake adapter's refund app through the CLI's own checks. The same `blind-retry` persona on the buggy build, the idempotent build (`--variant idempotent-refund`) reads FIXED_VERIFIED; the refusing build (`--variant refuse-refund`) reads NO_VERIFIED_REPAIR.
 - **Still open:** a FIXED_VERIFIED on the real Mastra template needs a fixed variant of its adapter and a run of the template.
 
-Not yet: a `migration-between-runs` flag waits for the catalog fingerprint in the suite identity (LQ N13).
+Not yet: a `migration-between-runs` flag waits for the catalog fingerprint in the suite identity.
 
 ## Checks
 

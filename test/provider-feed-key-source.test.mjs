@@ -1,4 +1,4 @@
-// FIX-06 (SURPASS-BYPASS-01 B-12; provider-feed/7): a provider feed's custody rests on who holds the key that signs its entries, and
+// A provider feed's declared key source (keySource, provider-feed/7): its custody rests on who holds the key that signs its entries, and
 // nothing in a run shows that. An app can serve a feed of its own on a second port and sign it with its own key. So the profile
 // declares where the public key came from (keySource: provider, adapter with adapterReads, or stub), the run record's feed and every
 // sealed window carry it, and custody reads it: an undeclared source, or an adapter that reads the application's own store, is a key
@@ -92,7 +92,7 @@ test('custody: a boundary absence decided only by a feed whose key the app could
   assert.deepEqual(onlyClauseCustody({ result: { verdict: 'pass', observers: ['provider-feed-mail'], claimedOperations: ['send'] }, windows: [feedWindow(record({ keySource: 'stub' }))] }), { verdict: 'pass', custody: 'independent' });
 });
 
-// PR398-REVIEW finding 1: a provider feed sees only its own provider's sends, so another observer's silence never covers the route an
+// A provider feed sees only its own provider's sends, so another observer's silence never covers the route an
 // app-held feed was meant to cover. Two feeds (one honest, one the app could sign), or an SMTP sink beside the app-held feed, all naming
 // the domain: a boundary absence (effect.none or effect.count) stays inconclusive whatever else decided it.
 test('custody: a boundary absence beside a deciding feed whose key the app could hold stays inconclusive, however independent the other windows are', () => {
@@ -123,7 +123,7 @@ test('custody: a boundary absence beside a deciding feed whose key the app could
   assert.deepEqual(clauseCustody({ kind: 'effect.count', select: sel, verdict: 'fail', windows: [other(record({ keySource: 'stub' })), feedWindow(record({ keySource: 'undeclared' }))] }).verdict, 'fail', 'a count that fails is never lifted to inconclusive');
 });
 
-// PR398-REVIEW delta D1: a presence-only feed (an export file, or an endpoint without a witness) never decides an absence, but an honest
+// A presence-only feed (an export file, or an endpoint without a witness) never decides an absence, but an honest
 // one would have shown the send, so one whose key the app could hold keeps the absence inconclusive whenever it sees the select.
 test('custody: a feed whose key the app could hold keeps a boundary absence inconclusive when it sees the select, even presence-only', () => {
   const other = (feed, events = []) => ({ ...feedWindow(feed, events), instanceId: 'provider-feed-other' });
@@ -133,7 +133,7 @@ test('custody: a feed whose key the app could hold keeps a boundary absence inco
   const lowered = { verdict: 'inconclusive', custody: 'subject-writable', custodyReason: CUSTODY_REASON, custodyUpgrade: FEED_KEY_UPGRADE };
   const none = (select, windows, extra = {}) => clauseCustody({ kind: 'effect.none', select, verdict: 'pass', windows, ...extra });
   const file = extra => record({ route: 'file', ...extra });
-  // The reviewer's three probes: an app-store adapter's export file beside an SMTP sink; an undeclared export file beside an honest stub
+  // Three cases: an app-store adapter's export file beside an SMTP sink; an undeclared export file beside an honest stub
   // feed; an undeclared endpoint feed without a witness beside it. The tag is the weakest custody of the deciding and the lowered windows.
   assert.deepEqual(none(unpinned, [smtp, presence(file({ keySource: 'adapter', adapterReads: 'application-store' }))]), lowered);
   assert.deepEqual(none(sel, [other(record({ keySource: 'stub' })), presence(file({ keySource: 'undeclared' }))]), lowered);
@@ -152,7 +152,7 @@ test('custody: a feed whose key the app could hold keeps a boundary absence inco
   assert.deepEqual(clauseCustody({ kind: 'effect.exists', select: sel, verdict: 'pass', windows: [other(record({ keySource: 'stub' }), [{ ...sendEvent, observer: { ...sendEvent.observer, instanceId: 'provider-feed-other' } }]), presence(file({ keySource: 'undeclared' }))] }), { verdict: 'pass', custody: 'independent' });
 });
 
-// PR398-REVIEW delta, effect.only: the same promise for "nothing but these happened". Its pass took the weakest custody of the
+// effect.only: the same promise for "nothing but these happened". Its pass took the weakest custody of the
 // authoritative windows only, so an app-held presence-only feed among the judged observers left the pass to the others.
 test('custody: an effect.only pass that judges a feed whose key the app could hold reads inconclusive, presence-only included; a fail stays a fail', () => {
   const a = { ...feedWindow(record({ keySource: 'stub' })), instanceId: 'provider-feed-a' };
@@ -250,9 +250,9 @@ test('end to end: an undeclared feed key leaves a clean check inconclusive; a de
   assert.equal(COLLECTOR_RECORDS['provider-feed'].label, 'provider-feed/8');
 });
 
-// PR398-REVIEW finding 1, end to end: an app that mails through two vendors. Vendor A is the honest stub (declared "stub"); vendor B's feed
+// End to end: an app that mails through two vendors. Vendor A is the honest stub (declared "stub"); vendor B's feed
 // is one the app could sign itself, played by a second stub whose feed simply omits what the app sends through it. The check's forbidden
-// send goes through B, so neither feed records it: on main both feeds' silence passed CLEAN, and B's key is what that pass rested on.
+// send goes through B, so neither feed records it: in an earlier build both feeds' silence passed CLEAN, and B's key is what that pass rested on.
 test('end to end: an honest second feed does not lend its independence to a clean check that an app-held feed decides', async t => {
   const a = await startStub(t, { feedId: 'vendor-a' }), b = await startStub(t, { feedId: 'vendor-b' });
   const server = createServer((req, res) => {
@@ -297,8 +297,8 @@ test('end to end: an honest second feed does not lend its independence to a clea
   assert.deepEqual([held.results.find(x => x.id === 'CLEAN').status, clause(held, 'CLEAN').custody], ['pass', 'independent']);
 });
 
-// PR398-REVIEW delta D1, end to end: vendor B's feed is an export file (presence-only, so it never decides an absence) that the app could
-// write, played by a stub journal that leaves out what the app sends through B. On 004a0c95 vendor A's silence passed CLEAN.
+// End to end, presence-only: vendor B's feed is an export file (presence-only, so it never decides an absence) that the app could
+// write, played by a stub journal that leaves out what the app sends through B. In an earlier build vendor A's silence passed CLEAN.
 test('end to end: an app-held export-file feed that cannot decide still keeps an honest vendor\'s silence from passing a clean check or an effect.only', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'sh-feed-file-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));

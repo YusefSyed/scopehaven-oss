@@ -169,7 +169,7 @@ A matrix says what the application declares. The statement says what the operato
 
    Each rule has one of two confidences:
    - **`stated`** cites one of the statement's own sources (`sourceId` and `locator`).
-   - **`adopted-declaration`** takes a candidate as declared. It must keep the declaration's cell and decision, and carry no relation, state, creators, limit or lifecycle; narrowing a declaration is a stated rule. It keeps the "Declared policy" category, so the coverage report shows its R9 warning, and it is counted apart.
+   - **`adopted-declaration`** takes a candidate as declared. It must keep the declaration's cell and decision, and carry no relation, state, creators, limit or lifecycle; narrowing a declaration is a stated rule. It keeps the "Declared policy" category, so the coverage report shows its declared-intent warning, and it is counted apart.
 
    A rule still marked `candidate` is refused.
 3. **`statement seal`** needs a `statedBy` label (`--stated-by`) and the matrices any adoption names. The label is free text the caller supplies: nothing authenticates it, signs it or checks that a person approved the statement.

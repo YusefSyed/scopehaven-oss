@@ -82,7 +82,7 @@ test('a hand-edited verdict, window or count is refused; an edit without reseali
   refuse(reseal(escaped), 'sequence-verdict', 'NO-REFUND');
 });
 
-test('M10: the expected sequence binds the assertions; a rewritten assertion re-derived and resealed is refused', async () => {
+test('the expected sequence binds the assertions; a rewritten assertion re-derived and resealed is refused', async () => {
   const failing = await run([scripted(refunding)]);
   // Rewritten as an allowed-use control (which custody does not degrade) whose effect must exist: re-derived, it reads pass.
   const rewritten = structuredClone(failing); rewritten.assertions[0].effect.kind = 'effect.exists'; rewritten.assertions[0].severity = 'control';
@@ -94,21 +94,21 @@ test('M10: the expected sequence binds the assertions; a rewritten assertion re-
   refuse(failing, 'unexpected-sequence', undefined, { expectedSequence: other });
 });
 
-test('M4, M5: results and windows must match the assertions and observers one for one', async () => {
+test('results and windows must match the assertions and observers one for one', async () => {
   const r = await run([scripted(refunding), scripted({ instanceId: 'sqlite-audit-second' })]);
   const extra = structuredClone(r); extra.results.push({ ...extra.results[0], id: 'FABRICATED' });
   refuse(reseal(extra), 'invalid-sequence-run', 'assertions');
   // Dropping the window of the observer that saw the refund would recompute as a pass.
   const missing = structuredClone(r); missing.windows['before>after'].shift();
   refuse(rederive(missing), 'invalid-sequence-run', 'windows');
-  // M1, M3: instance ids and assertion ids are unique.
+  // Instance ids and assertion ids are unique.
   const sameInstance = structuredClone(r); sameInstance.observers[1].instanceId = sameInstance.observers[0].instanceId;
   sameInstance.windows['before>after'][1].instanceId = sameInstance.observers[0].instanceId;
   refuse(rederive(sameInstance), 'invalid-sequence-run', 'observers');
   const two = await run([scripted(refunding)], sequence([refundsNone({ id: 'A' }), refundsNone({ id: 'B', title: 'again' })]));
   const sameId = structuredClone(two); sameId.assertions[1].id = 'A';
   refuse(rederive(sameId), 'invalid-sequence-run', 'assertions');
-  // M6: the run's identity has the sequence id and hash forms.
+  // The run's identity has the sequence id and hash forms.
   for (const [field, value] of [['sequenceId', 'NO-REFUND\u001b[0m'], ['sequenceId', ''], ['sequenceHash', 'abc']]) { const x = structuredClone(r); x[field] = value; refuse(reseal(x), 'invalid-sequence-run', 'identity', undefined, field); }
   const keys = structuredClone(r); delete keys.windows['before>after'];
   refuse(reseal(keys), 'invalid-sequence-run', 'windows');
@@ -116,8 +116,8 @@ test('M4, M5: results and windows must match the assertions and observers one fo
   refuse(reseal(more), 'invalid-sequence-run', 'windows');
 });
 
-test('M-2: an observer kind is bound to its source and instance id; windows and events to their observer', async () => {
-  // 1b: a presence-only OTel run relabelled as an authoritative audit source.
+test('an observer kind is bound to its source and instance id; windows and events to their observer', async () => {
+  // A presence-only OTel run relabelled as an authoritative audit source.
   const otel = await run([scripted({ kind: 'otlp-http-json-receiver', source: 'otel-genai', instanceId: 'otel-traces' })]);
   assert.equal(otel.results[0].verdict, 'unobservable');
   validateSequenceRun(otel, { expectedSequence: sequence() });
@@ -128,7 +128,7 @@ test('M-2: an observer kind is bound to its source and instance id; windows and 
   // The effect rules would now pass it; custody holds an audit-table absence at inconclusive, and the observer binding refuses the relabel.
   assert.deepEqual([relabelled.results[0].verdict, relabelled.results[0].custodyReason], ['inconclusive', 'subject-writable-custody']);
   refuse(relabelled, 'invalid-sequence-run', 'observers', { expectedSequence: sequence() });
-  // M8: the window's source is bound to its observer's.
+  // The window's source is bound to its observer's.
   const audit = await run([scripted(refunding)]);
   const source = structuredClone(audit);
   for (const w of source.windows['before>after']) { w.source = 'http-audit-log'; w.events.forEach(e => { e.source = 'http-audit-log'; }); }
@@ -141,12 +141,12 @@ test('M-2: an observer kind is bound to its source and instance id; windows and 
     for (const w of r.windows['before>after']) { w.instanceId = r.observers[0].instanceId; w.events.forEach(e => { e.observer = { kind: r.observers[0].kind ?? 'x', instanceId: r.observers[0].instanceId }; }); }
     refuse(rederive(r), 'invalid-sequence-run', 'observers', undefined, label);
   }
-  // 7e: an event attributed to another observer inside the window: another kind, another instance, or both.
+  // An event attributed to another observer inside the window: another kind, another instance, or both.
   for (const [label, observer] of [['kind', { kind: 'postgres-snapshot-diff', instanceId: 'sqlite-audit-db' }], ['instance', { kind: 'sqlite-audit-table', instanceId: 'sqlite-audit-other' }], ['both', { kind: 'postgres-snapshot-diff', instanceId: 'pg-snapshot-x' }]]) {
     const event = structuredClone(audit); event.windows['before>after'][0].events[0].observer = observer;
     refuse(rederive(event), 'invalid-sequence-run', 'window-observer', undefined, label);
   }
-  // 7d: one window of an observer with a widened scope.
+  // One window of an observer with a widened scope.
   const twoWindows = sequence([refundsNone({ id: 'X', to: 'mid' }), refundsNone({ id: 'Y', from: 'mid', effect: { kind: 'effect.none', select: { name: 'notes', operation: 'update' } } })]);
   const scoped = await run([scripted()], twoWindows);
   assert.equal(scoped.results[1].verdict, 'unobservable');
@@ -171,8 +171,8 @@ test('M-2: an observer kind is bound to its source and instance id; windows and 
   refuse(rederive(borrowed), 'invalid-sequence-run', 'observers');
 });
 
-test('R3: a declared scope must be the one its kind declares (operations, attribution, evidence)', async () => {
-  // 2a: a genuine gate run cannot see a database update. Widened to "update" and "refunds" on every window it would pass.
+test('a declared scope must be the one its kind declares (operations, attribution, evidence)', async () => {
+  // A genuine gate run cannot see a database update. Widened to "update" and "refunds" on every window it would pass.
   const gateRun = await run([scripted({ kind: 'hold-gate', source: 'hold-proxy', instanceId: 'gate-1', names: ['model', 'ungated'] })]);
   assert.equal(gateRun.results[0].verdict, 'unobservable');
   validateSequenceRun(gateRun, { expectedSequence: sequence() });
@@ -192,7 +192,7 @@ test('R3: a declared scope must be the one its kind declares (operations, attrib
 });
 
 test('windows the runner never stores are refused: in-flight complete, net-only or exact entries outside a snapshot, a failure reason on net-only', async () => {
-  // 7b: complete coverage with an action still in flight (collectWindow would make it partial).
+  // Complete coverage with an action still in flight (collectWindow would make it partial).
   const inflight = await run([scripted({ plan: () => [{ outcome: 'started' }] })]);
   assert.equal(inflight.windows['before>after'][0].coverage, 'partial');
   validateSequenceRun(inflight);
@@ -203,7 +203,7 @@ test('windows the runner never stores are refused: in-flight complete, net-only 
   refuse(rederive(withReason), 'invalid-sequence-run', 'window-coverage');
   const failedNoReason = structuredClone(reasoned); Object.assign(failedNoReason.windows['before>after'][0], { coverage: 'failed', reason: null });
   refuse(rederive(failedNoReason), 'invalid-sequence-run', 'window-coverage');
-  // 7f: a field collectWindow never writes.
+  // A field collectWindow never writes.
   const extraField = structuredClone(reasoned); extraField.windows['before>after'][0].lineage = { anything: true };
   refuse(reseal(extraField), 'invalid-sequence-run', 'window-fields');
   // net-only is a snapshot's net change; an audit table never stores it.
@@ -211,7 +211,7 @@ test('windows the runner never stores are refused: in-flight complete, net-only 
   refuse(rederive(netOnly), 'invalid-sequence-run', 'window-coverage');
 });
 
-test('5b, L4: the aborted code and the assertions follow the runner and sequence rules, also without --sequence', async () => {
+test('the aborted code and the assertions follow the runner and sequence rules, also without --sequence', async () => {
   const r = await run([scripted()]);
   for (const aborted of ['', 'not a code!', 'x'.repeat(201)]) { const a = structuredClone(r); a.aborted = aborted; refuse(rederive(a), 'invalid-sequence-run', 'aborted'); }
   const stopped = structuredClone(r); stopped.aborted = 'precondition-failed:ask';
@@ -227,7 +227,7 @@ test('5b, L4: the aborted code and the assertions follow the runner and sequence
   assert.throws(() => validateSequence(twice), /declared twice/);
 });
 
-test('M9, M15: genuine snapshot runs with exact entries validate (Postgres xmin, SQLite change-column), and their method is bound to the kind', async t => {
+test('genuine snapshot runs with exact entries validate (Postgres xmin, SQLite change-column), and their method is bound to the kind', async t => {
   // Postgres: a pg-snapshot observer over the scripted server; the named row unchanged, so absence is exact.
   const env = { SCOPEHAVEN_TARGET_DB_READER: `${USER}:${PASSWORD}` };
   const state = (snapshot) => ({ snapshot, tables: { Chat: [['c1', '700', 'h1']] } });
@@ -240,7 +240,7 @@ test('M9, M15: genuine snapshot runs with exact entries validate (Postgres xmin,
   assert.deepEqual([pgWindow.coverage, pgWindow.exact?.[0]?.method, pgRun.results[0].verdict, pgRun.results[0].custodyReason], ['net-only', 'xmin', 'inconclusive', 'subject-writable-custody']);
   assert.equal(pgRun.observers[0].kind, 'postgres-snapshot-diff');
   validateSequenceRun(pgRun, { expectedSequence: chatNone });
-  // 3d: a snapshot window keeps its coverage, reason and exact entries as collectWindow stored them.
+  // A snapshot window keeps its coverage, reason and exact entries as collectWindow stored them.
   for (const [label, edit] of [['net-only with a failure reason', w => { w.reason = 'key-type-refused'; }], ['exact entries on a complete window', w => { w.coverage = 'complete'; w.reason = null; }]]) {
     const x = structuredClone(pgRun); edit(x.windows['before>after'][0]);
     refuse(rederive(x), 'invalid-sequence-run', 'window-coverage', undefined, label);
@@ -249,7 +249,7 @@ test('M9, M15: genuine snapshot runs with exact entries validate (Postgres xmin,
   const principal = structuredClone(pgRun); principal.observers[0].scope.actorAttribution = 'principal';
   for (const w of principal.windows['before>after']) w.scope.actorAttribution = 'principal';
   refuse(rederive(principal), 'invalid-sequence-run', 'observer-scope');
-  // 3b: the same xmin window attributed to a SQLite kind.
+  // The same xmin window attributed to a SQLite kind.
   const asSqlite = structuredClone(pgRun); asSqlite.observers[0].kind = 'sqlite-snapshot-diff'; asSqlite.observers[0].instanceId = 'sqlite-snapshot-db';
   for (const w of asSqlite.windows['before>after']) w.instanceId = 'sqlite-snapshot-db';
   refuse(rederive(asSqlite), 'invalid-sequence-run', 'window-observer');
@@ -262,13 +262,13 @@ test('M9, M15: genuine snapshot runs with exact entries validate (Postgres xmin,
   const sqRun = saved(await runSequence(rowNone, { origin: 'http://127.0.0.1:1', observers: [snap], transport }));
   assert.deepEqual([sqRun.windows['before>after'][0].exact?.[0]?.method ?? 'change-column', sqRun.observers[0].kind], ['change-column', 'sqlite-snapshot-diff']);
   validateSequenceRun(sqRun, { expectedSequence: rowNone });
-  // 2c: relabelled as Postgres with quiescent xmin entries, keeping the SQLite instance id.
+  // Relabelled as Postgres with quiescent xmin entries, keeping the SQLite instance id.
   const asPg = structuredClone(sqRun); asPg.observers[0].kind = 'postgres-snapshot-diff';
   for (const w of asPg.windows['before>after']) w.exact = w.exact.map(e => ({ name: e.name, method: 'xmin', auditSha256: null, ambiguousResources: [], presentResources: e.presentResources, violated: false, basis: 'xmin', marks: { startXmax: '800', endXmax: '800', inProgress: 0 }, quiescent: true }));
   refuse(rederive(asPg), 'invalid-sequence-run', 'observers');
 });
 
-test('W3: a genuine MySQL snapshot run with a change-column entry validates; its kind and method are bound', async t => {
+test('a genuine MySQL snapshot run with a change-column entry validates; its kind and method are bound', async t => {
   const env = { SCOPEHAVEN_TARGET_MYSQL: `${MYSQL_USER}:${MYSQL_PASSWORD}` };
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-seqrun-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const audit = join(dir, 'AUDIT.txt'); writeFileSync(audit, 'checked\n');
@@ -288,7 +288,7 @@ test('W3: a genuine MySQL snapshot run with a change-column entry validates; its
   refuse(rederive(asXmin), 'invalid-sequence-run', 'window-observer');
 });
 
-test('L2, L7: a run with 16 observers and the gate validates; a programmatic assertion with an undefined field validates once saved', async () => {
+test('a run with 16 observers and the gate validates; a programmatic assertion with an undefined field validates once saved', async () => {
   const many = Array.from({ length: 16 }, (_, i) => scripted({ instanceId: `sqlite-audit-${i}` }));
   const seventeen = await run([...many, scripted({ kind: 'hold-gate', source: 'hold-proxy', instanceId: 'gate-1', names: ['model'] })]);
   validateSequenceRun(seventeen);
@@ -310,7 +310,7 @@ test('a scopehaven-sequence/1 record is reported as not recomputable, never trus
 
 // The sinks listen on ports the OS reports free; a bind lost to another process is retried (fixtures/free-port.mjs).
 import { onFreePorts, freePorts } from '../observers/fixtures/free-port.mjs';
-// W3 sinks: the "app" is the request step's transport, which makes one outbound charge through the egress recorder
+// Sinks: the "app" is the request step's transport, which makes one outbound charge through the egress recorder
 // (proxy form) and sends one message through the SMTP sink, as an app whose clients point at the sinks would.
 function charge(port) {
   return new Promise(resolve => { const req = request({ host: '127.0.0.1', port, method: 'POST', path: 'http://api.pay.example/v1/charges', headers: { host: 'api.pay.example' } }, res => { res.resume(); res.on('end', resolve); }); req.on('error', resolve); req.end('{"amount":100}'); });
@@ -324,7 +324,7 @@ function mail(port) {
   });
 }
 const sendNone = (id, source, name) => ({ id, title: `Asking never sends to ${name}`, severity: 'high', from: 'before', to: 'after', effect: { kind: 'effect.none', select: { source, name, operation: 'send' } } });
-test('W3: genuine sink runs validate (presence-only fails reproduce; a routed sink without its witness is missing); a scope outside the sinks\' is refused', async () => {
+test('genuine sink runs validate (presence-only fails reproduce; a routed sink without its witness is missing); a scope outside the sinks\' is refused', async () => {
   const seq = sequence([sendNone('NO-CHARGE', 'http-egress', 'api.pay.example'), sendNone('NO-MAIL', 'smtp-capture', 'customers.example')]);
   // One sequence run on fresh ports; sinks that started before a lost bind are stopped before the retry.
   const runOn = (s, build, transportFor = () => transport) => onFreePorts(2, async (a, b) => {
@@ -354,7 +354,7 @@ test('W3: genuine sink runs validate (presence-only fails reproduce; a routed si
   validateSequenceRun(widen(quiet, s => { s.evidence = 'authoritative'; }));
 });
 
-// ---- Follow-ups to the round-3 review (seqv-followups) ----
+// ---- Event scope, configuration binding and more observer kinds ----
 // A genuine SQLite audit-table run: the request step's "app" logs one mapped action (note.create, an insert) and one
 // unmapped action (login, recorded as an update under a name the scope does not list).
 async function auditRun(t) {
@@ -368,12 +368,12 @@ async function auditRun(t) {
 }
 const everyScope = (r, edit) => { const x = structuredClone(r); edit(x.observers[0].scope); for (const ws of Object.values(x.windows)) ws[0].scope = structuredClone(x.observers[0].scope); return rederive(x); };
 
-test('follow-up 2 (A4): every event is one its observer could record; a narrowed scope cannot turn a recorded fail into unobservable', async t => {
+test('every event is one its observer could record; a narrowed scope cannot turn a recorded fail into unobservable', async t => {
   const { run: r, seq } = await auditRun(t);
   const w = r.windows['before>after'][0];
   assert.deepEqual([w.events.map(e => `${e.operation} ${e.name}`).sort(), r.observers[0].scope.names, r.results[0].verdict], [['insert note.create', 'update login'], ['note.create'], 'fail']);
   validateSequenceRun(r, { expectedSequence: seq }); // the unmapped "login" update carries a name the scope does not list, as recorded
-  // A4: operations narrowed to update, or names narrowed to none, would read unobservable; both are refused.
+  // Operations narrowed to update, or names narrowed to none, would read unobservable; both are refused.
   for (const [label, edit] of [['operations narrowed', sc => { sc.operations = ['update']; }], ['names narrowed', sc => { sc.names = []; }]]) {
     const x = everyScope(r, edit);
     assert.equal(x.results[0].verdict, 'unobservable', label);
@@ -388,10 +388,10 @@ test('follow-up 2 (A4): every event is one its observer could record; a narrowed
   refuse(everyScope(gateRun, sc => { sc.names = ['ungated']; }), 'invalid-sequence-run', 'window-events');
 });
 
-test('follow-up 1: --observers binds a run to its configuration (names included); --gate adds the gate', async t => {
+test('--observers binds a run to its configuration (names included); --gate adds the gate', async t => {
   const { run: r, configs, seq } = await auditRun(t);
   validateSequenceRun(r, { expectedSequence: seq, expectedObservers: declaredObservers(configs) });
-  // A2: a names-only edit on the observer and every window is consistent, so only the configuration refuses it.
+  // A names-only edit on the observer and every window is consistent, so only the configuration refuses it.
   const named = everyScope(r, sc => { sc.names = [...sc.names, 'refund.issue']; });
   validateSequenceRun(named, { expectedSequence: seq });
   refuse(named, 'unexpected-observers', undefined, { expectedSequence: seq, expectedObservers: declaredObservers(configs) });
@@ -424,10 +424,10 @@ test('follow-up 1: --observers binds a run to its configuration (names included)
   assert.match(lines.at(-1), /--gate binds a run only together with --observers/);
 });
 
-test('follow-up 3 (P11, P12, P13): genuine audit-log-file, http-audit-endpoint and mcp-stdio-recorder runs validate', async t => {
+test('genuine audit-log-file, http-audit-endpoint and mcp-stdio-recorder runs validate', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-seqrun-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const ORIGIN = 'http://127.0.0.1:4420';
-  // P11: an audit-log file. A sequence sends no witness, so the window is partial, never complete.
+  // An audit-log file. A sequence sends no witness, so the window is partial, never complete.
   const logPath = join(dir, 'audit.log'); writeFileSync(logPath, '');
   const auditFile = createAuditFileObserver({ instanceId: 'audit-file-owui', path: logPath, origin: ORIGIN, actors: { agent: 'u-agent' }, witness: 'chat.create', settleMs: 100, quietMs: 100,
     rules: [{ name: 'knowledge.update', method: 'POST', path: '/api/v1/knowledge/{id}/update', refusedStatuses: [403] }, { name: 'chat.create', method: 'POST', path: '/api/v1/chats/new', operation: 'insert' }] });
@@ -435,7 +435,7 @@ test('follow-up 3 (P11, P12, P13): genuine audit-log-file, http-audit-endpoint a
   const p11 = saved(await runSequence(kbNone, { origin: 'http://127.0.0.1:1', observers: [auditFile], transport }));
   assert.deepEqual([p11.observers[0].kind, p11.observers[0].scope.actorAttribution, p11.windows['before>after'][0].coverage], ['audit-log-file', 'principal', 'partial']);
   validateSequenceRun(p11, { expectedSequence: kbNone });
-  // P12: an HTTP audit endpoint the "app" appends to.
+  // An HTTP audit endpoint the "app" appends to.
   let items = [{ id: 1, user: 'agent', action: 'login' }];
   const server = createServer((req, res) => { res.writeHead(req.headers.authorization === 'Bearer synthetic-admin' ? 200 : 401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ data: { items } })); });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); t.after(() => new Promise(resolve => server.close(resolve)));
@@ -445,7 +445,7 @@ test('follow-up 3 (P11, P12, P13): genuine audit-log-file, http-audit-endpoint a
   const p12 = saved(await runSequence(noteNone, { origin: 'http://127.0.0.1:1', observers: [httpAudit], transport: async () => { items = [...items, { id: 2, user: 'agent', action: 'note.create' }]; return { status: 200 }; } }));
   assert.deepEqual([p12.observers[0].kind, p12.results[0].verdict], ['http-audit-endpoint', 'fail']);
   validateSequenceRun(p12, { expectedSequence: noteNone });
-  // P13: an MCP stdio recorder's log file.
+  // An MCP stdio recorder's log file.
   const mcpPath = join(dir, 'mcp.jsonl'), frames = new FrameLog({ path: mcpPath }); frames.push({ kind: 'open', conn: 'c' });
   const mcp = createMcpObserver({ instanceId: 'mcp-log-agent', path: mcpPath, tools: ['refund'] });
   const toolNone = sequence([refundsNone({ id: 'NO-REFUND-CALL', effect: { kind: 'effect.none', select: { source: 'mcp-jsonrpc', name: 'refund', operation: 'tool-call' } } })]);
@@ -455,8 +455,8 @@ test('follow-up 3 (P11, P12, P13): genuine audit-log-file, http-audit-endpoint a
   validateSequenceRun(p13, { expectedSequence: toolNone });
 });
 
-// Round-2 review asks on the configuration binding (carried in w3-r2-lows).
-test('follow-up 1: the binding is in order: the same observers declared in another order are not the run\'s', async t => {
+// The configuration binding.
+test('the binding is in order: the same observers declared in another order are not the run\'s', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-seqrun-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const path = join(dir, 'app.db'), db = new DatabaseSync(path);
   db.exec('CREATE TABLE audit (id INTEGER PRIMARY KEY AUTOINCREMENT, who TEXT, what TEXT); CREATE TABLE notes (id TEXT PRIMARY KEY, body TEXT)'); db.close();
@@ -467,7 +467,7 @@ test('follow-up 1: the binding is in order: the same observers declared in anoth
   refuse(r, 'unexpected-observers', undefined, { expectedObservers: declaredObservers([...configs].reverse()) });
 });
 
-test('follow-up 1: declaredObservers builds every observer type without starting it: nothing listens, connects, or opens or creates a file', async t => {
+test('declaredObservers builds every observer type without starting it: nothing listens, connects, or opens or creates a file', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-seqrun-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const missing = join(dir, 'missing');
   const [otelPort, egressPort, smtpPort, gatePort, pgPort, mysqlPort, auditPort] = await freePorts(7);

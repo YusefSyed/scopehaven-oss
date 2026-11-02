@@ -450,7 +450,7 @@ test('units: observer candidates come from names, identity pointers need distinc
   assert.doesNotMatch(formatFirstRow(null).join('\n'), NO_PASS_WORDING);
 });
 
-test('lane F feedback items 3, 5, 8, 9, 10: GoTrue who-am-I, labelled shell candidates, Supabase candidate, re-asked empty answers, the rerun line, assistant routes', async () => {
+test('GoTrue who-am-I, labelled shell candidates, Supabase candidate, re-asked empty answers, the rerun line, assistant routes', async () => {
   const app = await createTwoTenantApp({ gotrue: true, chat: true });
   const { dir, cleanup } = await workspace();
   try {
@@ -460,11 +460,11 @@ test('lane F feedback items 3, 5, 8, 9, 10: GoTrue who-am-I, labelled shell cand
     const base = ['--base-url', app.origin, '--env', env, '--id', 'notes', '--record-a', '/api/notes/note-a1', '--record-b', '/api/notes/note-b1', '--no-run'];
     let r = await runInit(['--yes', ...base, ...ROE, '--confirm-authorization', '--app-env', appEnv, '--out', join(dir, 'o1')]);
     assert.equal(r.code, 0, r.text);
-    assert.match(r.text, /Who-am-I: \/auth\/v1\/user via bearer; identity field \/email/); // item 3
-    assert.match(r.text, /Observer candidate: pg-snapshot from SUPABASE_URL in the app \.env \(Supabase stack: a local one keeps its Postgres on 127\.0\.0\.1:54322/); // item 5
-    assert.match(r.text, /Assistant or agent routes: \/api\/chat \(405\)\. Not drafted: assistant-turn checks need a message and a planted value/); // item 10
+    assert.match(r.text, /Who-am-I: \/auth\/v1\/user via bearer; identity field \/email/);
+    assert.match(r.text, /Observer candidate: pg-snapshot from SUPABASE_URL in the app \.env \(Supabase stack: a local one keeps its Postgres on 127\.0\.0\.1:54322/);
+    assert.match(r.text, /Assistant or agent routes: \/api\/chat \(405\)\. Not drafted: assistant-turn checks need a message and a planted value/);
     assert.deepEqual(JSON.parse(await readFile(join(dir, 'o1', 'init-report.json'), 'utf8')).chatRoutes, [{ path: '/api/chat', status: 405 }]);
-    assert.ok(r.text.includes(`set -a; . ${/\s/.test(env) ? `'${env}'` : env}; set +a;`), 'item 9: the rerun line names the env file init was given'); // item 9
+    assert.ok(r.text.includes(`set -a; . ${/\s/.test(env) ? `'${env}'` : env}; set +a;`), 'the rerun line names the env file init was given');
     assert.doesNotMatch(r.text, /YOUR_ENV_FILE/);
     // Interactive, no --app-env: a shell candidate is labelled and never asked about; an empty answer is asked again.
     const asked = [];
@@ -472,9 +472,9 @@ test('lane F feedback items 3, 5, 8, 9, 10: GoTrue who-am-I, labelled shell cand
     const ask = async flag => { asked.push(flag); const a = answers[flag]; return Array.isArray(a) ? a.shift() : a ?? ''; };
     r = await runInit([...base, '--out', join(dir, 'o2')], { ask, env: { ...process.env, ANTHROPIC_BASE_URL: 'https://operator-tool.example' } });
     assert.equal(r.code, 0, r.text);
-    assert.match(r.text, /egress-recorder from ANTHROPIC_BASE_URL in this shell \(may be your own tools' settings, not the app's; give --app-env for the app's\)/); // item 5
+    assert.match(r.text, /egress-recorder from ANTHROPIC_BASE_URL in this shell \(may be your own tools' settings, not the app's; give --app-env for the app's\)/);
     assert.ok(!asked.includes('--use-observer'), 'a shell candidate is never asked about');
-    assert.match(r.text, /--client needs an answer\./); // item 8
+    assert.match(r.text, /--client needs an answer\./);
     assert.equal(asked.filter(f => f === '--client').length, 2);
   } finally { await app.close(); await cleanup(); }
 });
@@ -529,12 +529,12 @@ test('timed onboarding: start, init stamps every stage, the review of a FAIL, th
     assert.equal(report.starterRun.id, saved.runId);
     assert.match(report.timing.firstHeldFail, /pending review/);
     // Review: only a FAIL row of a stamped run; then the receipt.
-    r = await runInit(['review', '--out', out, '--run', saved.runId, '--check', 'A-WHOAMI', '--holds', 'yes', '--reviewer-role', 'lane O reviewer']);
+    r = await runInit(['review', '--out', out, '--run', saved.runId, '--check', 'A-WHOAMI', '--holds', 'yes', '--reviewer-role', 'onboarding reviewer']);
     assert.equal(r.code, 2); assert.match(r.text, /not a FAIL row/);
     r = await runInit(['receipt', '--out', out]);
     assert.equal(r.code, 0, r.text); assert.match(r.text, /unreviewed [1-9]/);
     for (const check of saved.failChecks) {
-      r = await runInit(['review', '--out', out, '--run', saved.runId, '--check', check, '--holds', check === 'B-READS-A-RECORD' ? 'yes' : 'no', '--reviewer-role', 'lane O reviewer']);
+      r = await runInit(['review', '--out', out, '--run', saved.runId, '--check', check, '--holds', check === 'B-READS-A-RECORD' ? 'yes' : 'no', '--reviewer-role', 'onboarding reviewer']);
       assert.equal(r.code, 0, r.text);
     }
     r = await runInit(['receipt', '--out', out]);
@@ -632,7 +632,7 @@ test('timed onboarding: a stop after requests stamps its stop code; --stack with
   } finally { await sick.close(); await cleanup(); }
 });
 
-test('units: receipts and the timing table decide lane O\'s done condition from stamps', () => {
+test('units: receipts and the timing table decide the onboarding done condition from stamps', () => {
   const at = m => new Date(Date.UTC(2026, 9, 27, 12, 0) + m * 60000).toISOString();
   const onboarding = ({ label, owned, firstRow, fails = [], reviews = [], start = true, runs = true }) => {
     const s = start ? [{ schema: STAMP_SCHEMA, run: `o-${label}`, stage: 'onboarding-start', at: at(0), label, owned, operatorRole: 'design partner engineer', head: 'a'.repeat(40) }] : [];

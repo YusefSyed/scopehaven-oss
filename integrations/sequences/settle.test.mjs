@@ -1,5 +1,5 @@
-// Review S9 (CORE-WIRING-REVIEW.json round 2): a sequence's end mark taken right after a
-// forbidden request must not give an absence pass on a commit that lands 300 ms later.
+// A sequence's end mark taken right after a forbidden request must not give an absence pass on a commit that lands
+// 300 ms later.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -33,7 +33,7 @@ const sequence = { schema: SEQUENCE_SCHEMA, id: 'late-commit', actors: { member:
   assertions: [{ id: 'NO-EDIT', title: 'The edit is not committed', severity: 'high', from: 'a', to: 'b', effect: { kind: 'effect.none', select: { source: 'sql-audit-table', name: 'note.update' } } }] };
 const auditConfig = (app, extra = {}) => ({ id: 'audit', type: 'sqlite-audit', path: app.dbPath, principals: ['member-1'], audit: { table: 'audit', idColumn: 'id', actorColumn: 'who', actionColumn: 'action', resourceColumn: 'target', actions: { 'note.update': 'update' } }, ...extra });
 
-test('review S9: a sequence waits the declared settleMs before an end mark, so a late commit fails the absence check', async t => {
+test('a sequence waits the declared settleMs before an end mark, so a late commit fails the absence check', async t => {
   const app = await lateApp(t);
   const settled = await runSequence(sequence, { origin: app.origin, observers: buildObservers([auditConfig(app, { settleMs: 1000 })], { env }), env });
   recheck(settled, sequence);

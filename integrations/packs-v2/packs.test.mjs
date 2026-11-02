@@ -49,7 +49,7 @@ test('the four shipped packs match their manifests, are named by behaviour, and 
     const pack = await readPack(join(SHIPPED_PACKS, name));
     assert.equal(pack.manifest.name, name);
     assert.equal(pack.manifest.version, '1.0.0');
-    assert.equal(pack.manifest.regulation, null, `${name}: no regulation mapping until the claims register approves one`);
+    assert.equal(pack.manifest.regulation, null, `${name}: no regulation mapping until one is approved`);
     assert.doesNotMatch(name, /(^|-)(gdpr|hipaa|pci|sox|ccpa|dora|iso\d*|nist|eu-ai|soc\d*)(-|$)/i);
     for (const file of ['checks.json', 'cases.json']) assert.equal(sha256Hex(await readFile(join(SHIPPED_PACKS, name, file))), pack.manifest.files[file]);
     assert.ok(pack.manifest.derivedFrom.some(d => /owned fixture suite: [A-Z]+-\d+/.test(d)), `${name} cites the owned fixture checks it was built from`);

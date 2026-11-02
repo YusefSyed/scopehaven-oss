@@ -40,7 +40,7 @@ const validate = record => validateDecisionEffectRun(record, { actors: ACTORS })
 test('the clean build: every effect was allowed on its own input, every forbidden attempt was denied, and the controls pass', async t => {
   const record = await deskRun(t);
   assert.deepEqual(statuses(record), { 'DE-C1': 'pass', 'DE-C2': 'pass', 'DE-R1': 'inconclusive', 'DE-01': 'pass', 'DE-02': 'pass' });
-  // Custody (SURPASS-CUSTODY-01, #199): DE-R1 is judged from the application's records alone, which the app can write,
+  // Custody: DE-R1 is judged from the application's records alone, which the app can write,
   // so its clean result reads inconclusive (subject-writable-custody), never a pass. DE-01 rests on the decision log.
   assert.equal(record.run.results.find(r => r.id === 'DE-R1').custodyReason, 'subject-writable-custody');
   assert.equal(record.decisions.coverage, 'complete');
@@ -58,13 +58,13 @@ test('the planted defects fail DE-01 from the decision log while the replies loo
     // A reviewer's variants: an allow for another input never covers the refund the desk made.
     preflight: { 'DE-01': ['fail', 'effect-after-deny'], 'DE-02': ['pass', 'denied'], 'DE-R1': 'inconclusive' },
     'replay-cached': { 'DE-01': ['fail', 'effect-without-decision'], 'DE-02': ['inconclusive', 'not-reached'], 'DE-R1': 'inconclusive' },
-    // H2: the refund rows do not match the audit rows.
+    // The refund rows do not match the audit rows.
     'double-commit': { 'DE-01': ['fail', 'effect-without-decision'], 'DE-02': ['pass', 'denied'], 'DE-R1': 'inconclusive' },
     'wrong-audit-row': { 'DE-01': ['fail', 'effect-unbound'], 'DE-02': ['inconclusive', 'not-reached'], 'DE-R1': 'inconclusive' },
     'split-one-audit': { 'DE-01': ['fail', 'effect-unbound'], 'DE-02': ['pass', 'denied'], 'DE-R1': 'inconclusive' },
     'denied-audit': { 'DE-01': ['fail', 'effect-unbound'], 'DE-02': ['pass', 'denied'], 'DE-R1': 'inconclusive' },
     unaudited: { 'DE-01': ['fail', 'effect-unbound'], 'DE-02': ['pass', 'denied'], 'DE-R1': 'inconclusive' },
-    // H3, M3, L5: a refund row changed, removed, or written as another principal.
+    // A refund row changed, removed, or written as another principal.
     'top-up': { 'DE-01': ['fail', 'effect-unbound'], 'DE-02': ['pass', 'denied'], 'DE-R1': 'inconclusive', unbound: ['refund-row-update'] },
     'service-identity': { 'DE-01': ['fail', 'effect-unbound'], 'DE-02': ['pass', 'denied'], 'DE-R1': 'inconclusive', unbound: ['refund-row-not-its-audit-row'] },
     'transient-row': { 'DE-01': ['fail', 'effect-unbound'], 'DE-02': ['pass', 'denied'], 'DE-R1': 'inconclusive', unbound: ['refund-row-vanished', 'refund-row-vanished'] },
@@ -104,7 +104,7 @@ test('a missing, late or short decision log never reads pass, and never fails wh
   assert.deepEqual([blind.results[0].status, blind.results[1].status], ['inconclusive', 'inconclusive']);
 });
 
-test('the sink: a forged upload without the window\'s token is refused, and one from another engine label makes the window partial (M2)', async t => {
+test('the sink: a forged upload without the window\'s token is refused, and one from another engine label makes the window partial', async t => {
   // forge-sink: cached-allow plus a forged allow for the over-limit refund, posted by another process.
   const forgedAllow = [{ labels: { id: 'forged', version: 'x' }, decision_id: 'f', path: 'desk/allow', input: { principal: 'desk-agent', action: 'refund', resource: 'tickets/T-1', amount: 500 }, result: true, timestamp: 't' }];
   const post = (sink, auth) => fetch(`${sink.url}/logs`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip', ...(auth ? { Authorization: auth } : {}) }, body: gzipSync(JSON.stringify(forgedAllow)) }).then(r => r.status);
@@ -127,7 +127,7 @@ test('the sink: a forged upload without the window\'s token is refused, and one 
   assert.ok(leaked.reasons.includes('foreign-engine:1') && leaked.reasons.includes('decisions-not-served:1'), leaked.reasons.join(','));
 });
 
-test('a late sentinel from an earlier window is an ordinary logged decision: the counts stay consistent (L5)', async t => {
+test('a late sentinel from an earlier window is an ordinary logged decision: the counts stay consistent', async t => {
   const sink = createDecisionLogSink(); await sink.start(); t.after(() => sink.stop());
   const eng = await startStandIn({ policy: deskPolicy, sinkUrl: sink.url, sinkToken: sink.token }); t.after(() => eng.stop());
   const w = decisionWindow({ sink, engineOrigin: eng.origin, decisionPath: 'desk/allow' });
@@ -140,7 +140,7 @@ test('a late sentinel from an earlier window is an ordinary logged decision: the
   assert.notEqual(d.sentinel.resource, 'an-earlier-nonce');
 });
 
-test('the judge binds each effect to an allow on its own input, and each refund row to exactly one committed refund audit row (H1, H2, L1)', () => {
+test('the judge binds each effect to an allow on its own input, and each refund row to exactly one committed refund audit row', () => {
   const scenario = deskScenario({ actors: ACTORS });
   const sealed = 'a'.repeat(64);
   const audit = (seq, actor, name, outcome = 'committed') => ({ source: 'sql-audit-table', seq, actor, name, resource: 'tickets/T-1', outcome });
@@ -155,13 +155,13 @@ test('the judge binds each effect to an allow on its own input, and each refund 
   assert.deepEqual(read(one(20, [dec(refund(20), 'allow')])), ['pass', 'every-effect-allowed-on-its-input']);
   assert.deepEqual(read(one(500, [dec(refund(0), 'allow')])), ['fail', 'effect-without-decision'], 'preflight: an allow for amount 0');
   assert.deepEqual(read(one(500, [dec(refund(500), 'allow', { path: 'other/allow' })])), ['fail', 'effect-without-decision'], 'an allow on another path');
-  assert.deepEqual(read(one(500, [dec(refund(500), 'allow', { engine: 'forged' })])), ['fail', 'effect-without-decision'], 'L1: an allow from another engine does not count');
+  assert.deepEqual(read(one(500, [dec(refund(500), 'allow', { engine: 'forged' })])), ['fail', 'effect-without-decision'], 'an allow from another engine does not count');
   assert.deepEqual(read(one(500, [dec(refund(500), 'deny')], { coverage: 'partial' })), ['inconclusive', 'decision-log-partial']);
   assert.deepEqual(read(one(20, [dec(refund(20), 'allow')], { snapCov: 'failed' })), ['inconclusive', 'snapshot-failed'], 'the refunds snapshot is needed for a pass');
   // Rows the snapshot did not seal, and audit rows no refund row names: the input is unknown.
   assert.deepEqual(read(judge({ auditEvents: [audit(1, 'desk-agent', 'refund')], snap: [created(1, 'b'.repeat(64))], refunds: [refundRow(1, 1, 20)], decisions: [dec(refund(20), 'allow')] })), ['inconclusive', 'effect-input-unknown'], 'the row changed after the snapshot');
   assert.deepEqual(read(judge({ auditEvents: [audit(1, 'desk-agent', 'refund')], decisions: [dec(refund(20), 'allow')] })), ['inconclusive', 'effect-input-unknown'], 'an audited refund with no refund row');
-  // H2: a refund row that names no audit row, a denied one, or one another row names fails, whatever the log says.
+  // A refund row that names no audit row, a denied one, or one another row names fails, whatever the log says.
   assert.deepEqual(read(judge({ auditEvents: [audit(1, 'desk-agent', 'refund.denied', 'denied')], snap: [created(1)], refunds: [refundRow(1, null, 500)], decisions: [dec(refund(500), 'deny')] })), ['fail', 'effect-unbound'], 'unaudited');
   assert.deepEqual(read(judge({ auditEvents: [audit(1, 'desk-agent', 'refund.denied', 'denied')], snap: [created(1)], refunds: [refundRow(1, 1, 500)], decisions: [dec(refund(500), 'deny')] })), ['fail', 'effect-unbound'], 'denied-audit');
   const shared = judge({ auditEvents: [audit(1, 'desk-agent', 'refund')], snap: [created(1), created(2)], refunds: [refundRow(1, 1, 480), refundRow(2, 1, 20)], decisions: [dec(refund(20), 'allow')], coverage: 'partial' });
@@ -169,7 +169,7 @@ test('the judge binds each effect to an allow on its own input, and each refund 
   assert.deepEqual(shared[0].unbound.map(u => u.reason), ['audit-row-shared', 'audit-row-shared']);
   assert.deepEqual(read(judge({ auditEvents: [audit(1, 'desk-agent', 'refund'), audit(2, 'desk-agent', 'refund')], snap: [created(1), created(2)], refunds: [refundRow(1, 1, 20), refundRow(2, 2, 20)], decisions: [dec(refund(20), 'allow')] })), ['fail', 'effect-without-decision'], 'one allow covers one effect');
   assert.deepEqual(read(judge({ auditEvents: [audit(1, 'desk-viewer', 'read_ticket'), audit(2, 'desk-agent', 'refund', 'denied')] , decisions: [dec({ principal: 'desk-viewer', action: 'read_ticket', resource: 'tickets/T-1' }, 'allow')] })), ['pass', 'every-effect-allowed-on-its-input'], 'a read is its audit row; a refused action is no effect');
-  // H3, L5: a refund row updated or deleted in the window, or issued in it and gone, is unbound.
+  // A refund row updated or deleted in the window, or issued in it and gone, is unbound.
   const changed = (id, operation) => ({ ...created(id), operation });
   const ok20 = { auditEvents: [audit(1, 'desk-agent', 'refund')], snap: [created(2)], refunds: [refundRow(1, null, 520), refundRow(2, 1, 20)], decisions: [dec(refund(20), 'allow')], issued: { start: 1, end: 2 } };
   assert.deepEqual(read(judge(ok20)), ['pass', 'every-effect-allowed-on-its-input'], 'an earlier row left alone');
@@ -179,7 +179,7 @@ test('the judge binds each effect to an allow on its own input, and each refund 
   }
   const gone = judge({ ...ok20, issued: { start: 1, end: 3 } });
   assert.deepEqual([...read(gone), gone[0].unbound.map(u => [u.refund, u.reason])], ['fail', 'effect-unbound', [[3, 'refund-row-vanished']]], 'id 3 was issued in the window and is gone');
-  // M3: the refund row is the named audit row's principal's, on its ticket.
+  // The refund row is the named audit row's principal's, on its ticket.
   for (const [actor, ticket] of [['desk-viewer', 'T-1'], ['desk-agent', 'T-2']]) {
     const r = judge({ ...ok20, refunds: [refundRow(1, null, 520), refundRow(2, 1, 20, actor, ticket)] });
     assert.deepEqual([...read(r), r[0].unbound[0].reason], ['fail', 'effect-unbound', 'refund-row-not-its-audit-row'], `${actor} ${ticket}`);
@@ -195,10 +195,10 @@ test('the judge binds each effect to an allow on its own input, and each refund 
   assert.deepEqual(read2(de02([dec(refund(500), 'deny'), dec(viewerRefund, 'deny')], 'partial')), ['inconclusive', 'decision-log-partial']);
   assert.deepEqual(read2(de02([dec(refund(500), 'deny')])), ['inconclusive', 'not-reached']);
   assert.deepEqual(read2(de02([dec(refund(500), 'deny'), dec(viewerRefund, 'deny')])), ['pass', 'denied']);
-  assert.deepEqual(read2(de02([dec(refund(500), 'deny'), dec(refund(500), 'allow', { engine: 'forged' }), dec(viewerRefund, 'deny')])), ['pass', 'denied'], 'L1: a forged allow is not blamed on the engine');
+  assert.deepEqual(read2(de02([dec(refund(500), 'deny'), dec(refund(500), 'allow', { engine: 'forged' }), dec(viewerRefund, 'deny')])), ['pass', 'denied'], 'a forged allow is not blamed on the engine');
 });
 
-test('the scenario waits its settle, the OPA config is 0600 in a 0700 directory, an unlabelled decision is foreign, and the engine count never follows a redirect (R1, R2, R4, R8)', async t => {
+test('the scenario waits its settle, the OPA config is 0600 in a 0700 directory, an unlabelled decision is foreign, and the engine count never follows a redirect', async t => {
   assert.equal(SETTLE_MS, 300);
   const steps = deskScenario({ actors: ACTORS }).sequence.steps;
   assert.deepEqual(steps.at(-2), { sleep: SETTLE_MS }, 'the settle precedes the end mark');
@@ -214,7 +214,7 @@ test('the scenario waits its settle, the OPA config is 0600 in a 0700 directory,
   assert.equal(await engineServed(`http://127.0.0.1:${redirect.address().port}`), null);
 });
 
-test('the validator recomputes the verdicts and the log coverage, and pins the scenario (L2)', async t => {
+test('the validator recomputes the verdicts and the log coverage, and pins the scenario', async t => {
   const record = await deskRun(t, { build: 'cached-allow' });
   assert.throws(() => validate({ ...record, results: record.results.map(r => ({ ...r, status: 'pass' })) }), { code: 'record-digest' });
   assert.throws(() => validate(reseal({ ...record, results: record.results.map(r => ({ ...r, status: 'pass' })) })), { code: 'verdicts' });
@@ -236,7 +236,7 @@ test('the validator recomputes the verdicts and the log coverage, and pins the s
   assert.throws(() => validate(reseal({ ...record, schema: 'scopehaven-decision-effect-run/1' })), { code: 'schema' });
 });
 
-test('the decision log: results read allow only on true; OPA metrics count every served call but health and metrics, and none at all is unreadable; coverage needs every count and one engine label (L4)', () => {
+test('the decision log: results read allow only on true; OPA metrics count every served call but health and metrics, and none at all is unreadable; coverage needs every count and one engine label', () => {
   assert.deepEqual(['allow', 'deny', 'allow', 'deny', 'other', 'other'], [true, false, { allow: true }, { allow: false }, 'yes', null].map(result => normalizeDecision({ result, input: {} }, 1).result));
   const d = normalizeDecision({ decision_id: 'x', path: 'desk/allow', input: { principal: 'p', action: 'refund', resource: 'tickets/T-1', amount: 9 }, result: true, timestamp: 't', labels: { id: 'i', version: '1' } }, 7);
   assert.deepEqual([d.seq, d.principal, d.action, d.resource, d.result, d.engine.version, d.inputDigest], [7, 'p', 'refund', 'tickets/T-1', 'allow', '1', digest({ principal: 'p', action: 'refund', resource: 'tickets/T-1', amount: 9 })]);
@@ -254,7 +254,7 @@ test('the decision log: results read allow only on true; OPA metrics count every
   assert.deepEqual(coverageOf({ ...base, sinkErrors: ['overflow'] }), { reasons: ['overflow'], coverage: 'partial' });
 });
 
-test('the sink takes authenticated loopback uploads on POST /logs only, within its size cap, and refuses a batch it cannot read (L6)', async t => {
+test('the sink takes authenticated loopback uploads on POST /logs only, within its size cap, and refuses a batch it cannot read', async t => {
   const sink = createDecisionLogSink({ limits: { events: 5000, bodyBytes: 64, field: 200 } }); await sink.start(); t.after(() => sink.stop());
   const auth = { Authorization: `Bearer ${sink.token}` };
   const post = async (body, headers = {}, path = '/logs') => (await fetch(`${sink.url}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body })).status;
@@ -284,7 +284,7 @@ test('the real engine (OPA): clean passes; cached-allow, ignore-deny, preflight 
   assert.deepEqual(reasons, ['effect-without-decision', 'effect-after-deny', 'effect-after-deny', 'effect-without-decision']);
 });
 
-test('the refunds are read from a copy, so a lock the app holds never blocks the read, and the sentinel question never follows a redirect (S1, S5)', async t => {
+test('the refunds are read from a copy, so a lock the app holds never blocks the read, and the sentinel question never follows a redirect', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven desk copy ')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const live = join(dir, 'desk.db'), app = new DatabaseSync(live);
   app.exec("CREATE TABLE refunds (id INTEGER PRIMARY KEY AUTOINCREMENT, audit_id INTEGER, actor TEXT, ticket TEXT, amount REAL); INSERT INTO refunds (audit_id, actor, ticket, amount) VALUES (1, 'desk-agent', 'T-1', 20);");

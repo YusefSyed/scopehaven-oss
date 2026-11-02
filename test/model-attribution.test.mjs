@@ -1,4 +1,4 @@
-// Model-change attribution in the core comparison (moat W6, lead-model-identity-wiring-61).
+// Model-change attribution in the core comparison.
 // A run may carry modelIdentity (integrations/model-identity). For evidence origins whose
 // subject can be served by a model, compareRuns credits each verdict change to the application
 // or puts it down to the model, so a model swap can no longer earn a repair label.
@@ -208,7 +208,7 @@ test('a model entry with unreadable fingerprints or weights digest is malformed,
   assert.equal(sparse.modelAttribution.state, 'recorded'); assert.equal(sparse.modelAttribution.strength, 'vendor-model-string');
 });
 
-test('an attribution that throws reads not-recorded with the failure named, and fails the gate (N13)', async t => {
+test('an attribution that throws reads not-recorded with the failure named, and fails the gate', async t => {
   const { leaky, secure } = await responseOnlyRuns(t);
   // A models list the shape check accepts but that attribution cannot iterate.
   const hostile = identity('gemma4:latest', A); hostile.models[Symbol.iterator] = () => { throw new Error('not iterable'); };
@@ -247,7 +247,7 @@ test('an incompatible pair credits nobody (L4)', async t => {
 
 test('--require-model-identity fails a model-served comparison without identity, and only that', async t => {
   assert.equal(parseArgs(['--target', 'demo-repaired', '--out', '/abs/out', '--baseline', 'b1', '--require-model-identity']).requireModelIdentity, true);
-  // G1-v3 (L7): without a baseline the switch decides nothing, so the gate refuses it, as the Action does.
+  // Without a baseline the switch decides nothing, so the gate refuses it, as the Action does.
   assert.throws(() => parseArgs(['--target', 'demo-repaired', '--out', '/abs/out', '--require-model-identity']), /invalid-options/);
   assert.equal(Object.hasOwn(parseArgs(['--target', 'demo-repaired', '--out', '/abs/out']), 'requireModelIdentity'), false);
   for (const bad of [['--target', 'x', '--out', '/abs', '--require-model-identity', '--require-model-identity'], ['--target', 'x', '--out', '/abs', '--require-model-identity', 'yes'], ['--target', 'x', '--require-model-identity', '--out', '/abs', '--baseline']])
@@ -256,17 +256,17 @@ test('--require-model-identity fails a model-served comparison without identity,
   const required = { requireModelIdentity: true };
   assert.deepEqual(summarizeGate({ baseline: leaky, candidate: secure, ...required }).reasons, ['model-identity-not-recorded']);
   assert.deepEqual(summarizeGate({ baseline: withModel(leaky, identity('gemma4:latest', A)), candidate: secure, ...required }).reasons, ['model-identity-not-recorded']);
-  // G1-v3 (M3): the switch counts only an identity held in Scopehaven's custody (tap-memory).
+  // The switch counts only an identity held in Scopehaven's custody (tap-memory).
   const held = id => ({ ...id, custody: 'tap-memory' });
   const credited = summarizeGate({ baseline: withModel(leaky, held(identity('gemma4:latest', A))), candidate: withModel(secureNewLabel, held(identity('gemma4:latest', A))), ...required });
   assert.deepEqual([credited.exitCode, credited.reasons], [0, []]);
   for (const custody of [undefined, 'tap-file']) {
     const unheld = id => custody === undefined ? id : { ...id, custody };
     const read = summarizeGate({ baseline: withModel(leaky, unheld(identity('gemma4:latest', A))), candidate: withModel(secureNewLabel, held(identity('gemma4:latest', A))), ...required });
-    // A tap-file reading never credits a repair (G1-v4 L-1), so that pair also fails repair-not-attributable.
+    // A tap-file reading never credits a repair, so that pair also fails repair-not-attributable.
     assert.deepEqual([read.exitCode, read.reasons], [1, custody === undefined ? ['model-identity-unverified'] : ['repair-not-attributable', 'model-identity-unverified']], String(custody));
     assert.deepEqual(read.comparison.modelIdentityPolicy.causes, [{ side: 'baseline', reason: custody === undefined ? 'custody-not-recorded' : 'subject-writable-custody' }]);
-    // G1-v4 L-2: the policy is not met, so the summary credits no repair and withholds a repair label that could stand.
+    // The policy is not met, so the summary credits no repair and withholds a repair label that could stand.
     assert.equal(read.comparison.modelAttribution.repairCreditedToApp, false, String(custody));
     assert.equal(read.comparison.modelAttribution.policy, 'not-met', String(custody));
     if (read.comparison.compatibility === 'compatible' && read.comparison.allowedControlsPass) assert.equal(read.comparison.restorationLabel, 'Not attributable to the application: the model identity policy was not met', String(custody));

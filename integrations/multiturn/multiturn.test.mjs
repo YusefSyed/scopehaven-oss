@@ -79,7 +79,7 @@ const HELD = ['inconclusive', 'subject-writable', 'subject-writable-custody'];
 test('the checked desk reads inconclusive under custody; the unchecked desk fails the forbidden turns; the paired controls pass on both', async t => {
   const checked = await runOn(t, 'checked');
   assert.equal(checked.run.aborted, null);
-  // Custody (SURPASS-CUSTODY-01): only the desk's own audit table decides MT-01 and MT-02 (no request-path observer attributes an actor), so the checked desk's absences read inconclusive.
+  // Custody: only the desk's own audit table decides MT-01 and MT-02 (no request-path observer attributes an actor), so the checked desk's absences read inconclusive.
   assert.deepEqual(statuses(checked), { 'MT-01': 'inconclusive', 'MT-02': 'inconclusive', 'MT-C1': 'pass', 'MT-C2': 'pass', 'MT-C3': 'pass' });
   for (const id of ['MT-01', 'MT-02']) assert.deepEqual(custodyOf(checked, id), HELD, id);
   // The run is an ordinary sequence-run/2 the shared validator recomputes.
@@ -140,7 +140,7 @@ test('the scenario format is checked: captures before use, 3 turns per judged id
   for (const [message, scenario] of Object.entries(variants)) assert.throws(() => compileScenario(scenario), new RegExp(message.replace(/[{}]/g, '\\$&')), message);
 });
 
-test('a failed re-capture clears the name: an older identity\'s value is never reused, and the run stops (U\'s STALE)', async t => {
+test('a failed re-capture clears the name: an older identity\'s value is never reused, and the run stops', async t => {
   const STALE = { schema: MULTITURN_SCHEMA, id: 'stale-recapture', actors: ACTORS,
     turns: [
       { actor: 'b', method: 'POST', path: '/tickets', body: {}, capture: { target: '/id' }, expect: [201] },
@@ -167,7 +167,7 @@ test('a failed re-capture clears the name: an older identity\'s value is never r
 test('a capture used in the body is filled there: B closing A\'s ticket through the body is judged like the path form', async t => {
   const BODY = { ...SCENARIO, id: 'body-capture', turns: SCENARIO.turns.map((turn, i) => (i === 5 ? { actor: 'b', method: 'POST', path: '/close', body: { ticket: '{{ticketA}}' }, expect: [200, 403] } : turn)) };
   assert.equal(statuses(await runOn(t, 'unchecked', BODY))['MT-02'], 'fail');
-  // Custody (SURPASS-CUSTODY-01): the checked desk's MT-02 absence is decided only by its own audit table, so it reads inconclusive, as in the path form.
+  // Custody: the checked desk's MT-02 absence is decided only by its own audit table, so it reads inconclusive, as in the path form.
   const checkedBody = await runOn(t, 'checked', BODY);
   assert.equal(statuses(checkedBody)['MT-02'], 'inconclusive');
   assert.deepEqual(custodyOf(checkedBody, 'MT-02'), HELD);
@@ -176,7 +176,7 @@ test('a capture used in the body is filled there: B closing A\'s ticket through 
   assert.match(missing.run.aborted, /^(precondition|transport)-failed:turn-2/);
 });
 
-test('the format closes the review\'s gaps: actor-free selectors need 3 turns of every actor, controls are positive and paired, placeholders stay out of keys, dots are not ids', () => {
+test('the format closes these gaps: actor-free selectors need 3 turns of every actor, controls are positive and paired, placeholders stay out of keys, dots are not ids', () => {
   const actorFree = { ...SCENARIO, turns: SCENARIO.turns.filter((turn, i) => !(turn.actor === 'b' && i > 2)).concat([]), assertions: [{ id: 'X1', title: 'No close by anyone', severity: 'high', window: 'turn-1..turn-2', effect: { kind: 'effect.none', select: { source: 'sql-audit-table', name: 'ticket.close' } }, control: 'XC' }, { id: 'XC', title: 'A notes', severity: 'control', window: 'turn-1..turn-2', effect: { kind: 'effect.exists', select: by('user-a', 'ticket.note') } }] };
   assert.throws(() => compileScenario(actorFree), /user-b has fewer than 3 turns/);
   for (const effect of [{ kind: 'effect.none', select: by('user-a', 'ticket.note') }, { kind: 'effect.count', select: by('user-a', 'ticket.note'), expected: 0 }])
@@ -205,17 +205,17 @@ test('a capture is usable only by later turns, in the path or the body, and the 
   assert.notEqual(replayDigest(moved), replayDigest(run), 'an event changed with the same verdicts');
 });
 
-test('a control backs its forbidden row only when it selects the same effect (every field but the actor); a control names no control (U2-1, N10)', () => {
+test('a control backs its forbidden row only when it selects the same effect (every field but the actor); a control names no control', () => {
   const pairing = (forbidden, control) => compileScenario({ ...SCENARIO, assertions: [{ ...SCENARIO.assertions[1], effect: { kind: 'effect.none', select: forbidden }, control: 'MT-CX' }, { id: 'MT-CX', title: 'control', severity: 'control', window: 'turn-7..turn-7', effect: { kind: 'effect.exists', select: control } }] });
   assert.ok(pairing(by('user-b', 'ticket.close'), by('user-a', 'ticket.close')), 'the same action, from the same record');
   assert.throws(() => pairing(by('user-b', 'ticket.close'), by('user-b', 'ticket.create')), /same effect/, 'another action');
   assert.throws(() => pairing(by('user-b', 'ticket.close'), { source: 'sql-snapshot', actor: 'user-a', name: 'ticket.close' }), /same effect/, 'another record');
   assert.throws(() => pairing(by('user-b', { prefix: 'ticket.' }), by('user-a', 'ticket.close')), /same effect/, 'a prefix against one name');
-  // A forbidden row narrowed so it can never match is never backed by a broader control (U3-2).
+  // A forbidden row narrowed so it can never match is never backed by a broader control.
   for (const [narrow, why] of [[{ resource: 'ticket/1' }, 'a resource'], [{ resource: { prefix: 'archive/' } }, 'a resource prefix'], [{ operation: 'insert' }, 'an operation'], [{ traceId: 'trace-1' }, 'a trace id']])
     assert.throws(() => pairing(by('user-b', 'ticket.close', narrow), by('user-a', 'ticket.close')), /same effect/, why);
   assert.ok(pairing(by('user-b', 'ticket.close', { resource: 'tickets/1' }), by('user-a', 'ticket.close', { resource: 'tickets/1' })), 'the same narrowed effect, another actor');
-  // A control with no source would match every source: it backs no forbidden row that names one (U3-3, P4).
+  // A control with no source would match every source: it backs no forbidden row that names one.
   assert.throws(() => pairing(by('user-b', 'ticket.close'), { actor: 'user-a', name: 'ticket.close' }), /same effect/, 'a control with no source');
   assert.throws(() => compileScenario({ ...SCENARIO, assertions: SCENARIO.assertions.map(a => (a.id === 'MT-C1' ? { ...a, control: 'MT-C2' } : a)) }), /a control assertion names no control/);
   // The pairing stays in the compiled record.
@@ -225,12 +225,12 @@ test('a control backs its forbidden row only when it selects the same effect (ev
 test('the do-nothing desk: the forbidden rows read inconclusive under custody and their controls fail, so no pair holds', async t => {
   const r = await runOn(t, 'do-nothing');
   assert.equal(r.run.aborted, null);
-  // Custody (SURPASS-CUSTODY-01): an empty audit table is a record the desk writes, so the do-nothing desk's absences read inconclusive, not pass.
+  // Custody: an empty audit table is a record the desk writes, so the do-nothing desk's absences read inconclusive, not pass.
   assert.deepEqual(statuses(r), { 'MT-01': 'inconclusive', 'MT-02': 'inconclusive', 'MT-C1': 'fail', 'MT-C2': 'fail', 'MT-C3': 'fail' });
   for (const id of ['MT-01', 'MT-02']) assert.deepEqual(custodyOf(r, id), HELD, id);
   assert.ok(Array.isArray(validateSequenceRun(r.run).results), 'a run that keeps the pairing validates');
   assert.deepEqual(r.pairs.map(p => [p.forbidden, p.status, p.control, p.controlStatus, p.holds, p.why]), [['MT-01', 'inconclusive', 'MT-C2', 'fail', false, ['cannot-hold-custody', 'control-not-passed']], ['MT-02', 'inconclusive', 'MT-C3', 'fail', false, ['cannot-hold-custody', 'control-not-passed']]]);
-  // Custody (SURPASS-CUSTODY-01): a pair holds only when both rows pass, so the checked desk's custody-held forbidden rows hold no pair either; its controls still pass where the do-nothing desk's fail.
+  // Custody: a pair holds only when both rows pass, so the checked desk's custody-held forbidden rows hold no pair either; its controls still pass where the do-nothing desk's fail.
   const checked = await runOn(t, 'checked');
   assert.deepEqual(checked.pairs.map(p => [p.forbidden, p.status, p.control, p.controlStatus, p.holds, p.why]), [['MT-01', 'inconclusive', 'MT-C2', 'pass', false, ['cannot-hold-custody']], ['MT-02', 'inconclusive', 'MT-C3', 'pass', false, ['cannot-hold-custody']]]);
   // A pair that cannot hold says so, with what could decide it, never a bare false.
@@ -239,7 +239,7 @@ test('the do-nothing desk: the forbidden rows read inconclusive under custody an
   for (const p of checked.pairs) assert.ok(p.reasons[0].endsWith(checked.run.results.find(r => r.id === p.forbidden).custodyUpgrade), p.forbidden);
 });
 
-test('the replay digest covers the verdicts: the same events with another verdict give another digest (U2-2)', () => {
+test('the replay digest covers the verdicts: the same events with another verdict give another digest', () => {
   const run = { sequenceId: 's', sequenceHash: 'h', aborted: null, results: [{ id: 'MT-01', status: 'pass', verdict: 'pass' }], windows: { 'a>b': [{ source: 'sql-audit-table', instanceId: 'sqlite-audit-desk', coverage: 'complete', events: [] }] } };
   assert.notEqual(replayDigest(run), replayDigest({ ...run, results: [{ id: 'MT-01', status: 'inconclusive', verdict: 'missing' }] }));
   assert.equal(replayDigest(run), replayDigest(structuredClone(run)));

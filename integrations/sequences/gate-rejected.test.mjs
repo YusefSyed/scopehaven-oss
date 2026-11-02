@@ -145,7 +145,7 @@ async function closeDelimitedUpstream(status, close) {
   return { url: `http://127.0.0.1:${s.address().port}`, close: () => new Promise(r => s.close(r)) };
 }
 
-test('SEQ-REJ review M1: a declared 403 without a length, reset mid-body, notes response, upstream-error and response-end and stays unknown; a clean close ends it', { timeout: 60000 }, async () => {
+test('rejected sequence send: a declared 403 without a length, reset mid-body, notes response, upstream-error and response-end and stays unknown; a clean close ends it', { timeout: 60000 }, async () => {
   for (const close of ['rst', 'fin']) {
     const up = await closeDelimitedUpstream(403, close);
     const gate = createHoldGate({ upstream: up.url, rules: [{ id: 'refund', pathPrefix: '/tool/refund', holds: 0, rejected: [403] }] }); await gate.start();
@@ -304,7 +304,7 @@ test('SEQ-REJ residual (operator trust): an upstream that applies the call and s
   // sequences README and KNOWN-LIMITS; without the declaration the same run reads inconclusive.
   const lying = await heldToolRun({ toolMode: 'lies', rejected: [403] });
   assert.equal(lying.applied.refund, 2, 'Amy\'s held refund applied');
-  // Custody follows the gate's record, not who chose the answer: the row still reads independent (review M2).
+  // Custody follows the gate's record, not who chose the answer: the row still reads independent.
   assert.deepEqual([rowOf(lying.run, 'INFLIGHT-REFUND').status, rowOf(lying.run, 'INFLIGHT-REFUND').custody], ['pass', 'independent']);
   assert.equal(rowOf((await heldToolRun({ toolMode: 'lies' })).run, 'INFLIGHT-REFUND').status, 'inconclusive');
 });

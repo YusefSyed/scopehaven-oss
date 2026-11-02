@@ -335,7 +335,7 @@ export async function liveCheckGuard(recordFile, target, observerConfig, { now =
 const scanDigest = files => { const h = createHash('sha256'); for (const f of [...files].sort((a, b) => (a.id < b.id ? -1 : 1))) h.update(`${f.id}\0${f.content.length}\0`).update(f.content); return h.digest('hex'); };
 export const WATCHED_UNTIL = 'so the queue is left watched and windows read partial (table-not-in-wal) until its requests are observed on the wire (an egress recorder under a confined run)';
 // What the file scan and the live check say about each unlogged platform table the observer cannot read (pg_net's request
-// queue). init --stack never ignores one on these checks (the ruling on #553: an inference is not an observation, and
+// queue). init --stack never ignores one on these checks (an inference is not an observation, and
 // the app's own server code or an API exposing the net schema are seen by neither): each stays watched, and the finding is the
 // reason its windows read partial. use: 'unused' (every file read, none names it, and the live check under the record found it
 // installed, unlogged and called by nothing), 'used', or 'unknown'. files.skipped / files.readRoots: declarationFiles.
@@ -587,7 +587,7 @@ export async function runStack(argv, io = {}) {
     for (const line of formatFirstRow(summary.first)) say(line);
     say(`  run file: ${runFile}`);
     say(`  stack report: ${files.stack}`);
-    // The onboarding clock (integrations/init/clocks.mjs, lane O), when it ships: the stack's own starter run is the run it
+    // The onboarding clock (integrations/init/clocks.mjs), when it ships: the stack's own starter run is the run it
     // times. A clock that is missing or fails never changes the result.
     await stampClock(out, assessJson.id, summary, summary.counts.FAIL ? 1 : 0);
     if (summary.counts.FAIL) say(`Exit 1: the starter run has ${summary.counts.FAIL} FAIL row${summary.counts.FAIL === 1 ? '' : 's'}.`);

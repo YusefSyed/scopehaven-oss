@@ -1,5 +1,5 @@
 #!/bin/bash
-# CMP-SCHEDULE-01: one scheduled re-run, for launchd (com.scopehaven.drift.plist.template), cron or
+# One scheduled re-run, for launchd (com.scopehaven.drift.plist.template), cron or
 # the scheduled workflow. It gates a built-in synthetic target against the last successful run kept
 # in a private directory, writes the drift summary there (latest-drift.md), and keeps this run as the
 # next baseline unless it regressed or could not be compared. Nothing is sent anywhere: no mail, chat

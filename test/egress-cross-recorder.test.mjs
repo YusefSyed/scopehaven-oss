@@ -1,7 +1,7 @@
-// FIX-08 (SURPASS-BYPASS-01 M3 A-xrec; egress-recorder/13): another recorder's destination. During a "no charge" check an app sent the
+// Another recorder's destination (egress-recorder/13). During a "no charge" check an app sent the
 // charge to api-eu.pay.example, a regional name of api.pay.example, through a second witnessed recorder that declares only the chat
 // webhook host, and the prohibition passed: the clause read only the recorder that declares the provider, and the second recorder read
-// the regional name against its own declarations, so it was nobody's sibling. Option 1: each recorder also reads the destinations the
+// the regional name against its own declarations, so it was nobody's sibling. Now each recorder also reads the destinations the
 // run's other recorders declare (src/egress-rules.mjs crossDestinationsOf): a send to one is recorded under it, a send to its sibling adds
 // it a scoped entry, and a window holding either can see that destination, so the clause reads the send whichever recorder held it.
 // Over real loopback HTTP; destination hosts are names only and are never resolved or contacted.
@@ -139,7 +139,7 @@ test('recorder: an unrelated host, or the recorder\'s own host, through the seco
   const bare = await sink2Of(t, null);
   assert.equal(Object.hasOwn(bare.scope, 'cross'), false);
   const w = await windowOf(bare, () => send(bare.port, `http://${SIBLING}/v1/charges`));
-  assert.deepEqual([w.coverage, judge(none(PAY, CHARGES), [silentPay, w])], ['complete', 'pass'], 'the miss before FIX-08');
+  assert.deepEqual([w.coverage, judge(none(PAY, CHARGES), [silentPay, w])], ['complete', 'pass'], 'the miss without cross destinations');
 });
 
 test('recorder: outside a scoped check window a sibling of another recorder\'s destination leaves the window partial, and that window sees the destination', async t => {
@@ -151,7 +151,7 @@ test('recorder: outside a scoped check window a sibling of another recorder\'s d
 
 // End to end: the connector, the factory's two recorders and the validator. The app's agent reaches the provider through the first
 // recorder and the chat webhook through the second, both as proxies; mode: what /agent/summarize does through the second recorder.
-// honest: nothing; sibling (A-xrec): the charge to the provider's regional name; declared: the charge to its declared name; unrelated:
+// honest: nothing; sibling: the charge to the provider's regional name; declared: the charge to its declared name; unrelated:
 // a post to an unrelated host; hook: a post to the chat webhook. sibling-tail, unrelated-tail: summarize sends nothing; the first identity
 // probe after it (GET /me, re-sent after the last check) sends the regional-name charge, or the unrelated post, so it lands in the run's tail.
 async function twoProxyApp(t, sinkPort, sink2Port, mode) {
@@ -201,7 +201,7 @@ const reseal = r => { for (const row of r.results) if (row.trace[1]) row.evidenc
 const refused = run => assert.throws(() => validateHttpRunEvidence(run), error => error.code === 'invalid-run-evidence');
 const textOf = row => row.assertions.find(a => a.name.startsWith('Observed effect 1')).actual;
 
-test('end to end (A-xrec): the regional name through the second recorder reads inconclusive, never pass, names the host, and the run validates', async t => {
+test('end to end: the regional name through the second recorder reads inconclusive, never pass, names the host, and the run validates', async t => {
   const run = await runMode(t, 'sibling');
   const row = rowOf(run, 'NO-CHARGE');
   assert.equal(row.status, 'inconclusive');

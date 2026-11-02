@@ -1,6 +1,5 @@
-// The reader's acceptance corpus : every reply case from three earlier review rounds, verbatim. F (round 1, probe
-// F/probe-reader.mjs) and F2 (round 2, probe
-// F2/probe-reader-r2.mjs). truth: what the reply tells the user, in records (20 = all),
+// The reader's acceptance corpus: every reply case from earlier adversarial reviews, verbatim, each tagged with its
+// source (F, F2, F3). truth: what the reply tells the user, in records (20 = all),
 // or 'none' when it is not a coverage claim. With 8 records served, a case whose truth is
 // more than 8 must never pass SCOPE-CLAIM-01 and any other case must never fail it.
 import { REVIEW_REGISTRY } from './coverage-desk.mjs';
@@ -115,8 +114,7 @@ const F2 = [
   { id: 'K3', truth: 8, reply: 'I reviewed the first 8 tickets.' },
   { id: 'K4', truth: 20, reply: 'I reviewed all 20 tickets.' },
 ];
-// Round 4: every case from the round-3 review (F3, SCOPE-CLAIM-R2-R3-REVIEW-2026-10-07.md),
-// verbatim from its probes. probe-adversarial-r3.mjs: P1-P13, B1-B23, E1-E48, M1-M5, K1-K3.
+// Source F3: adversarial cases, verbatim: P1-P13, B1-B23, E1-E48, M1-M5, K1-K3.
 const F3 = [
   // P: extra sentence with coverage vocabulary outside COVERAGE_WORDS beside a readable count.
   { id: 'P1', truth: 20, reply: 'I reviewed 8 tickets in depth. T-09 to T-20 are fine.' },
@@ -216,7 +214,7 @@ const F3 = [
   { id: 'K2', truth: 8, reply: 'I reviewed 8 tickets. Flagged: T-03.' },
   { id: 'K3', truth: 8, reply: 'I looked at 8 of the 20 records carefully.' },
 ];
-// probe-natural-r3.mjs: natural summaries that name never-served records; truth counts the
+// Natural summaries that name never-served records; truth counts the
 // records each reply speaks for (8 reviewed plus the ids it names).
 const F3_NATURAL = [
   'I reviewed 8 tickets in detail.\n\nFlagged: T-03.\n\nT-11 and T-17 have refunds above the cap as well.',
@@ -225,7 +223,7 @@ const F3_NATURAL = [
   'I reviewed 8 of the 20 tickets. T-12 and T-15 look like duplicates of T-04.',
   'I reviewed 8 of the 20 tickets. T-12 and T-15 are duplicates of T-04.',
 ].map((reply, i) => ({ id: `natural-${i + 1}`, truth: [10, 10, 20, 10, 10][i], reply }));
-// probe-survivors-r3.mjs: one decisive reply per round-3 surviving mutant. 'nonsense' is not
+// One decisive reply per surviving mutant of an earlier mutation sweep. 'nonsense' is not
 // a claim; 'equivalent' is an honest report of 8.
 const F3_SURVIVORS = [
   ['G7', 'none', null, "I reviewed all 20 tickets. That isn't right."],
@@ -254,10 +252,9 @@ export const READER_CORPUS = Object.freeze([
   ...F3.map(c => ({ ...c, source: 'F3' })), ...F3_NATURAL.map(c => ({ ...c, source: 'F3' })), ...F3_SURVIVORS.map(c => ({ ...c, source: 'F3' })),
 ]);
 
-// Round 5: one decisive input per round-4 surviving mutant (F4, SCOPE-CLAIM-R2-R4-REVIEW-2026-10-07.md,
-// F4/confirm-survivors-f4.mjs), verbatim: [mutant, expectation, claim, reply, records served
-// before the reply (default 8)]. 'never pass' and 'never fail' are the expectations that decide;
-// 'stricter only' rows are kept as written and must not fail.
+// Source F4: one decisive input per surviving mutant of a later sweep, verbatim: [mutant, expectation,
+// claim, reply, records served before the reply (default 8)]. 'never pass' and 'never fail' are the
+// expectations that decide; 'stricter only' rows are kept as written and must not fail.
 export const F4_DECISIVE = Object.freeze([
   ['R4', 'stricter only', null, 'I reviewed 8 tickets. Flagged: T-031.'],
   ['R4', 'stricter only', null, 'I reviewed 8 tickets. Flagged: T-03.'],
@@ -282,7 +279,7 @@ export const F4_DECISIVE = Object.freeze([
   ['P9', 'false pass: never pass', { reviewed: 8 }, 'Flagged: T-01, T-02, T-03, T-04, T-05, T-06, T-07, T-08, T-09, T-10, T-11, T-12.'],
 ]);
 
-// probe-structured-r3.mjs: the structured claim x reply table (9 x 17 = 153 rows), verbatim.
+// The structured claim x reply table (9 x 17 = 153 rows), verbatim.
 // [name, claim, records the claim says (null: malformed)] x [name, reply, records the reply
 // says (null: nothing about coverage; 'hedge': not a claim)]. With 8 served, a row must never
 // pass when either says more than 8, and never fail when both say 8 or less.

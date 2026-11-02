@@ -132,7 +132,7 @@ export function validateSequenceNativeRun(run, { expectedSuite } = {}) {
   need(problem === null, 'invalid-sequence-evidence', problem);
   const identity = { applicationId: run.applicationId, contextId: run.contextId, build: run.build };
   need(ID.test(identity.applicationId ?? '') && ID.test(identity.contextId ?? '') && typeof identity.build === 'string' && BUILD_LABEL.test(identity.build), 'invalid-sequence-evidence', 'identity');
-  // The store adds integrity and notes when it reads a run, and the CLI the authorization stamp (CMP-ROE-01) and the build
+  // The store adds integrity and notes when it reads a run, and the CLI the authorization stamp and the build
   // that made the run (src/producer.mjs), both outside the sealed run, so neither changes a verdict; everything else must be
   // what the sealed run derives.
   const { integrity: _i, notes: _n, authorization, producer: _p, ...core } = run;

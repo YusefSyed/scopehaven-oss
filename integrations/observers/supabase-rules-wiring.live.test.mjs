@@ -1,4 +1,4 @@
-// The Supabase identity rules wired into a run (NC9 item 3), end to end on a local Supabase stack: a refund app over the stack's
+// The Supabase identity rules wired into a run, end to end on a local Supabase stack: a refund app over the stack's
 // PostgREST, assessed by runHttpAssessment with a pg-snapshot observer whose actor capture the stack's superuser installed, and a
 // target that declares supabaseRules. The defective twin's row-level security filters the allowed user's own refund to zero rows and
 // the app reports success anyway: the allowed-use control fails, rls-zero-row. The fixed twin's refund changes the row, and a twin

@@ -1,4 +1,4 @@
-// Framework mode from the CLI (NC1 item 2): `./scopehaven assess --framework <langgraph|mastra> --template <path> ...`
+// Framework mode from the CLI: `./scopehaven assess --framework <langgraph|mastra> --template <path> ...`
 // runs a frozen framework scenario end to end through run.mjs's own steps (the template checkout at the pinned commit,
 // the seeds at their sha256, the adapter under the turn-runner contract with the scripted model stub), judges the record,
 // and saves an ordinary core run (run-record.mjs) in the run store. The report, SARIF and run history read it as they

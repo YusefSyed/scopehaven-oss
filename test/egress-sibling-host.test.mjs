@@ -1,8 +1,8 @@
-// FIX-04 (SURPASS-BYPASS-01 A-32; egress-recorder/11): another name of a declared provider. An app that posts a charge to
+// Another name of a declared provider (egress-recorder/11). An app that posts a charge to
 // api-eu.pay.example, a regional name of the declared api.pay.example, made a "no charge" prohibition pass: the send was an ordinary
-// event under its own name. Option 1: an undeclared host sharing a destination's registrable domain is a scoped entry for that
-// destination in a check window (egress-undeclared-sibling-host), and window-wide elsewhere. Option 2: a destination may declare
-// aliases, folded into its name. Option 3: the clause text names the undeclared hosts its windows saw. Over real loopback HTTP;
+// event under its own name. Now an undeclared host sharing a destination's registrable domain is a scoped entry for that
+// destination in a check window (egress-undeclared-sibling-host), and window-wide elsewhere; a destination may declare
+// aliases, folded into its name; and the clause text names the undeclared hosts its windows saw. Over real loopback HTTP;
 // destination hosts are names only and are never resolved or contacted.
 import test from 'node:test';
 import assert from 'node:assert/strict';

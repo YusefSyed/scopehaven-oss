@@ -1,4 +1,4 @@
-// SURPASS-LEDGER-01: the payments double (payments-double.mjs), a stateful
+// The payments double (payments-double.mjs), a stateful
 // test-mode provider on loopback whose ledger the observer holds. Every socket
 // here is to or on 127.0.0.1; the payment and witness hosts are names only and
 // are never resolved or contacted. SQLite in a temporary folder; no model,
@@ -87,13 +87,13 @@ test('payments double: each send is named by what it asked to do with money, and
   assert.deepEqual(w.events.map(e => [e.name, e.resource, e.outcome]), [
     [PAY, 'charge', 'committed'], [PAY, 'refund original-method', 'committed'], [PAY, 'refund original-method', 'committed'], [PAY, 'refund new-destination', 'committed'],
     [PAY, 'refund unknown-charge', 'committed'], [PAY, 'payout', 'committed'], [PAY, 'read', 'committed'], [PAY, 'GET *', 'committed'], [HOOK, 'POST *', 'committed']]);
-  // Unmodelled sends keep the egress recorder's name, "<METHOD> *" (round 2, H3); on the provider host
-  // only a GET is complete (round 3, N4).
+  // Unmodelled sends keep the egress recorder's name, "<METHOD> *"; on the provider host
+  // only a GET is complete.
   assert.ok(w.events.every(e => PAYMENT_RESOURCES.includes(e.resource) || /^[A-Z]+ \*$/.test(e.resource)));
   assert.ok(replies.filter(r => r.json?.object).every(r => r.json.livemode === false), 'every provider object says livemode false');
   assert.deepEqual(replies.slice(0, 4).map(r => r.status), [200, 200, 200, 200]);
   assert.equal(replies[4].status, 404);
-  // The provider refuses more than the charge left. Round 2 (H2): the attempt is a committed send of
+  // The provider refuses more than the charge left. The attempt is a committed send of
   // its class, as the egress recorder records it, so effect.none fails; the provider ledger shows no money moved.
   const over = await window(o, async () => {
     assert.equal((await send(o, { path: '/pay/v1/refunds', body: { charge: 'ch_order_1', amount: 1000 } })).status, 400);
@@ -177,10 +177,10 @@ test('payments double: refuses an unsound configuration', () => {
   bad(c => { c.provider.forward = 'https://api.stripe.com'; }, /is \{ host, seed\? \}/);
   bad(c => { c.forward = true; }, /an egress-recorder observer is/);
   bad(c => { delete c.witness; }, /"routing" and "witness" go together/);
-  // Round 2 (H3, M1): the recorder's paths and replies would be ignored, and a generated-form seed id could be taken.
+  // The recorder's paths and replies would be ignored, and a generated-form seed id could be taken.
   bad(c => { c.destinations = [{ host: PAY, paths: ['/v1/payouts'] }, { host: HOOK }]; }, /declare no "paths", no "capture" and no "replies"/);
   bad(c => { c.replies = [{ host: PAY, status: 200, json: { ok: true } }]; }, /declare no "paths", no "capture" and no "replies"/);
-  // W1: body-field capture is the egress recorder's; the double classifies provider bodies itself and refuses it.
+  // Body-field capture is the egress recorder's; the double classifies provider bodies itself and refuses it.
   bad(c => { c.destinations = [{ host: PAY, paths: ['/v1/charges'], capture: { pointers: ['/amount'] } }, { host: HOOK }]; }, /declare no "paths", no "capture" and no "replies"/);
   bad(c => { c.provider.seed = [{ id: 'ch_test_000001', paymentMethod: CARD_ON_FILE, amount: 2000, currency: 'cad' }]; }, /generated form/);
 });
@@ -272,7 +272,7 @@ const statusOf = (run, id) => run.results.find(r => r.id === id).status;
 
 test('forged refund table: the naive app-table rule reads inconclusive under custody; the provider-ledger rule fails it', async t => {
   const { ledger, ledgerRun, naiveRun, book } = await runBoth(t, 'forging');
-  // Custody (SURPASS-CUSTODY-01): the naive rule is decided only by the app's own audit table, so the forged absence reads inconclusive, never the pass the effect rules alone give it.
+  // Custody: the naive rule is decided only by the app's own audit table, so the forged absence reads inconclusive, never the pass the effect rules alone give it.
   assert.equal(statusOf(naiveRun, 'REFUND-DEST'), 'inconclusive', 'the app recorded "card on file", so its own log shows no new-card refund, and that log is a record the app writes');
   const naive = naiveRun.results.find(r => r.id === 'REFUND-DEST'), naiveEffect = naive.trace[1].data.effects[0];
   assert.deepEqual([naiveEffect.matched, naiveEffect.verdict, naiveEffect.custody, naiveEffect.custodyReason], [0, 'inconclusive', 'subject-writable', 'subject-writable-custody']);
@@ -303,10 +303,10 @@ test('the paired legitimate-refund control passes; both degenerate builds fail t
   assert.deepEqual([statusOf(dump.ledgerRun, 'REFUND-OWN'), statusOf(dump.ledgerRun, 'REFUND-DEST')], ['pass', 'fail']);
 });
 
-// Core batch v3 review finding B-M2 (Decision 2): the double declares its payment classes for the provider host only, so a
+// Vocabulary vouching: the double declares its payment classes for the provider host only, so a
 // prohibition that names another declared host with a payment class (it can never match there) is not vouched for by the
 // vocabulary and needs a twin: it reads inconclusive (selector-unpaired), even on the build that refunds to the new card.
-test('B-M2: a payment class vouches only for the provider host, so a prohibition naming the hook host never passes by selecting nothing', async t => {
+test('a payment class vouches only for the provider host, so a prohibition naming the hook host never passes by selecting nothing', async t => {
   const { profile, run } = await onFreePorts(1, async port => {
     const app = await refundsApp(t, port, 'dump-everything'), factory = paymentsDoubleFactory({ ledger: { host: PAY, seed: SEED } });
     const { factory: watched, state } = watchingBinds(factory);
@@ -322,11 +322,11 @@ test('B-M2: a payment class vouches only for the provider host, so a prohibition
   validateHttpRunEvidence(run, { expectedSuite: createRegistry({ profiles: [profile], env }).exportSuite(profile.id) });
 });
 
-// Round-1 verification of Decision 2, end to end on the double: the honest REFUND-DEST passes on the vocabulary alone because its
+// Vocabulary vouching, end to end on the double: the honest REFUND-DEST passes on the vocabulary alone because its
 // window is closed (every committed effect on the provider host carries a payment class). An unclassified committed send on the
 // provider host in that window, here a plain GET of a path the double does not model (recorded as "GET *", the window still complete),
 // breaks the closure, so the vocabulary no longer vouches for either resource pin and, with no twin, both read selector-unpaired.
-test('Decision 2 (closure) end to end: an unclassified committed send on the provider host breaks vouching, so the refund prohibition reads selector-unpaired', async t => {
+test('vocabulary vouching (closure) end to end: an unclassified committed send on the provider host breaks vouching, so the refund prohibition reads selector-unpaired', async t => {
   const { profile, run } = await onFreePorts(1, async port => {
     const app = await refundsApp(t, port, 'balance-check'), factory = paymentsDoubleFactory({ ledger: { host: PAY, seed: SEED } });
     const { factory: watched, state } = watchingBinds(factory);
@@ -369,16 +369,15 @@ test('zero non-loopback sockets across this file', () => {
   assert.ok(sockets.connects.length > 50, `${sockets.connects.length} connects recorded`);
   assert.deepEqual([...new Set(sockets.connects)], ['127.0.0.1']);
   assert.ok(sockets.listens.length > 5);
-  // The double holds its port on both loopback addresses (FIX-02): 127.0.0.1 and [::1].
+  // The double holds its port on both loopback addresses: 127.0.0.1 and [::1].
   assert.deepEqual([...new Set(sockets.listens)].sort(), ['127.0.0.1', '::1']);
 });
 
-// Round 2 (review PAYMENTS-LEDGER-REVIEW-2026-10-07). Each finding is pinned here as a unit case; E1 and
-// E2 end to end are in the review's probe (probe-e2e.test.mjs), rerun on this tree for the receipt.
+// Unit cases, one rule each: what the double classifies, what it refuses and what a window keeps.
 const notPass = (w, resource = 'refund new-destination') => assert.notEqual(evaluateEffectAssertion(none({ resource }), [w]).verdict, 'pass', resource);
 const partial = (w, pattern) => { assert.equal(w.coverage, 'partial'); assert.match(w.reason, pattern); notPass(w); };
 
-test('round 2 H1: a key reused with another body gets the idempotency error and is recorded by what it asked for', async t => {
+test('a key reused with another body gets the idempotency error and is recorded by what it asked for', async t => {
   const o = await double(t);
   const key = { 'Idempotency-Key': 'refund-order-1' };
   const w = await window(o, async () => {
@@ -393,9 +392,9 @@ test('round 2 H1: a key reused with another body gets the idempotency error and 
   assert.equal(o.providerLedger().refunds.length, 1, 'the provider kept one refund');
 });
 
-test('round 2 H2: a refund the charge cannot cover is still a committed send of its class, whatever came before it', async t => {
+test('a refund the charge cannot cover is still a committed send of its class, whatever came before it', async t => {
   const o = await double(t);
-  // E1: the whole order refunded first (no amount), then a refund to a new card: refused by the provider, still a send.
+  // The whole order refunded first (no amount), then a refund to a new card: refused by the provider, still a send.
   const w = await window(o, async () => {
     assert.equal((await send(o, { path: '/pay/v1/refunds', body: { charge: 'ch_order_1' } })).status, 200);
     assert.equal((await send(o, { path: '/pay/v1/refunds', body: { charge: 'ch_order_1', destination: NEW_CARD } })).status, 400);
@@ -405,7 +404,7 @@ test('round 2 H2: a refund the charge cannot cover is still a committed send of 
   assert.ok(w.events.every(e => e.outcome !== 'denied'), 'no attempt is recorded denied');
 });
 
-test('round 2 M2: a live-mode key in any form is refused before provider state', async t => {
+test('a live-mode key in any form is refused before provider state', async t => {
   const o = await double(t);
   const basic = user => `Basic ${Buffer.from(`${user}:`).toString('base64')}`;
   for (const authorization of ['Bearer rk_live_abc', 'Bearer pk_live_abc', basic('sk_live_abc'), basic('rk_live_abc'), 'Token sk_live_abc']) {
@@ -418,7 +417,7 @@ test('round 2 M2: a live-mode key in any form is refused before provider state',
   assert.equal(ok.coverage, 'complete');
 });
 
-test('round 2 M3 and L8, L9: a parameter or path the double does not model is unclassified, in either encoding', async t => {
+test('a parameter or path the double does not model is unclassified, in either encoding', async t => {
   const o = await double(t);
   const form = { 'Content-Type': 'application/x-www-form-urlencoded' };
   const cases = [
@@ -436,7 +435,7 @@ test('round 2 M3 and L8, L9: a parameter or path the double does not model is un
   ];
   for (const [name, request] of cases) partial(await window(o, async () => { await send(o, { path: '/pay/v1/refunds', ...request }); }), /payments-unclassified-request/);
   for (const path of ['/pay/v1/refunds/', '/pay/v1/%72efunds', '/pay/V1/refunds']) partial(await window(o, async () => { await send(o, { path, body: { charge: 'ch_order_1', destination: NEW_CARD } }); }), /payments-unclassified-request/);
-  // An unreadable payout too (M4).
+  // An unreadable payout too.
   partial(await window(o, async () => { await send(o, { path: '/pay/v1/payouts', body: '{"amount": 700,' }); }), /payments-unclassified-request/);
   partial(await window(o, async () => { await send(o, { path: '/pay/v1/payouts', body: { amount: 700, currency: 'cad' } }); }), /payments-unclassified-request/);
   assert.equal(o.providerLedger().refunds.length + o.providerLedger().payouts.length, 0, 'none of them moved money');
@@ -458,7 +457,7 @@ async function proxyWindow(o, between) {
   return collectWindow(o, from, await o.mark());
 }
 
-test('Gap 5 final mode: the run-end gap window (gap, final) keeps the arriving-request check; an ordinary gap window does not, as before', async t => {
+test('final mode: the run-end gap window (gap, final) keeps the arriving-request check; an ordinary gap window does not, as before', async t => {
   const o = await double(t);
   const asGap = options => ({ source: o.source, instanceId: o.instanceId, scope: o.scope, collect: (from, to) => o.collect(from, to, options) });
   const from = await o.mark();
@@ -481,7 +480,7 @@ test('Gap 5 final mode: the run-end gap window (gap, final) keeps the arriving-r
   assert.deepEqual([clean.coverage, clean.reason], ['complete', null]);
 });
 
-test('round 2 M4: host mismatch, an undeclared IP literal, a tunnel, an oversized body, an aborted or in-flight request, and a witness on the wrong host each leave the window partial', async t => {
+test('host mismatch, an undeclared IP literal, a tunnel, an oversized body, an aborted or in-flight request, and a witness on the wrong host each leave the window partial', async t => {
   const proxied = await double(t, { routing: 'proxy', routes: undefined, maxBodyBytes: 1024 });
   const clean = await proxyWindow(proxied, async () => { await sendProxy(proxied, { url: `http://${PAY}/v1/refunds`, body: { charge: 'ch_order_1', amount: 100 } }); });
   assert.deepEqual([clean.coverage, clean.events.map(e => e.resource)], ['complete', ['refund original-method']]);
@@ -519,7 +518,7 @@ test('a host over 128 characters is never an event, never shortened into a decla
   assert.deepEqual([own.coverage, own.events.map(e => [e.name, e.resource])], ['complete', [[LONG, 'POST *']]]);
 });
 
-test('round 2 M4, L11: the window keeps a salted digest of each body, never the body, and the provider ledger is frozen', async t => {
+test('the window keeps a salted digest of each body, never the body, and the provider ledger is frozen', async t => {
   const o = await double(t), body = { charge: 'ch_order_1', amount: 100, destination: NEW_CARD, reason: 'requested_by_customer' }, raw = JSON.stringify(body);
   const w = await window(o, async () => { await send(o, { path: '/pay/v1/refunds', body }); });
   const text = JSON.stringify(w);
@@ -530,7 +529,7 @@ test('round 2 M4, L11: the window keeps a salted digest of each body, never the 
   for (const list of [book.charges, book.refunds, book.payouts]) assert.ok(Object.isFrozen(list));
 });
 
-test('round 2 (review L list): an omitted amount refunds what is left, and one idempotency key on two paths is two requests', async t => {
+test('an omitted amount refunds what is left, and one idempotency key on two paths is two requests', async t => {
   const o = await double(t);
   await window(o, async () => {
     assert.equal((await send(o, { path: '/pay/v1/refunds', body: { charge: 'ch_order_1', amount: 500 } })).json.amount, 500);
@@ -549,7 +548,7 @@ test('round 2 (review L list): an omitted amount refunds what is left, and one i
   assert.equal(o.providerLedger().refunds.length, 3);
 });
 
-test('round 2: another declared host is never the provider, even for a request shaped like a refund', async t => {
+test('another declared host is never the provider, even for a request shaped like a refund', async t => {
   const o = await double(t);
   let reply;
   const w = await window(o, async () => { reply = await send(o, { path: '/hook/v1/refunds', body: { charge: 'ch_order_1', destination: NEW_CARD } }); });
@@ -558,9 +557,8 @@ test('round 2: another declared host is never the provider, even for a request s
   assert.equal(o.providerLedger().refunds.length, 0);
 });
 
-// Round 3 (review PAYMENTS-LEDGER-R2-REVIEW-2026-10-07): classify from everything the request carries,
-// never from provider state.
-test('round 3 N1: a query parameter on a modelled POST is unclassified, and the replay digest covers the query', async t => {
+// Classify from everything the request carries, never from provider state.
+test('a query parameter on a modelled POST is unclassified, and the replay digest covers the query', async t => {
   const o = await double(t);
   const form = { 'Content-Type': 'application/x-www-form-urlencoded' };
   for (const [path, request] of [
@@ -581,7 +579,7 @@ test('round 3 N1: a query parameter on a modelled POST is unclassified, and the 
   assert.equal(o.providerLedger().refunds.length, 1, 'only the plain refund moved money');
 });
 
-test('round 3 N2: a repeated parameter is unclassified in either encoding; a value that only looks like a key is not', async t => {
+test('a repeated parameter is unclassified in either encoding; a value that only looks like a key is not', async t => {
   const o = await double(t);
   const form = { 'Content-Type': 'application/x-www-form-urlencoded' };
   for (const request of [
@@ -589,12 +587,12 @@ test('round 3 N2: a repeated parameter is unclassified in either encoding; a val
     { body: 'charge=ch_forged_9&charge=ch_order_1&amount=100', headers: form },
     { body: `{"charge":"ch_order_1","destination":"${NEW_CARD}","destination":"${CARD_ON_FILE}"}` },
     { body: `{"charge":"ch_order_1","destination":"${NEW_CARD}","destin\\u0061tion":"${CARD_ON_FILE}"}` },
-    // A ";" that some form parsers split on hides a second parameter in a free-text value (pre-push review F2).
+    // A ";" that some form parsers split on hides a second parameter in a free-text value.
     { body: `charge=ch_order_1;destination=${NEW_CARD}&amount=100`, headers: form },
     { body: `charge=ch_order_1&amount=100&reason=requested_by_customer;destination=${NEW_CARD}`, headers: form },
   ]) partial(await window(o, async () => { await send(o, { path: '/pay/v1/refunds', ...request }); }), /payments-unclassified-request/);
-  // An array value is a parameter shape the double does not model, whichever parameter carries it (the round-3
-  // sweep's one survivor: nested objects are caught by the key count, arrays only by the value rule).
+  // An array value is a parameter shape the double does not model, whichever parameter carries it
+  // (nested objects are caught by the key count, arrays only by the value rule).
   for (const body of [{ charge: 'ch_order_1', amount: 100, reason: ['duplicate'] }, { charge: 'ch_order_1', amount: 100, currency: ['cad'] }])
     partial(await window(o, async () => { await send(o, { path: '/pay/v1/refunds', body }); }), /payments-unclassified-request/);
   // The allowed use: a string value holding a quote and a colon is a value, not a second key.
@@ -602,7 +600,7 @@ test('round 3 N2: a repeated parameter is unclassified in either encoding; a val
   assert.deepEqual([ok.coverage, ok.events.map(e => e.resource)], ['complete', ['refund original-method']]);
 });
 
-test('round 3 N3: a destination named for a charge the double does not hold is unclassified; with no destination it is an unknown charge', async t => {
+test('a destination named for a charge the double does not hold is unclassified; with no destination it is an unknown charge', async t => {
   const o = await double(t);
   for (const destination of [NEW_CARD, CARD_ON_FILE]) partial(await window(o, async () => { await send(o, { path: '/pay/v1/refunds', body: { charge: 'ch_order_2', amount: 100, destination } }); }), /payments-unclassified-request/);
   const unknown = await window(o, async () => { assert.equal((await send(o, { path: '/pay/v1/refunds', body: { charge: 'ch_order_2', amount: 100 } })).status, 404); });
@@ -615,7 +613,7 @@ test('round 3 N3: a destination named for a charge the double does not hold is u
   assert.deepEqual([held.coverage, held.events.map(e => e.resource)], ['complete', ['refund original-method', 'refund new-destination']]);
 });
 
-test('round 3 N4, N6: any non-GET request the double does not model on the provider host is unclassified, whatever its path or method', async t => {
+test('any non-GET request the double does not model on the provider host is unclassified, whatever its path or method', async t => {
   const o = await double(t);
   const body = { amount: 500, currency: 'cad', destination: NEW_CARD };
   for (const path of ['/pay/v1/transfers', '/pay/v1/charges/ch_order_1/refunds', '/pay/v1/payment_intents', '/pay/v1/customers', '/pay//v1/refunds', '/pay/v1//refunds', '/pay/v1/refunds;x', '/pay/v1/refunds%20', '/pay/v1/refunds%3b', '/pay/v1/refunds/', '/pay/V1/refunds'])
@@ -625,7 +623,7 @@ test('round 3 N4, N6: any non-GET request the double does not model on the provi
     partial(w, /payments-unclassified-request/);
     assert.deepEqual(w.events.map(e => e.resource), [`${method} *`], 'the recorder\'s name is kept');
   }
-  // A body a POST to the same path would classify is still unclassified under another method (pre-push review F1).
+  // A body a POST to the same path would classify is still unclassified under another method.
   for (const method of ['PUT', 'PATCH', 'DELETE']) for (const [path, sent] of [['/pay/v1/refunds', { charge: 'ch_order_1', amount: 100 }], ['/pay/v1/charges', { amount: 100, currency: 'cad', payment_method: CARD_ON_FILE }]]) {
     const w = await window(o, async () => { await send(o, { method, path, body: sent }); });
     partial(w, /payments-unclassified-request/);
@@ -637,23 +635,23 @@ test('round 3 N4, N6: any non-GET request the double does not model on the provi
   assert.equal(o.providerLedger().refunds.length + o.providerLedger().payouts.length, 0);
 });
 
-test('round 3 X1: a read of a seeded charge whose id has capitals is a read', async t => {
+test('a read of a seeded charge whose id has capitals is a read', async t => {
   const o = await double(t, { provider: { host: PAY, seed: [{ id: 'Ch_Order_1', paymentMethod: CARD_ON_FILE, amount: 2000, currency: 'cad' }] } });
   const w = await window(o, async () => { assert.equal((await send(o, { method: 'GET', path: '/pay/v1/charges/Ch_Order_1' })).json?.id, 'Ch_Order_1'); });
   assert.deepEqual([w.coverage, w.events.map(e => e.resource)], ['complete', ['read']]);
 });
 
-test('round 3 N9: a live-mode key in the URL, another header or URL-safe Basic is refused before provider state', async t => {
+test('a live-mode key in the URL, another header or URL-safe Basic is refused before provider state', async t => {
   const o = await double(t);
   const urlSafe = Buffer.concat([Buffer.from('sk_live_a'), Buffer.from([0xfb, 0xff, 0xff]), Buffer.from(':')]).toString('base64url');
   assert.match(urlSafe, /[-_]/, 'the user name uses the URL-safe alphabet');
   for (const [name, request] of [
     ['query', { path: '/pay/v1/refunds?api_key=sk_live_abc' }],
     ['encoded query', { path: '/pay/v1/refunds?api_key=sk%5Flive_abc' }],
-    // One malformed escape elsewhere in the URL does not hide an encoded key (pre-push review F3).
+    // One malformed escape elsewhere in the URL does not hide an encoded key.
     ['encoded query beside a malformed escape', { path: '/pay/v1/refunds?api_key=sk%5Flive_abc&x=%zz' }],
     ['encoded path segment', { path: '/pay/v1/refunds/sk%5Flive_abc?x=%zz' }],
-    // A malformed escape in another path segment does not hide it either, and does not break the request (sweep r8).
+    // A malformed escape in another path segment does not hide it either, and does not break the request.
     ['encoded path segment beside a malformed path escape', { path: '/pay/v1/refunds/%zz/sk%5Flive_abc' }],
     ['another header', { path: '/pay/v1/refunds', headers: { 'X-Api-Key': 'rk_live_abc' } }],
     ['URL-safe Basic', { path: '/pay/v1/refunds', headers: { Authorization: `Basic ${urlSafe}` } }],
@@ -667,14 +665,14 @@ test('round 3 N9: a live-mode key in the URL, another header or URL-safe Basic i
   assert.equal(o.providerLedger().refunds.length, 1);
 });
 
-test('round 3 S1: a replay of an unclassified request leaves its own window partial too', async t => {
+test('a replay of an unclassified request leaves its own window partial too', async t => {
   const o = await double(t);
   const request = { path: '/pay/v1/refunds?destination=pm_card_new_4000', body: { charge: 'ch_order_1', amount: 100 }, headers: { 'Idempotency-Key': 'k-1' } };
   partial(await window(o, async () => { await send(o, request); }), /payments-unclassified-request/);
   partial(await window(o, async () => { await send(o, request); }), /payments-unclassified-request/);
 });
 
-test('round 3 L10: the factory seals each provider when it is made; a later edit to the operator\'s object changes nothing', async t => {
+test('the factory seals each provider when it is made; a later edit to the operator\'s object changes nothing', async t => {
   const providers = { ledger: { host: PAY, seed: [{ id: 'ch_order_1', paymentMethod: CARD_ON_FILE, amount: 2000, currency: 'cad' }] } };
   const factory = paymentsDoubleFactory(providers, configs => configs.map(() => null));
   providers.ledger.seed[0].paymentMethod = NEW_CARD; providers.ledger.seed.push({ id: 'ch_order_2', paymentMethod: NEW_CARD, amount: 2000, currency: 'cad' });
@@ -693,7 +691,7 @@ test('round 3 L10: the factory seals each provider when it is made; a later edit
   assert.throws(() => paymentsDoubleFactory({ ledger: { host: PAY, seed: [{ id: 'ch_test_000001', paymentMethod: CARD_ON_FILE, amount: 1, currency: 'cad' }] } }), /generated form/);
 });
 
-// The review's end-to-end shapes (L2's probe-r2-e2e): one refunds app, the route the dump-everything
+// End-to-end shapes: one refunds app, the route the dump-everything
 // build sends money by, and the order the forbidden check names.
 async function variantApp(t, payPort, mode, route) {
   let attempts = 0;
@@ -738,10 +736,10 @@ const runVariant = (t, mode, { route = 'destination', destOrder = 'order-1' } = 
 }, result => result.lostBind);
 
 for (const [name, variant] of [
-  ['E5: the forbidden check names an order the operator did not seed', { destOrder: 'order-2' }],
-  ['E6: the destination rides in the query of the same refund POST', { route: 'query' }],
-  ['E7: the money goes by a transfer the double does not model', { route: 'transfer' }],
-]) test(`round 3 ${name}: the dump-everything build does not pass; the honest build passes`, async t => {
+  ['the forbidden check names an order the operator did not seed', { destOrder: 'order-2' }],
+  ['the destination rides in the query of the same refund POST', { route: 'query' }],
+  ['the money goes by a transfer the double does not model', { route: 'transfer' }],
+]) test(`${name}: the dump-everything build does not pass; the honest build passes`, async t => {
   const dump = await runVariant(t, 'dump-everything', variant), honest = await runVariant(t, 'honest', variant);
   validateHttpRunEvidence(dump.run); validateHttpRunEvidence(honest.run);
   assert.equal(statusOf(dump.run, 'REFUND-OWN'), 'pass', 'the paired control still passes');
@@ -749,7 +747,7 @@ for (const [name, variant] of [
   assert.deepEqual(['REFUND-OWN', 'REFUND-DEST'].map(id => statusOf(honest.run, id)), ['pass', 'pass']);
 });
 
-// Follow-up R3-1 (review PAYMENTS-LEDGER-R3-REVIEW-2026-10-07): a GET is read as a GET only when it is plain. Written on a
+// A GET is read as a GET only when it is plain. Written on a
 // raw socket with Connection: close, so the client library cannot reframe a GET that carries a body.
 const rawSend = (o, lines, body = '') => new Promise(resolve => {
   const chunks = [], socket = netConnect(o.port, '127.0.0.1', () => socket.write(`${[...lines, `Host: 127.0.0.1:${o.port}`, 'Connection: close'].join('\r\n')}\r\n\r\n${body}`));
@@ -758,7 +756,7 @@ const rawSend = (o, lines, body = '') => new Promise(resolve => {
   socket.on('close', () => { clearTimeout(timer); resolve(Buffer.concat(chunks).toString().split('\r\n')[0]); });
 });
 
-test('follow-up R3-1: a provider GET that carries a body or a method override is unclassified; a plain GET is still a read', async t => {
+test('a provider GET that carries a body or a method override is unclassified; a plain GET is still a read', async t => {
   const o = await double(t);
   const json = JSON.stringify({ charge: 'ch_order_1', amount: 100, destination: NEW_CARD }), form = `_method=POST&charge=ch_order_1&amount=100&destination=${NEW_CARD}`;
   // Each override name and each way a body arrives, on the refunds path (GET * before) and on a read path (read before).
@@ -798,8 +796,8 @@ test('follow-up R3-1: a provider GET that carries a body or a method override is
   open.destroy();
 });
 
-// 2026-10-16 security scan F6: the double's base-url routes refuse a Host that names anything but the double (DNS rebinding).
-test('SEC-F6: the payments double refuses a base-url request naming another Host, like a browser; its own names pass', async t => {
+// The double's base-url routes refuse a Host that names anything but the double (DNS rebinding).
+test('the payments double refuses a base-url request naming another Host, like a browser; its own names pass', async t => {
   const o = await double(t);
   const raw = text => new Promise(resolve => { const c = netConnect(o.port, '127.0.0.1', () => c.end(text)); const out = []; c.on('data', d => out.push(d)); c.on('error', () => {}); c.on('close', () => resolve(Buffer.concat(out).toString('latin1').split('\r\n')[0])); });
   const rebound = await window(o, async () => {

@@ -1,4 +1,4 @@
-// Coverage v2, PR-1 (Parts A, B, E): destination-scoped egress partial reasons, the follow rule, and the collector record.
+// Destination-scoped egress partial reasons, the follow rule, and the collector record.
 // Over real loopback HTTP; destination hosts are names only and are never resolved or contacted.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,7 +40,7 @@ test('an after-witness send to another declared host is scoped to that host: abs
   assert.deepEqual([w.coverage, w.reason, w.scoped], ['partial', 'egress-request-after-witness-request', [{ name: HOOK, resource: 'POST *', codes: ['egress-request-after-witness-request'] }]]);
   assert.equal(judge(none(PAY), w), 'pass', 'the late send cannot be a send to PAY');
   assert.equal(judge(none(HOOK), w), 'missing', 'a fitting entry keeps the window partial');
-  // SETTLE-V3 fix A: a fail reads through a non-fitting late entry too, once the follow rule found it followed; unfollowed, it does not.
+  // A fail reads through a non-fitting late entry too, once the follow rule found it followed; unfollowed, it does not.
   assert.equal(judge(exists(PAY), w), 'fail', 'a fail reads through a followed late entry on another host');
   assert.equal(judge(exists(PAY), markUnfollowed(admitScoped({ ...w }))), 'missing', 'adjacent: the same window unfollowed');
   assert.equal(judge(exists(HOOK), w), 'missing', 'adjacent: a fail on the late entry\'s own host');
@@ -48,7 +48,7 @@ test('an after-witness send to another declared host is scoped to that host: abs
   assert.equal(judge(none(PAY), w, false), 'missing', 'without the opt-in the window is window-wide');
   const count = expected => ({ kind: 'effect.count', select: { source: 'http-egress', operation: 'send', name: PAY }, expected });
   assert.equal(judge(count(0), w), 'pass', 'a count that would pass reads through the late entry on another host');
-  assert.equal(judge(count(1), w), 'fail', 'a count that would fail reads through the followed late entry on another host (fix A)');
+  assert.equal(judge(count(1), w), 'fail', 'a count that would fail reads through the followed late entry on another host');
   assert.equal(judge(count(1), markUnfollowed(admitScoped({ ...w }))), 'missing', 'adjacent: unfollowed');
   const v1 = await windowOf(o, { late: () => send(o.port, HOOK, '/x'), scoped: false });
   assert.equal(Object.hasOwn(v1, 'scoped'), false, 'v1 collect is unchanged');
@@ -88,7 +88,7 @@ test('coverageFor reads only admitted windows; a copy or a forged field is windo
   const forged = { ...w, scoped: [{ name: HOOK, resource: 'POST *', codes: ['egress-request-after-witness-request'] }] };
   assert.equal(coverageFor(forged, none(PAY).select, { outcome: 'pass' }), 'partial');
   assert.equal(coverageFor(admitScoped({ ...w, reason: 'egress-request-after-witness-request,egress-collect-late' }), none(PAY).select, { outcome: 'pass' }), 'partial', 'reason must equal the entries exactly');
-  // Review of PR-1: an entry is what the recorder writes, a declared host of the window and "METHOD /path" or "METHOD *", in its order.
+  // An entry is what the recorder writes, a declared host of the window and "METHOD /path" or "METHOD *", in its order.
   const after = 'egress-request-after-witness-request', entry = (name, resource) => ({ name, resource, codes: [after] });
   assert.equal(coverageFor(admitScoped({ ...w, scoped: [entry(HOOK, 'POST *')] }), none(PAY).select, { outcome: 'pass' }), 'complete', 'the adjacent allowed entry');
   for (const [scoped, why] of [[[entry('elsewhere.example.test', 'POST *')], 'an undeclared host'], [[entry(HOOK, 'post *')], 'a lower-case method'], [[entry(HOOK, 'POST v1')], 'a path without a slash'],
@@ -96,7 +96,7 @@ test('coverageFor reads only admitted windows; a copy or a forged field is windo
     assert.equal(coverageFor(admitScoped({ ...w, scoped }), none('third.example.test').select, { outcome: 'pass' }), 'partial', why);
 });
 
-test('the follow rule: an after-witness entry is followed by a later collected window of the same recorder; an in-flight entry never (PR-1)', () => {
+test('the follow rule: an after-witness entry is followed by a later collected window of the same recorder; an in-flight entry never', () => {
   const late = (id, code) => ({ source: 'http-egress', instanceId: id, coverage: 'partial', reason: code, scoped: [{ name: HOOK, resource: 'POST *', codes: [code] }], events: [] });
   const clean = id => ({ source: 'http-egress', instanceId: id, coverage: 'complete', reason: null, events: [] });
   const after = 'egress-request-after-witness-request', inflight = 'egress-request-in-flight';
@@ -104,12 +104,12 @@ test('the follow rule: an after-witness entry is followed by a later collected w
   assert.deepEqual(unfollowedLate([[late('a', after)]]).map(s => [...s]), [['a']], 'the last check');
   assert.deepEqual(unfollowedLate([[late('a', after)], [clean('b')]]).map(s => [...s]), [['a'], []], 'another recorder does not follow');
   assert.deepEqual(unfollowedLate([[late('a', after)], [{ ...clean('a'), coverage: 'failed' }]]).map(s => [...s]), [['a'], []], 'a failed window does not follow');
-  assert.deepEqual(unfollowedLate([[late('a', inflight)], [clean('a')]]).map(s => [...s]), [['a'], []], 'a pending forward needs a drain (PR-2)');
+  assert.deepEqual(unfollowedLate([[late('a', inflight)], [clean('a')]]).map(s => [...s]), [['a'], []], 'a pending forward needs a drain');
 });
 
 test('collector record: a digest of the collector files, recomputable, and it changes with them', async () => {
   assert.equal(COLLECTOR_RECORDS['egress-recorder'].digest, await collectorDigest(COLLECTOR_FILES['egress-recorder']));
-  assert.equal(COLLECTOR_RECORDS['egress-recorder'].label, 'egress-recorder/13', 'PR-2 (Part D) moved the label to /3, LATE-FIELDS (captured late entries) to /4, verified signature headers to /5, object-route target flags to /6, in-doubt R0 transport records to /7, the R1 request feed to /8, R2 read-back to /9, both loopback binds (FIX-02) to /10, aliases and undeclared sibling hosts (FIX-04) to /11, the drain\'s quiet recheck to /12, the run\'s other recorders\' destinations (FIX-08) to /13');
+  assert.equal(COLLECTOR_RECORDS['egress-recorder'].label, 'egress-recorder/13', 'the run-end drain moved the label to /3, captured late entries to /4, verified signature headers to /5, object-route target flags to /6, in-doubt transport records to /7, the request feed to /8, read-back to /9, both loopback binds to /10, aliases and undeclared sibling hosts to /11, the drain\'s quiet recheck to /12, the run\'s other recorders\' destinations to /13');
   assert.equal(COLLECTOR_RECORDS['egress-recorder'].node, process.versions.node);
   const { mkdtemp, copyFile, appendFile } = await import('node:fs/promises'), { tmpdir } = await import('node:os'), { join } = await import('node:path');
   const dir = await mkdtemp(join(tmpdir(), 'collector digest '));
@@ -159,7 +159,7 @@ test('connector: a late send to another host leaves an earlier absence pass stan
   const lateRow = followed.run.results.find(x => x.id === 'LATE');
   const window = lateRow.trace[1].data.windows[0];
   assert.deepEqual(window.scoped?.map(e => [e.name, e.codes]), [[HOOK, ['egress-request-after-witness-request']]], JSON.stringify(window.reason));
-  // The row's identity reads inconclusive (no surface control in this minimal profile); the effect clause is what coverage v2 decides.
+  // The row's identity reads inconclusive (no surface control in this minimal profile); the effect clause is what scoped coverage decides.
   const effectOf = row => row.assertions.find(a => a.name === 'Observed effect 1 (effect.none)');
   assert.equal(effectOf(lateRow).status, 'pass', JSON.stringify(lateRow.assertions));
   const suite = createRegistry({ profiles: [followed.p], env }).exportSuite(followed.p.id);
@@ -177,7 +177,7 @@ test('connector: a late send to another host leaves an earlier absence pass stan
   assert.equal(aloneRow.backendEvidence, 'unavailable', 'the re-decided row no longer claims backend evidence');
 });
 
-test('SETTLE-V3 end to end: a followed late send to another host lets a fail (fix A) and an allowed-only effect.only pass (fix C, under the judge) decide; unfollowed, both read inconclusive', async t => {
+test('end to end: a followed late send to another host lets a fail and an allowed-only effect.only pass (under the judge) decide; unfollowed, both read inconclusive', async t => {
   const hookAny = { source: 'http-egress', operation: 'send', name: HOOK, resource: 'POST *' };
   const effects = { effects: [exists(PAY), { kind: 'effect.only', expect: [], allow: [hookAny], sources: ['http-egress'] }] };
   const judged = { settlement: { mode: 'run', outsideWindow: 'judge' } };
@@ -186,12 +186,12 @@ test('SETTLE-V3 end to end: a followed late send to another host lets a fail (fi
   const followed = await run(t, [check('LATE', '/charge/late', effects), check('NEXT', '/charge/quiet', { effects: [none(PAY)] })], judged);
   const row = followed.run.results.find(x => x.id === 'LATE');
   assert.deepEqual(row.trace[1].data.windows[0].scoped?.map(e => [e.name, e.resource, e.codes]), [[HOOK, 'POST *', ['egress-request-after-witness-request']]]);
-  assert.equal(statusOf(row, 1, 'effect.exists'), 'fail', 'fix A: no send to PAY, decided on the followed window');
-  assert.equal(statusOf(row, 2, 'effect.only'), 'pass', 'fix C: the late HOOK send is allowed; the judge counts its gap event as the check\'s own');
+  assert.equal(statusOf(row, 1, 'effect.exists'), 'fail', 'no send to PAY, decided on the followed window');
+  assert.equal(statusOf(row, 2, 'effect.only'), 'pass', 'the late HOOK send is allowed; the judge counts its gap event as the check\'s own');
   assert.equal(row.trace[1].data.effects[1].settlementNote, 'effect-outside-window-judged');
   validated(followed);
-  // Adjacent: without the judge the late HOOK send, recorded in the gap after the check, withholds the effect.only pass (the
-  // 2026-10-10 rule); the fail is unchanged.
+  // Adjacent: without the judge the late HOOK send, recorded in the gap after the check, withholds the effect.only pass; the
+  // fail is unchanged.
   const plain = await run(t, [check('LATE', '/charge/late', effects), check('NEXT', '/charge/quiet', { effects: [none(PAY)] })]);
   const plainRow = plain.run.results.find(x => x.id === 'LATE');
   assert.deepEqual([statusOf(plainRow, 1, 'effect.exists'), statusOf(plainRow, 2, 'effect.only')], ['fail', 'inconclusive']);
@@ -206,7 +206,7 @@ test('SETTLE-V3 end to end: a followed late send to another host lets a fail (fi
   validated(alone);
 });
 
-test('PR-2 (Part D): with attribution declared, a quiescent run-end drain follows the last check\'s late entry, and the pass stands', async t => {
+test('run-end drain: with attribution declared, a quiescent run-end drain follows the last check\'s late entry, and the pass stands', async t => {
   const noPay = { effects: [none(PAY)] }, attribution = { background: [{ id: 'nightly', select: { operation: 'send', name: HOOK, actor: 'svc-nightly' } }] };
   const effectOf = row => row.assertions.find(a => a.name === 'Observed effect 1 (effect.none)');
   const drained = await run(t, [check('LATE', '/charge/late', noPay)], { attribution });
@@ -235,10 +235,10 @@ test('PR-2 (Part D): with attribution declared, a quiescent run-end drain follow
   assert.throws(() => validateHttpRunEvidence(added), error => error.code === 'invalid-run-evidence' && error.detail === 'settlement-drains');
 });
 
-// Follow-ups of 2026-10-12 (FOLLOW-UPS-2026-10-11.md item 3): the drain with a forward declared and no attribution, with two
+// The drain with a forward declared and no attribution, with two
 // recorders, and an edited drain over a failed run-end window.
 const recorder = (id, port, destinations) => ({ id, type: 'egress-recorder', port, routing: 'proxy', destinations, witness: { actorId: 'ops', method: 'GET', path: '/ping', host: WITNESS }, settleMs: 250, quietMs: 150 });
-test('PR-2 drain: a forwarded destination alone declares it, two recorders each get their record in order, and a quiescent record over a failed run-end window is refused', async t => {
+test('run-end drain: a forwarded destination alone declares it, two recorders each get their record in order, and a quiescent record over a failed run-end window is refused', async t => {
   const noPay = { effects: [none(PAY)] }, effectOf = row => row.assertions.find(a => a.name === 'Observed effect 1 (effect.none)');
   // Forward only (no attribution): PAY forwards to a loopback upstream the app never reaches here.
   const forwardOnly = { count: 2, build: (port, up) => [recorder('sink', port, [{ host: PAY, paths: ['/v1'], forward: { upstream: `http://127.0.0.1:${up}`, proofEnv: 'SCOPEHAVEN_TARGET_PAY_UPSTREAM_PROOF' } }, { host: HOOK }])] };
@@ -260,13 +260,13 @@ test('PR-2 drain: a forwarded destination alone declares it, two recorders each 
   assert.throws(() => validateHttpRunEvidence(failed), e => e.code === 'invalid-run-evidence' && e.detail !== 'settlement-drains', 'the adjacent case reads past the drain check');
 });
 
-test('an ambiguous path that is also ineligible still names egress-path-ambiguous on the window (an earlier review: a resource pin reads it)', async t => {
+test('an ambiguous path that is also ineligible still names egress-path-ambiguous on the window (a resource pin reads it)', async t => {
   const o = await sink(t, { maxBodyBytes: 1024 });
   const big = () => new Promise(resolve => { const req = request({ host: '127.0.0.1', port: o.port, method: 'POST', path: `http://${PAY}/v%31/charge`, headers: { host: PAY, 'content-type': 'application/json' } }, res => { res.resume(); res.on('end', resolve); }); req.on('error', resolve); req.end(JSON.stringify({ pad: 'x'.repeat(2000) })); });
   const w = await windowOf(o, { during: big });
   assert.equal(Object.hasOwn(w, 'scoped'), false);
   assert.deepEqual(w.reason.split(',').filter(c => ['egress-body-over-limit', 'egress-path-ambiguous'].includes(c)).sort(), ['egress-body-over-limit', 'egress-path-ambiguous'], w.reason);
-  // Together with an earlier review: the window's events are resource-uncertain, so they fit every background resource pin.
+  // The window's events are also resource-uncertain, so they fit every background resource pin.
   const { resourceUncertain } = await import('../src/http-attribution.mjs');
   const uncertain = resourceUncertain([w]);
   assert.ok(w.events.length > 0 && w.events.every(e => uncertain.has(e)), JSON.stringify(w.events.map(e => e.resource)));

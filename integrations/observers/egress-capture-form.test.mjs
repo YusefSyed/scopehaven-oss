@@ -1,4 +1,4 @@
-// Gap 4 end to end over real loopback HTTP: a destination that declares capture.encodings ["json", "form"] has its
+// Form-encoded capture end to end over real loopback HTTP: a destination that declares capture.encodings ["json", "form"] has its
 // declared fields read from the app's form-encoded sends too, and every aliasing attempt (a URL query, a Cookie, a
 // repeated or non-canonical value) reads missing, never pass. Every request goes to 127.0.0.1; destination hosts are
 // names only and are never resolved or contacted.
@@ -130,7 +130,7 @@ test('connector run with form declared: verdicts from form fields, captureForm o
   assert.equal(row('SMALL').status, 'pass', JSON.stringify(row('SMALL').assertions));
   assert.equal(row('LARGE').status, 'fail', 'a 250 refund is not the 25 one');
   assert.notEqual(row('ALIASED').status, 'pass', 'a case-folded duplicate key never passes');
-  assert.deepEqual(r.observers.map(o => o.collector), [COLLECTOR_RECORDS['egress-recorder']], 'the collector that built the windows (coverage v2, Part E)');
+  assert.deepEqual(r.observers.map(o => o.collector), [COLLECTOR_RECORDS['egress-recorder']], 'the collector that built the windows');
   assert.deepEqual(r.observers.map(({ collector, ...o }) => o), [{ id: 'sink', type: 'egress-recorder', settleMs: 250, capture: { [PAY]: ['/amount', '/currency'] }, captureForm: [PAY] }]);
   const bodyAt = r.limitations.indexOf(BODY_CAPTURE_LIMITATION), formAt = r.limitations.indexOf(FORM_CAPTURE_LIMITATION);
   assert.ok(bodyAt >= 0 && formAt === bodyAt + 1, 'the form limitation follows the unchanged body-field limitation');

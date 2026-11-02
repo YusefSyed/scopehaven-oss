@@ -1,9 +1,9 @@
-// NC12, the Object.hasOwn coercion sweep (D-01's shape, #502): Object.hasOwn(T, x), x in T and T[x] coerce x to a string, so an array
+// The Object.hasOwn coercion sweep: Object.hasOwn(T, x), x in T and T[x] coerce x to a string, so an array
 // (["mail"], which JSON can hold) or an object whose toString names a known key (which an in-process caller can pass) read as that key,
 // while a strict === or includes beside it never matches. Each lookup below decided something on a profile, stored run, suite, spec,
 // pack or option value; each now requires a string first. For each: the string control, then an array and a toString object, refused.
-// A run recorded and sealed at main 96f15d25 by main's own connector (test/fixtures/pre-hasown-sweep-run-96f15d25.mjs) still validates
-// here, and its profile, suite, SARIF and report come out as main's. Synthetic data, no socket, no model.
+// A run recorded and sealed before the sweep by the earlier build's own connector (test/fixtures/pre-hasown-sweep-run-96f15d25.mjs)
+// still validates here, and its profile, suite, SARIF and report come out as that build's. Synthetic data, no socket, no model.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
@@ -49,8 +49,8 @@ test('an app-log rule vocabulary is read only as a string: ["egress"] no longer 
     const target = structuredClone(profile);
     target.appLogs[0].rules[0].vocabulary = vocabulary;
     assert.throws(() => validateAppLogs(target), /rule 1: "vocabulary" is "egress", "mail" or "named"/, String(vocabulary));
-    // Through the profile loader too. (JSON can hold the array; an in-process toString object reaches this rule as well, where main
-    // accepted it and only the loader's later copy refused it, as an unreadable configuration.)
+    // Through the profile loader too. (JSON can hold the array; an in-process toString object reaches this rule as well, where the
+    // earlier build accepted it and only the loader's later copy refused it, as an unreadable configuration.)
     assert.match(loads(target), /"vocabulary" is "egress", "mail" or "named"/, String(vocabulary));
   }
 });
@@ -69,7 +69,7 @@ test('an observer witness actorId is a declared actor only as a string: audit fi
     assert.doesNotThrow(() => validate(config, actors), validate.name);
     for (const actorId of forms('ops')) assert.throws(() => validate({ ...config, witness: { ...config.witness, actorId } }, actors), /the witness "actorId" must be a declared actor/, `${validate.name} ${String(actorId)}`);
   }
-  // From a profile file: main loaded ["ops"], and then the connector's credential filter and the lifecycle witness rule (both strict)
+  // From a profile file: the earlier build loaded ["ops"], and then the connector's credential filter and the lifecycle witness rule (both strict)
   // never matched it.
   const profile = recorded().webhook.profile;
   assert.equal(loads(profile), 'loaded');
@@ -93,7 +93,7 @@ test('a webhook provider is read only as a string: an unsigned record, a driver 
   assert.equal(webhookEvidenceProblem(run), null);
   assert.equal(webhookEvidenceProblem(run, { checks: suite.checks }), null);
   for (const provider of forms('twilio')) {
-    // An unsigned record, in a stored run validated without its suite (main accepted it; a signed one was refused by the key binding).
+    // An unsigned record, in a stored run validated without its suite (the earlier build accepted it; a signed one was refused by the key binding).
     const edited = structuredClone(run), row = rowOf(edited, 'SMS-UNSIGNED');
     row.trace[0].data.webhook.provider = provider; reseal(row);
     assert.equal(webhookEvidenceProblem(edited), 'webhook-record', String(provider));
@@ -147,7 +147,7 @@ test('a monitor rule id is known only as a string', () => {
   for (const id of forms(RULE_IDS[0])) assert.throws(() => createMonitor({ rules: [id] }), /Unknown monitor rule/, String(id));
 });
 
-test('runs recorded and sealed at main 96f15d25 validate here, and their profiles, suites, SARIF and reports come out as main\'s', () => {
+test('runs recorded and sealed before the sweep validate here, and their profiles, suites, SARIF and reports come out as they did then', () => {
   const r = recorded();
   assert.equal(r.recordedAt, '96f15d25');
   const env = { SCOPEHAVEN_TARGET_OPS: ['synthetic', 'webhook', 'ops', 'bearer', 'k7'].join('-') };
@@ -158,11 +158,11 @@ test('runs recorded and sealed at main 96f15d25 validate here, and their profile
     assert.equal(evidence(run, { expectedSuite: suite }), 'ok', name);
     assert.equal(compareRuns(run, run).compatible, true, name);
     assert.equal(contractDigest(validateTargetFile({ schemaVersion: 1, targets: [profile] })[0]), profileDigest, name);
-    // FIX-08 moved the collector records (egress-recorder/13, and every collector's files' digest, since factory.mjs is in each list):
-    // the suite comes out as main's with this build's records in their place, and nothing else differs.
+    // Cross-recorder destinations moved the collector records (egress-recorder/13, and every collector's files' digest, since
+    // factory.mjs is in each list): the suite comes out as recorded with this build's records in their place, and nothing else differs.
     const exported = createRegistry({ profiles: [profile], env }).exportSuite(profile.id);
     assert.ok(exported.observers.every(o => o.collector === undefined || digest(o.collector) === digest(COLLECTOR_RECORDS[o.type])), name);
-    // An app-log record also names the Node that exported it, and main's was 24.21.0: only that field may differ.
+    // An app-log record also names the Node that exported it, and the recorded one was 24.21.0: only that field may differ.
     assert.ok((exported.appLogs ?? []).every(a => a.collector.node === process.versions.node), name);
     const appLogs = exported.appLogs ? { appLogs: exported.appLogs.map((a, i) => ({ ...a, collector: { ...a.collector, node: suite.appLogs[i]?.collector.node } })) } : {};
     assert.deepEqual({ ...exported, ...appLogs, observers: exported.observers.map((o, i) => o.collector === undefined ? o : { ...o, collector: suite.observers[i]?.collector }) }, suite, name);
@@ -171,6 +171,6 @@ test('runs recorded and sealed at main 96f15d25 validate here, and their profile
     assert.equal(digest(sarif), sarifDigest, name);
     assert.equal(digest(renderReport(run)), reportDigest, name);
   }
-  // Last, so that on main everything above runs and passes: the HTTP evaluator moved.
+  // Last, so that on the earlier build everything above runs and passes: the HTTP evaluator moved.
   assert.notEqual(HTTP_EVALUATOR_HASH, r.httpEvaluatorHash);
 });

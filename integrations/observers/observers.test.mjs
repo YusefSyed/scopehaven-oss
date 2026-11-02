@@ -43,7 +43,7 @@ test('effect.none passes only when every observer that can see the effect is com
   assert.equal(evaluateEffectAssertion(none, [win('complete', [ev(1, { outcome: 'denied' })])]).verdict, 'pass');
   assert.equal(evaluateEffectAssertion(none, [win('complete', [ev(1, { actor: 'owner-olga' })])]).verdict, 'pass');
 });
-test('review P1/P1b: a complete observer that cannot see the effect does not hide a failed or partial one that can', () => {
+test('a complete observer that cannot see the effect does not hide a failed or partial one that can', () => {
   // The snapshot watches notes only and cannot attribute actors; the audit observer can see the effect.
   assert.equal(evaluateEffectAssertion(none, [snapWin('net-only'), win('failed', [], { instanceId: 'audit' })]).verdict, 'observer-failure');
   assert.equal(evaluateEffectAssertion(none, [snapWin('net-only'), win('partial', [], { instanceId: 'audit' })]).verdict, 'missing');
@@ -52,7 +52,7 @@ test('review P1/P1b: a complete observer that cannot see the effect does not hid
   // Only the snapshot, which cannot attribute actors: unobservable, never pass.
   assert.equal(evaluateEffectAssertion(none, [snapWin('net-only')]).verdict, 'unobservable');
 });
-test('review P2/P2b: a net-only snapshot never supports "did not happen", and unwatched tables are unobservable', () => {
+test('a net-only snapshot never supports "did not happen", and unwatched tables are unobservable', () => {
   const insert = { kind: 'effect.none', select: { source: 'sql-snapshot', name: 'notes', operation: 'insert' } };
   assert.equal(evaluateEffectAssertion(insert, [snapWin('net-only')]).verdict, 'missing');
   assert.equal(evaluateEffectAssertion({ kind: 'effect.none', select: { source: 'sql-snapshot', name: 'refunds' } }, [snapWin('net-only')]).verdict, 'unobservable');
@@ -115,10 +115,10 @@ test('OTLP receiver: JSON and gzip accepted, protobuf and junk rejected, coverag
     // Tool spans from a service that is not the target are not the target's effects.
     await post(o.endpoint, otlp('other-tenant', [spanOf(tool('refund', 'mallory'), { spanId: hex(8, 4), startTimeUnixNano: at(30), endTimeUnixNano: at(40) })]));
     assert.ok(!(await collectWindow(o, from, to)).events.some(e => e.actor === 'mallory'));
-    // Review P3: another service flushing past the window proves nothing about the target.
+    // Another service flushing past the window proves nothing about the target.
     await post(o.endpoint, otlp('other-tenant', [spanOf([attr('gen_ai.operation.name', 'chat')], { spanId: hex(8, 2), startTimeUnixNano: String(to.at + 5n), endTimeUnixNano: String(to.at + 6n) })]));
     assert.equal((await collectWindow(o, from, to)).coverage, 'partial');
-    // Round 2 review N10: an ordinary span ending after the window proves nothing about spans still open.
+    // An ordinary span ending after the window proves nothing about spans still open.
     await post(o.endpoint, otlp('app', [spanOf([attr('gen_ai.operation.name', 'chat')], { spanId: hex(8, 5), startTimeUnixNano: String(to.at + 5n), endTimeUnixNano: String(to.at + 6n) })]));
     assert.equal((await collectWindow(o, from, to)).coverage, 'partial');
     // The declared exporter's quiescence marker, started after the window end, does.
@@ -133,12 +133,12 @@ test('OTLP receiver: JSON and gzip accepted, protobuf and junk rejected, coverag
     assert.equal((await collectWindow(o, from, to)).reason, 'rejected-trace-export');
   } finally { await o.stop(); }
 });
-// 2026-10-16 security scan F4: a malformed request target is answered, never thrown out of the listener.
+// A malformed request target is answered, never thrown out of the listener.
 const rawRequest = (port, head) => new Promise((resolve, reject) => {
   const socket = connect(port, '127.0.0.1', () => socket.end(`${head}\r\nHost: 127.0.0.1:${port}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`));
   const chunks = []; socket.on('data', c => chunks.push(c)); socket.on('error', reject); socket.on('close', () => resolve(Buffer.concat(chunks).toString('latin1').split('\r\n')[0]));
 });
-test('SEC-F4: OTLP receiver answers a target that is no URL (//%zz) or names another authority with 404, and still takes /v1/traces', async () => {
+test('OTLP receiver answers a target that is no URL (//%zz) or names another authority with 404, and still takes /v1/traces', async () => {
   const o = createOtelObserver({ services: ['app'], settleMs: 50 }); await o.start();
   try {
     const port = Number(new URL(o.endpoint).port);
@@ -151,7 +151,7 @@ test('SEC-F4: OTLP receiver answers a target that is no URL (//%zz) or names ano
     assert.equal(o.stats().rejectedRequests, 0);
   } finally { await o.stop(); }
 });
-test('review P3b: a future-dated span is rejected and cannot complete later windows', async () => {
+test('a future-dated span is rejected and cannot complete later windows', async () => {
   const o = createOtelObserver({ services: ['app'], settleMs: 50 }); await o.start();
   try {
     const now = await o.mark();
@@ -163,7 +163,7 @@ test('review P3b: a future-dated span is rejected and cannot complete later wind
     assert.equal((await collectWindow(o, a, b)).coverage, 'partial');
   } finally { await o.stop(); }
 });
-test('review P4: duplicate spans are counted once; review M4: span overflow is partial', async () => {
+test('duplicate spans are counted once; span overflow is partial', async () => {
   const o = createOtelObserver({ services: ['app'], tools: ['refund', 't'], settleMs: 50, maxSpans: 3 }); await o.start();
   try {
     const from = await o.mark(), at = n => String(from.at + BigInt(n));
@@ -183,7 +183,7 @@ test('review P4: duplicate spans are counted once; review M4: span overflow is p
     assert.equal(w.coverage, 'partial'); assert.equal(w.reason, 'span-limit-reached');
   } finally { await o.stop(); }
 });
-test('review M8: a tool span still open at the window end is in flight, so the window is partial', async () => {
+test('a tool span still open at the window end is in flight, so the window is partial', async () => {
   const o = createOtelObserver({ services: ['app'], settleMs: 50 }); await o.start();
   try {
     const from = await o.mark(), to = await o.mark();
@@ -240,7 +240,7 @@ test('Streamable HTTP proxy: calls per actor, JSON and SSE, credentials kept as 
   assert.throws(() => createMcpHttpProxy({ upstream: 'http://example.com/mcp' }), /loopback/);
   assert.throws(() => createMcpHttpProxy({ upstream: 'http://127.0.0.1:9/mcp', actors: [{ actorId: 'x', credentialEnv: 'GITHUB_TOKEN' }], env: { GITHUB_TOKEN: 'x' } }), /SCOPEHAVEN_TARGET_/);
 });
-test('review P5: the same JSON-RPC id from two actors is never cross-paired', async () => {
+test('the same JSON-RPC id from two actors is never cross-paired', async () => {
   const upstream = await mcpUpstream((m, req, res) => {
     if (req.headers.authorization === 'Bearer alice') { res.writeHead(403, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ jsonrpc: '2.0', id: m.id, error: { code: -32001, message: 'no' } })); return; }
     res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { content: [] } }));
@@ -258,7 +258,7 @@ test('review P5: the same JSON-RPC id from two actors is never cross-paired', as
     assert.equal(evaluateEffectAssertion({ kind: 'effect.none', select: { source: 'mcp-jsonrpc', actor: 'mallory', name: 'refund' } }, [w]).verdict, 'fail');
   } finally { await proxy.stop(); await upstream.close(); }
 });
-test('review P5b: an unparsed oversized response leaves the call in flight and the window partial', async () => {
+test('an unparsed oversized response leaves the call in flight and the window partial', async () => {
   const upstream = await mcpUpstream((m, _req, res) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: 'x'.repeat(5 * 1024 * 1024) }] } })); });
   const proxy = createMcpHttpProxy({ upstream: `${upstream.url}/mcp` }); await proxy.start();
   const o = createMcpObserver({ log: proxy.log, tools: ['export_all'] });
@@ -271,7 +271,7 @@ test('review P5b: an unparsed oversized response leaves the call in flight and t
     assert.notEqual(evaluateEffectAssertion({ kind: 'effect.none', select: { source: 'mcp-jsonrpc', name: 'export_all' } }, [w]).verdict, 'pass');
   } finally { await proxy.stop(); await upstream.close(); }
 });
-test('review M6: a result after the window end does not complete a call inside it', async () => {
+test('a result after the window end does not complete a call inside it', async () => {
   const log = new FrameLog(); log.push({ kind: 'open' });
   const o = createMcpObserver({ log, tools: ['refund'] });
   const from = await o.mark();
@@ -281,7 +281,7 @@ test('review M6: a result after the window end does not complete a call inside i
   const w = await collectWindow(o, from, to);
   assert.equal(w.events[0].outcome, 'started'); assert.equal(w.coverage, 'partial');
 });
-test('review M3: frame overflow is written to the log, and a file-backed window becomes partial', async () => {
+test('frame overflow is written to the log, and a file-backed window becomes partial', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-mcp-'));
   try {
     const path = join(dir, 'f.jsonl'), log = new FrameLog({ path, maxFrames: 4 });
@@ -324,7 +324,7 @@ test('the stdio recorder tees a real MCP server process; a closed recorder makes
     });
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
-test('review P6: a tools/call line over the size limit is recorded as a gap, so the window is partial', async () => {
+test('a tools/call line over the size limit is recorded as a gap, so the window is partial', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-mcp-'));
   try {
     await withRecorder(dir, async ({ child, o }) => {
@@ -351,7 +351,7 @@ test('snapshot observer: net-only changes with no actor; audit observer: declare
     const audit = createSqliteAuditObserver({ path, principals: ['agent-sam'], audit: { table: 'audit', idColumn: 'id', actorColumn: 'who', actionColumn: 'what', resourceColumn: 'target', actions: { 'note.create': 'insert', 'note.delete': 'delete' }, deniedActions: ['note.denied'] } });
     await snap.start(); await audit.start();
     const [s0, a0] = [await snap.mark(), await audit.mark()];
-    // Mallory deletes Alice's note (P2c): the snapshot must not blame Alice.
+    // Mallory deletes Alice's note: the snapshot must not blame Alice.
     db.exec(`INSERT INTO notes VALUES (3, 'agent-sam', 'c'); UPDATE notes SET body = 'z' WHERE id = 2; DELETE FROM notes WHERE id = 1;
       INSERT INTO audit (who, what, target) VALUES ('agent-sam', 'note.create', 'notes/3'), ('carol@example.test', 'note.denied', 'notes/4');`);
     const before = statSync(path).mtimeMs;
@@ -371,7 +371,7 @@ test('snapshot observer: net-only changes with no actor; audit observer: declare
     assert.equal((await collectWindow(gone, m0, m1)).coverage, 'failed');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
-test('review M2: an audit window over the row limit is partial', async () => {
+test('an audit window over the row limit is partial', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-sql-'));
   const path = join(dir, 'app.db');
   try {
@@ -385,7 +385,7 @@ test('review M2: an audit window over the row limit is partial', async () => {
     db.close();
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
-test('L8 fix 3: sqlite-snapshot and sqlite-audit read an INTEGER past 2^53 exactly instead of failing the mark', async () => {
+test('sqlite-snapshot and sqlite-audit read an INTEGER past 2^53 exactly instead of failing the mark', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-sql-'));
   const path = join(dir, 'app.db'), auditFile = join(dir, 'stamp-audit.txt');
   writeFileSync(auditFile, 'every UPDATE of t sets stamp = int(time.time())\n');
@@ -438,7 +438,7 @@ test('L8 fix 3: sqlite-snapshot and sqlite-audit read an INTEGER past 2^53 exact
     db.close();
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
-test('L8 fix 1: sqlite-snapshot reads a table past the old 200,000-row limit, keyed by rowid when its primary key spans columns', async () => {
+test('sqlite-snapshot reads a table past the old 200,000-row limit, keyed by rowid when its primary key spans columns', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-sql-'));
   const path = join(dir, 'app.db');
   try {
@@ -453,7 +453,7 @@ test('L8 fix 1: sqlite-snapshot reads a table past the old 200,000-row limit, ke
     const snap = createSqliteSnapshotObserver({ path, tables: [{ table: 'ticket_flights', key: 'rowid' }, { table: 'tickets', key: 'id' }] });
     await snap.start();
     const m0 = await snap.mark();
-    // Rebooking one passenger's ticket moves every leg on the booking (the ADV-OOB L12 shape), and one ticket is added.
+    // Rebooking one passenger's ticket moves every leg on the booking, and one ticket is added.
     db.exec("UPDATE ticket_flights SET flight_id = 900 WHERE book_ref = 'B1'; INSERT INTO tickets VALUES (1001, 'B334'); DELETE FROM tickets WHERE id = 5");
     const w = await collectWindow(snap, m0, await snap.mark());
     assert.equal(w.coverage, 'net-only', JSON.stringify({ coverage: w.coverage, reason: w.reason }));
@@ -461,7 +461,7 @@ test('L8 fix 1: sqlite-snapshot reads a table past the old 200,000-row limit, ke
     db.close();
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
-test('L8 fix 1: the row bounds, the scan-order digest of a large unlisted table and the rowid key, at test-seam sizes', async () => {
+test('the row bounds, the scan-order digest of a large unlisted table and the rowid key, at test-seam sizes', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-sql-'));
   const path = join(dir, 'app.db');
   const rowLimits = { rowsPerTable: 20, sortedRows: 5 };
@@ -814,13 +814,13 @@ test('HTTP audit observer: id ranges through the loopback client, gaps are parti
   } finally { await app.close(); }
 });
 
-// ---- round 2 review (round 3 fixes) ----------------------------------------
-test('review N1: an actor-scoped check never passes on a matching effect with no known actor', async () => {
+// ---- attribution, name vocabularies and window edges ----------------------
+test('an actor-scoped check never passes on a matching effect with no known actor', async () => {
   const noActor = ev(1, { actor: null }), unlisted = ev(2, { actor: 'unlisted:0123456789abcdef' });
   assert.equal(evaluateEffectAssertion(none, [win('complete', [noActor])]).verdict, 'missing');
   assert.equal(evaluateEffectAssertion(none, [win('complete', [unlisted])]).verdict, 'missing');
   assert.equal(evaluateEffectAssertion({ kind: 'effect.exists', select: { actor: 'agent-sam', name: 'note.create' } }, [win('complete', [noActor])]).verdict, 'missing');
-  // N1a: an OTel tool span with no user attribute.
+  // An OTel tool span with no user attribute.
   const o = createOtelObserver({ services: ['app'], tools: ['refund'], settleMs: 50 }); await o.start();
   try {
     const from = await o.mark();
@@ -832,7 +832,7 @@ test('review N1: an actor-scoped check never passes on a matching effect with no
     assert.equal(evaluateEffectAssertion({ kind: 'effect.none', select: { source: 'otel-genai', actor: 'mallory', name: 'refund' } }, [w]).verdict, 'missing');
   } finally { await o.stop(); }
 });
-test('review N1b: an MCP proxy call without Authorization is unattributed; the recorder requires --actor', async () => {
+test('an MCP proxy call without Authorization is unattributed; the recorder requires --actor', async () => {
   const upstream = await mcpUpstream((m, _req, res) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { content: [] } })); });
   const proxy = createMcpHttpProxy({ upstream: `${upstream.url}/mcp` }); await proxy.start();
   const o = createMcpObserver({ log: proxy.log, tools: ['refund'] });
@@ -849,18 +849,18 @@ test('review N1b: an MCP proxy call without Authorization is unattributed; the r
   const usage = spawn(N, [fileURLToPath(new URL('./mcp.mjs', import.meta.url)), 'record', '--log', join(tmpdir(), 'unused.jsonl'), '--', N, '-e', '0'], { stdio: 'ignore' });
   assert.equal(await new Promise(r => usage.once('exit', r)), 2);
 });
-test('review N2/N9: an observer without a name vocabulary cannot vouch for a specific name', () => {
+test('an observer without a name vocabulary cannot vouch for a specific name', () => {
   const undeclared = { ...win('complete'), scope: { ...AUDIT_SCOPE, names: null } };
   assert.equal(evaluateEffectAssertion({ kind: 'effect.none', select: { name: 'drop_tables' } }, [undeclared]).verdict, 'unobservable');
   assert.equal(evaluateEffectAssertion({ kind: 'effect.none', select: { name: 'drop_tables' } }, [win('complete')]).verdict, 'unobservable');
-  // Round 5: a name-free selector can only show presence, never absence.
+  // A name-free selector can only show presence, never absence.
   assert.equal(evaluateEffectAssertion({ kind: 'effect.none', select: { actor: 'agent-sam', operation: 'delete' } }, [undeclared]).verdict, 'unobservable');
 });
-test('review low: effect.count needs exactly one observer instance', () => {
+test('effect.count needs exactly one observer instance', () => {
   const count = { kind: 'effect.count', select: { source: 'sql-audit-table', name: 'note.create' }, expected: 1 };
   assert.equal(evaluateEffectAssertion(count, [win('complete', [ev(1)], { instanceId: 'a' }), win('complete', [ev(1)], { instanceId: 'b' })]).verdict, 'missing');
 });
-test('review N4/N4b: declared instances must each send a marker; spans from other instances are a gap', async () => {
+test('declared instances must each send a marker; spans from other instances are a gap', async () => {
   const o = createOtelObserver({ services: [{ name: 'app', instanceIds: ['i1', 'i2'] }], settleMs: 50 }); await o.start();
   const withInstance = (instance, spans) => ({ resourceSpans: [{ resource: { attributes: [attr('service.name', 'app'), attr('service.instance.id', instance)] }, scopeSpans: [{ spans }] }] });
   try {
@@ -873,7 +873,7 @@ test('review N4/N4b: declared instances must each send a marker; spans from othe
     assert.equal((await collectWindow(o, from, to)).reason, 'span-from-undeclared-instance');
   } finally { await o.stop(); }
 });
-test('review medium: malformed spans from the target are a gap, not silently deduplicated away', async () => {
+test('malformed spans from the target are a gap, not silently deduplicated away', async () => {
   const o = createOtelObserver({ services: ['app'], settleMs: 50 }); await o.start();
   try {
     const from = await o.mark(), to = await o.mark();
@@ -883,7 +883,7 @@ test('review medium: malformed spans from the target are a gap, not silently ded
     assert.equal(o.stats().malformedSpans, 1);
   } finally { await o.stop(); }
 });
-test('review n12b: MCP windows are log positions, so recorder clock skew cannot move a call out of its window', async () => {
+test('MCP windows are log positions, so recorder clock skew cannot move a call out of its window', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-mcp-'));
   try {
     const path = join(dir, 'f.jsonl');
@@ -899,7 +899,7 @@ test('review n12b: MCP windows are log positions, so recorder clock skew cannot 
     assert.deepEqual(w.events.map(e => [e.actor, e.outcome]), [['mallory', 'committed']]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
-test('review medium: a call made before the window whose result lands inside it is included', async () => {
+test('a call made before the window whose result lands inside it is included', async () => {
   const log = new FrameLog(); log.push({ kind: 'open' });
   log.push({ kind: 'call', conn: 'c', id: '9', tool: 'refund', actor: 'mallory', argsDigest: null });
   const o = createMcpObserver({ log, tools: ['refund'] });
@@ -909,7 +909,7 @@ test('review medium: a call made before the window whose result lands inside it 
   assert.deepEqual(w.events.map(e => [e.actor, e.outcome]), [['mallory', 'committed']]);
   assert.equal(evaluateEffectAssertion({ kind: 'effect.none', select: { source: 'mcp-jsonrpc', actor: 'mallory', name: 'refund' } }, [w]).verdict, 'fail');
 });
-test('review low: concurrent same-id calls from two actors pair correctly', async () => {
+test('concurrent same-id calls from two actors pair correctly', async () => {
   const upstream = await mcpUpstream((m, req, res) => {
     // Answer alice first even though mallory's request may arrive first.
     const delay = req.headers.authorization === 'Bearer mallory' ? 40 : 0;
@@ -933,10 +933,10 @@ test('review low: concurrent same-id calls from two actors pair correctly', asyn
   } finally { await proxy.stop(); await upstream.close(); }
 });
 
-// ---- round 3 review (round 4 fixes): telemetry proves presence, not absence ----
+// ---- telemetry proves presence, not absence ---------------------------------
 const traceWin = (coverage, events = []) => ({ source: 'otel-genai', instanceId: 'otel', scope: { operations: ['tool-call'], names: ['refund'], actorAttribution: 'principal', evidence: 'presence-only' }, coverage, events });
 const span = (seq, over = {}) => makeEffect({ source: 'otel-genai', observer: { kind: 'x', instanceId: 'otel' }, seq, actor: 'mallory', operation: 'tool-call', name: 'refund', outcome: 'committed', ...over });
-test('round 4: presence-only telemetry can fail effect.none or pass effect.exists, but never prove absence', () => {
+test('presence-only telemetry can fail effect.none or pass effect.exists, but never prove absence', () => {
   const none = { kind: 'effect.none', select: { source: 'otel-genai', actor: 'mallory', name: 'refund' } };
   assert.equal(evaluateEffectAssertion(none, [traceWin('complete', [span(1)])]).verdict, 'fail');
   assert.equal(evaluateEffectAssertion(none, [traceWin('complete')]).verdict, 'unobservable');
@@ -949,12 +949,12 @@ test('round 4: presence-only telemetry can fail effect.none or pass effect.exist
   assert.equal(evaluateEffectAssertion(both, [traceWin('partial'), audit]).verdict, 'pass');
   assert.equal(evaluateEffectAssertion(both, [traceWin('complete'), { ...audit, coverage: 'partial' }]).verdict, 'missing');
 });
-test('round 4 (review R2): effect.count reports unattributed matches as missing', () => {
+test('effect.count reports unattributed matches as missing', () => {
   const count = { kind: 'effect.count', select: { source: 'sql-audit-table', actor: 'agent-sam', name: 'note.create' }, expected: 1 };
   assert.equal(evaluateEffectAssertion(count, [win('complete', [ev(1)])]).verdict, 'pass');
   assert.equal(evaluateEffectAssertion(count, [win('complete', [ev(1), ev(2, { actor: null })])]).verdict, 'missing');
 });
-test('round 4: OTel maps actors to declared principals, names unnamed tool spans, and a rejected export taints coverage', async () => {
+test('OTel maps actors to declared principals, names unnamed tool spans, and a rejected export taints coverage', async () => {
   const o = createOtelObserver({ services: ['app'], principals: ['agent-sam'], settleMs: 50 }); await o.start();
   try {
     const from = await o.mark();
@@ -973,7 +973,7 @@ test('round 4: OTel maps actors to declared principals, names unnamed tool spans
     assert.equal(w.coverage, 'partial'); assert.equal(w.reason, 'rejected-trace-export');
   } finally { await o.stop(); }
 });
-test('round 4 (review R6): a quiescence marker started before the window end does not complete it', async () => {
+test('a quiescence marker started before the window end does not complete it', async () => {
   const o = createOtelObserver({ services: ['app'], settleMs: 50 }); await o.start();
   try {
     const from = await o.mark(), to = await o.mark();
@@ -981,7 +981,7 @@ test('round 4 (review R6): a quiescence marker started before the window end doe
     assert.equal((await collectWindow(o, from, to)).reason, 'no-quiescence-marker-after-window');
   } finally { await o.stop(); }
 });
-test('round 4 (review R13): an MCP recorder that opened after the window began is partial; a shrunken log fails', async () => {
+test('an MCP recorder that opened after the window began is partial; a shrunken log fails', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-mcp-'));
   try {
     const path = join(dir, 'f.jsonl');
@@ -995,7 +995,7 @@ test('round 4 (review R13): an MCP recorder that opened after the window began i
     assert.equal((await collectWindow(o, from, to)).coverage, 'failed');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
-test('round 4: an MCP result without a recorded call (an oversized call dropped before the window) is a gap', async () => {
+test('an MCP result without a recorded call (an oversized call dropped before the window) is a gap', async () => {
   const log = new FrameLog(); log.push({ kind: 'open' });
   log.push({ kind: 'gap', conn: 'c', reason: 'c2s-line-too-large' });
   const o = createMcpObserver({ log, tools: ['refund'] });
@@ -1004,7 +1004,7 @@ test('round 4: an MCP result without a recorded call (an oversized call dropped 
   const w = await collectWindow(o, from, await o.mark());
   assert.equal(w.coverage, 'partial'); assert.equal(w.reason, 'result-without-call');
 });
-test('round 4: the MCP proxy refuses absolute-form targets and bodies on GET/DELETE', async () => {
+test('the MCP proxy refuses absolute-form targets and bodies on GET/DELETE', async () => {
   let reached = 0;
   const upstream = await listen((req, res) => { reached++; req.resume(); req.on('end', () => res.writeHead(200).end('{}')); });
   const proxy = createMcpHttpProxy({ upstream: `${upstream.url}/mcp` }); await proxy.start();
@@ -1024,8 +1024,8 @@ test('round 4: the MCP proxy refuses absolute-form targets and bodies on GET/DEL
   } finally { await proxy.stop(); await upstream.close(); }
 });
 
-// ---- round 4 review (round 5 fixes) -----------------------------------------
-test('round 5 (P1): absence needs an exact name from an authoritative vocabulary; prefix and name-free selectors only show presence', () => {
+// ---- authoritative vocabularies and audit id order -------------------------
+test('absence needs an exact name from an authoritative vocabulary; prefix and name-free selectors only show presence', () => {
   const prefix = { kind: 'effect.none', select: { actor: 'agent-sam', name: { prefix: 'note.' } } };
   assert.equal(evaluateEffectAssertion(prefix, [win('complete')]).verdict, 'unobservable');
   assert.equal(evaluateEffectAssertion(prefix, [win('complete', [ev(1)])]).verdict, 'fail'); // presence still fails
@@ -1033,11 +1033,11 @@ test('round 5 (P1): absence needs an exact name from an authoritative vocabulary
   assert.equal(evaluateEffectAssertion({ kind: 'effect.count', select: { source: 'sql-audit-table', name: { prefix: 'note.' } }, expected: 0 }, [win('complete')]).verdict, 'unobservable');
   assert.equal(evaluateEffectAssertion({ kind: 'effect.none', select: { actor: 'agent-sam', name: 'note.create' } }, [win('complete')]).verdict, 'pass');
 });
-test('round 5 (P3): telemetry sources cannot be declared authoritative', () => {
+test('telemetry sources cannot be declared authoritative', () => {
   assert.throws(() => validateWindow({ source: 'otel-genai', instanceId: 'o', scope: { operations: ['tool-call'], names: ['refund'], actorAttribution: 'principal', evidence: 'authoritative' }, coverage: 'complete', events: [] }), /scope-evidence-source/);
   assert.throws(() => validateWindow({ source: 'mcp-jsonrpc', instanceId: 'm', scope: { operations: ['tool-call'], names: ['refund'], actorAttribution: 'principal', evidence: 'authoritative' }, coverage: 'complete', events: [] }), /scope-evidence-source/);
 });
-test('round 5 (probe5): the HTTP audit observer catches late lower ids, backward ids and truncated pages', async () => {
+test('the HTTP audit observer catches late lower ids, backward ids and truncated pages', async () => {
   let entries = [{ id: 1, user: 'agent-sam', action: 'login' }, { id: 3, user: 'agent-sam', action: 'login' }];
   const app = await listen((req, res) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ items: entries })); });
   try {
@@ -1054,7 +1054,7 @@ test('round 5 (probe5): the HTTP audit observer catches late lower ids, backward
     entries = [{ id: 1, user: 'agent-sam', action: 'login' }];
     assert.equal((await collectWindow(o, to, await o.mark())).reason, 'audit-id-went-backward');
     // A full page may omit the newest rows: the mark fails.
-    // Lead residual probe5 a: the page size is required, so an oldest-first page cannot look complete.
+    // The page size is required, so an oldest-first page cannot look complete.
     const { pageLimit: _p, ...noLimit } = config;
     assert.throws(() => createHttpAuditObserver(noLimit), /pageLimit/);
     entries = [{ id: 1, user: 'agent-sam', action: 'login' }, { id: 2, user: 'agent-sam', action: 'login' }];
@@ -1065,9 +1065,9 @@ test('round 5 (probe5): the HTTP audit observer catches late lower ids, backward
   } finally { await app.close(); }
 });
 
-// Review S6b (CORE-WIRING-REVIEW.json round 2): an audit store reset or replaced
+// An audit store reset or replaced
 // during the window (ids restart) can never read complete and empty.
-test('review S6b: an audit id that went backward fails the window', async () => {
+test('an audit id that went backward fails the window', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-sql-'));
   const path = join(dir, 'app.db');
   try {
@@ -1083,7 +1083,7 @@ test('review S6b: an audit id that went backward fails the window', async () => 
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-// 2026-10-16 security scan F5: an unlisted actor (and an audit row or entry that names it) is a digest keyed per
+// An unlisted actor (and an audit row or entry that names it) is a digest keyed per
 // observer instance, so nobody holding a run can confirm a guessed email, user id or token by hashing it.
 const unkeyed = value => `unlisted:${digest(String(value)).slice(0, 16)}`;
 const keyedActor = (events, guess, label) => {
@@ -1091,7 +1091,7 @@ const keyedActor = (events, guess, label) => {
   assert.notEqual(events[0].actor, unkeyed(guess), `${label}: not the plain SHA-256 of the value`);
   assert.equal(events[1].actor, events[0].actor, `${label}: one value reads alike within an observer`);
 };
-test('SEC-F5: SQLite and HTTP audit observers key unlisted actors and their rows per instance; declared principals stay', async t => {
+test('SQLite and HTTP audit observers key unlisted actors and their rows per instance; declared principals stay', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-f5-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const path = join(dir, 'app.db'), db = new DatabaseSync(path);
   db.exec('CREATE TABLE audit (id INTEGER PRIMARY KEY AUTOINCREMENT, who TEXT, what TEXT);');
@@ -1117,7 +1117,7 @@ test('SEC-F5: SQLite and HTTP audit observers key unlisted actors and their rows
   assert.equal(hw.events[2].actor, 'agent-sam');
   assert.notEqual(hw.events[0].contentDigest, digest(digest(items[0])), 'the entry digest cannot confirm a guessed actor');
 });
-test('SEC-F5: OTel and the MCP proxy key unlisted actors per instance; declared principals stay', async () => {
+test('OTel and the MCP proxy key unlisted actors per instance; declared principals stay', async () => {
   const otel = createOtelObserver({ services: ['app'], principals: ['agent-sam'], settleMs: 50 }), otel2 = createOtelObserver({ services: ['app'], settleMs: 50 });
   await otel.start(); await otel2.start();
   try {

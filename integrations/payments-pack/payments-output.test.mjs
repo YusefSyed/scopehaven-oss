@@ -1,6 +1,6 @@
 // Writing payments runs (output.mjs writeRun) and reading fresh ones back (savedPaymentsRun). `payments run --out DIR` makes a
 // missing DIR 0700 whatever the umask, and keeps an existing one as it is. And the owned demo's two fresh runs, as written to disk,
-// are each accepted by savedPaymentsRun (#514 review R2-1): the export's checks copy the pack's run fields, row rules and scope, and
+// are each accepted by savedPaymentsRun: the export's checks copy the pack's run fields, row rules and scope, and
 // the checked-in samples are older, so a pack change that made every new run unexportable would fail here first. Owned synthetic
 // app and payments double only: every listener and connection is on 127.0.0.1, every file is under a fresh temporary directory,
 // and nothing is signed, so no key directory is read or made.

@@ -1,4 +1,4 @@
-// The build a run and a signed file name (security review F9, src/producer.mjs): a release copy's commit, a checkout's HEAD, or
+// The build a run and a signed file name (src/producer.mjs): a release copy's commit, a checkout's HEAD, or
 // `unknown`; the running and the packing build printed apart by every verifier; no evaluator identity or contract view digest moved;
 // and runs and packs saved before the field still verify. A real tarball's copy is exercised in test/build-release.test.mjs. Local only:
 // git, python3, a loopback lab and the owned synthetic fixture, under private temporary folders with their own signing keys.

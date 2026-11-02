@@ -1,4 +1,4 @@
-// App logs never reach a custody decision (src/app-log-rules.mjs, APP-LOG addendum R1 section 3). Three layers, each pinned:
+// App logs never reach a custody decision (src/app-log-rules.mjs). Three layers, each pinned:
 //   1. structural: app logs are declared under "appLogs", never "observers"; the connector keeps them in their own list and
 //      seals their windows as data.appLogWindows; the validator binds them apart from the observer windows;
 //   2. one choke point, src/effect-events.mjs custodyWindows, called first by every custody entry point: it refuses a window
@@ -54,7 +54,7 @@ const GUARDED = {
   'src/http-effects.mjs#decideEffects': ['decideEffects', () => decideEffects([{ kind: 'effect.exists', select: SELECT }], [W()])],
   'src/http-effects.mjs#decideSealed': ['decideEffects', () => decideSealed({ effects: [{ kind: 'effect.exists', select: SELECT }] }, [W()], 'boundary')],
   'src/http-effects.mjs#decideClause': ['evaluateEffectAssertion', () => decideClause({ kind: 'effect.exists', select: SELECT }, [W()], 'boundary')],
-  // In-doubt resolution IDR-2: the run-end re-decide stage guards every row's windows before it binds or decides anything.
+  // In-doubt resolution: the run-end re-decide stage guards every row's windows before it binds or decides anything.
   'src/http-effects.mjs#redecideResolved': ['redecideResolved', () => redecideResolved([{ effects: [{ kind: 'effect.exists', select: SELECT }], claims: [], readings: [], role: 'boundary', windows: [W()] }], [])],
   'src/later-outcome.mjs#laterFindings': ['laterFindings', () => laterFindings({ rows: [{ raw: [], settled: [], paired: [], windows: [W()], role: 'boundary' }], gaps: [[], []], readingOf: () => null })],
   'src/http-settlement.mjs#settlementFindings': ['settlementFindings', () => settlementFindings([ROW()], [[], []], null)],
@@ -74,7 +74,7 @@ const GUARDED = {
   // Admissions read app-log windows apart; their custody windows argument is guarded like any other.
   'src/app-log-verdicts.mjs#admissionsFor': ['admissionsFor', () => admissionsFor([{ kind: 'effect.none', select: SELECT }], { windows: [W()], appLogWindows: [], records: [] })],
   'src/app-log-verdicts.mjs#admissionRows': ['admissionRows', () => admissionRows([{ id: 'c', principal: 'p', requestId: null, decisions: [], windows: [W()], appLogWindows: [] }])],
-  // NC2 item 3: the Supabase service-role notes read a pinned clause over the check's windows through evaluateEffectAssertion first
+  // The Supabase service-role notes read a pinned clause over the check's windows through evaluateEffectAssertion first
   // (a thin wrapper of its guard), and write notes only, never a verdict.
   'integrations/observers/supabase-rules.mjs#serviceRoleNotes': ['evaluateEffectAssertion', () => serviceRoleNotes({ effects: [{ kind: 'effect.exists', select: { ...SELECT, actor: 'member-1' } }] }, [W()], { principals: ['member-1'] })],
 };
@@ -101,27 +101,27 @@ const EXEMPT = {
     'src/suspend-clock.mjs#applySuspendShort', 'src/suspend-clock.mjs#carriesSuspendShort',
     'integrations/collateral/only.mjs#judgeOnly', 'integrations/collateral/only.mjs#evaluateOnly', 'integrations/collateral/only.mjs#onlyScopedComplete', 'integrations/collateral/only.mjs#validateSpans', 'integrations/collateral/only.mjs#outcomeJudgedSends',
     'integrations/collateral/only.mjs#composeSnapshots', 'integrations/collateral/only.mjs#reconcile', 'integrations/collateral/only.mjs#bySource', 'integrations/collateral/only.mjs#quiescent', 'integrations/collateral/only.mjs#instanceOf',
-    // In-doubt resolution IDR-2: late records are normalized, bound onto (and read back from) the events of admitted egress windows only
+    // In-doubt resolution: late records are normalized, bound onto (and read back from) the events of admitted egress windows only
     // (an app-log window is never admitted, so no record binds there); the stage (redecideResolved) and the validator's binders call them.
     'src/in-doubt.mjs#lateEntriesFor', 'src/in-doubt.mjs#bindResolutions', 'src/in-doubt.mjs#sealedResolutions', 'src/http-effects.mjs#bindSealedResolutions',
-    // In-doubt resolution R1 (IDR-4): bindResolutions derives a request-feed read's result over the admitted egress window it binds onto.
+    // The request feed: bindResolutions derives a request-feed read's result over the admitted egress window it binds onto.
     'src/request-feed-rules.mjs#deriveRequestFeed',
-    // The key collapse's identity and retention rule (PR363-REVIEW major 1 and minor 5): countApplications, keyedReplays and R1's
+    // The key collapse's identity and retention rule: countApplications, keyedReplays and the request feed's
     // deriveRequestFeed read a key group through it; it reads one window's published declaration and decides nothing.
     'src/key-identity.mjs#keyGroupIdentity',
-    // In-doubt resolution R2 (IDR-3): bindResolutions derives a read-back read's result over the admitted egress window it binds onto.
+    // Read-back: bindResolutions derives a read-back read's result over the admitted egress window it binds onto.
     'src/read-back-rules.mjs#deriveReadBack',
-    // FIX-04 option 3: names the undeclared hosts of a clause's egress windows for its text (decideEffects, guarded, calls it); it reads
+    // Names the undeclared hosts of a clause's egress windows for its text (decideEffects, guarded, calls it); it reads
     // only http-egress windows and decides nothing. The connector and the binder admit those windows for it, as for gate B.
     'src/http-effects.mjs#undeclaredHostsSeen', 'src/effect-events.mjs#admitDisclosure', 'src/effect-events.mjs#disclosureAdmitted',
-    // NC9 item 3: names the service-role tools whose writes a pinned clause selects, for its text (decideEffects, guarded, calls it); it
+    // Names the service-role tools whose writes a pinned clause selects, for its text (decideEffects, guarded, calls it); it
     // reads only pg-snapshot and pg-wal windows that name principals (an app-log window's instance never qualifies) and decides nothing.
     'src/http-effects.mjs#serviceRoleToolsSeen'],
-  // The outbound canary sink (lane E1): it judges seeded-canary units ({ destination, canaries, scanned }), never effect events. A pass
+  // The outbound canary sink: it judges seeded-canary units ({ destination, canaries, scanned }), never effect events. A pass
   // needs authoritative: true on every required collector's window, which no presence-only or app-written record carries, so an
   // app-log window can only ever leave it inconclusive.
   'judges seeded-canary windows, never effect windows; a pass needs authoritative evidence': ['integrations/observers/canary-sink.mjs#judgeCanaries'],
-  // NC9 item 3: zeroRowAgreesWithWindow checks a sealed zero-row record against its observer's bound window inside the binder
+  // zeroRowAgreesWithWindow checks a sealed zero-row record against its observer's bound window inside the binder
   // (recomputeEffectTrace); it only ever refuses a record, never decides a clause.
   'validates a window or event; decides nothing': ['src/http-effects.mjs#zeroRowAgreesWithWindow', 'src/effect-events.mjs#validateWindow', 'src/effect-events.mjs#consistentScopedCaptures', 'src/idempotency.mjs#consistentIdempotencyRun', 'src/idempotency.mjs#consistentSigningRun', 'src/request-feed-rules.mjs#consistentRequestFeedRun', 'src/read-back-rules.mjs#consistentReadBackRun', 'src/effect-events.mjs#makeEffect',
     'src/effect-events.mjs#validateEffect', 'src/effect-events.mjs#validateScope'],
@@ -129,9 +129,9 @@ const EXEMPT = {
     ...['absentFieldBasis', 'baseSelector', 'credentialFrom', 'definitelyAbsent', 'formDecimalBasis', 'formDecimalSends', 'loopbackRequestAllowed', 'matchState', 'matches', 'originForm', 'validateEffectAssertion', 'validateSelector', 'wallNs'].map(n => `src/effect-events.mjs#${n}`),
     ...['absenceFields', 'applyLater', 'laterFields', 'backendObserved', 'claimDecisionsOf', 'declaredClaim', 'declaredEffect', 'effectAssertionName', 'effectAssertionRows', 'effectDecisionsOf', 'effectStatus', 'observerInstanceId', 'roleOfSeverity', 'sealedClaims', 'settleDeclared',
       'validateDeclaredClaims', 'validateDeclaredEffect', 'validateCheckEffects', 'outcomeJudgedProfileProblem', 'forbiddenSelectors', 'recordedDestinations',
-      // NC9 item 3, rls-zero-row: a sealed zero-row record, a row's own assertions and the decisions after every other stage; no window.
+      // rls-zero-row: a sealed zero-row record, a row's own assertions and the decisions after every other stage; no window.
       'applyZeroRow', 'responseContractSucceeded', 'validZeroRowRecord', 'zeroRowClause', 'zeroRowFields', 'zeroRowFinding'].map(n => `src/http-effects.mjs#${n}`),
-    // feedKeyCustody (FIX-06) reads one provider feed's declaration (a window's scope.feed, or a run record's feed), never a window.
+    // feedKeyCustody reads one provider feed's declaration (a window's scope.feed, or a run record's feed), never a window.
     ...['anchorOf', 'custodyUpgrade', 'feedKeyCustody', 'linkDigest', 'onlyCustodyUpgrade', 'roleOfSeverity', 'verifyChain'].map(n => `src/custody.mjs#${n}`),
     ...['applySettlement', 'correlationDeclared', 'finalSettleMs', 'fitsSelector', 'onlyDeclared', 'selectorsOf', 'settlementFields', 'settlementTokens'].map(n => `src/http-settlement.mjs#${n}`),
     ...['applyAttribution', 'attributionDeclarationProblem', 'attributionFields', 'attributionRecord', 'backgroundClassifier', 'backgroundProblem', 'fitsWide', 'validateAttributionRecord'].map(n => `src/http-attribution.mjs#${n}`),
@@ -153,7 +153,7 @@ const EXEMPT = {
   'reads observer configuration or run data, not windows': ['src/collector-identity.mjs#collectorDigest', 'src/idempotency.mjs#signingSecretValueClash', 'src/http-scope-text.mjs#signingUnusableLimitation', 'src/egress-rules.mjs#correlationRecorded', 'src/effect-outcome.mjs#forwardRecordOf', 'src/http-timing.mjs#maxDeclaredSettle',
     // Confined launch (src/confine.mjs): the declared observers' provider-side ports, which may not be allowlisted; configuration only, no windows.
     'src/confine.mjs#providerSidePorts',
-    // The declared-channel rule (src/channels.mjs, N11): checks a channel declaration's observer ids and types against the declared
+    // The declared-channel rule (src/channels.mjs): checks a channel declaration's observer ids and types against the declared
     // observers; configuration only, no windows. The module's readers take a saved run, skip report-only windows and decide no clause.
     'src/channels.mjs#channelDeclarationProblem',
     'src/http-timing.mjs#witnessCloseMs', 'src/fixture.mjs#suppliedContext', 'integrations/coverage-report/coverage.mjs#datastoreCoverage', 'integrations/policy-import/matrix.mjs#buildMatrix',
@@ -161,24 +161,24 @@ const EXEMPT = {
     'integrations/core-practice/profiles.mjs#lifecycleProfile', 'integrations/core-practice/profiles.mjs#selfLifecycleProfile', 'integrations/core-practice/profiles.mjs#creatorProfile', 'integrations/core-practice/profiles.mjs#settlementProfile',
     // Later outcomes: the run record's provider feeds that declare outcomes under a later-outcome label (observer records, no windows).
     'src/provider-feed-rules.mjs#laterFeedsOf', 'src/later-outcome.mjs#laterReadings',
-    // In-doubt resolution R1: whether a profile's or a run's recorders declare a request feed (observer configs or records, no windows).
+    // The request feed: whether a profile's or a run's recorders declare a request feed (observer configs or records, no windows).
     'src/request-feed-rules.mjs#requestFeedsDeclared',
-    // In-doubt resolution R2: a recorder's read-back record, and whether and how long a profile's or a run's recorders read back (observer
+    // Read-back: a recorder's read-back record, and whether and how long a profile's or a run's recorders read back (observer
     // configs or records, no windows).
     'src/read-back-rules.mjs#readBackRecordOf', 'src/read-back-rules.mjs#readBacksDeclared', 'src/read-back-rules.mjs#readBackReserveMs', 'src/read-back-rules.mjs#readBackMaxSettleMs',
-    // FIX-04 option 2: a recorder's declared aliases (an observer config or record, no windows).
+    // Other names of a declared provider: a recorder's declared aliases (an observer config or record, no windows).
     'src/egress-rules.mjs#aliasRecordOf',
-    // FIX-08: the destinations a profile's other egress recorders declare (observer configs, no windows).
+    // Another recorder's destinations: the destinations a profile's other egress recorders declare (observer configs, no windows).
     'src/egress-rules.mjs#crossDestinationsOf'],
-  // The authorization record's window (src/authorization.mjs, H1 step 1): guardObserver wraps an observer object so no observer call
+  // The authorization record's window (src/authorization.mjs): guardObserver wraps an observer object so no observer call
   // starts after the record's window ends, and windowRefusal names that ended window as the run's error. Both take the authorization
   // window or an observer, never an evidence window, and decide no clause.
   'takes the authorization window or an observer object, not evidence windows': ['src/authorization.mjs#guardObserver', 'src/authorization.mjs#windowRefusal'],
-  // N14 (integrations/payments-stripe/): judge reads the Stripe read-back observer's own ledger reads (scopehaven-stripe-ledger/1) and its
+  // Stripe (integrations/payments-stripe/): judge reads the Stripe read-back observer's own ledger reads (scopehaven-stripe-ledger/1) and its
   // row specs; anything that is not such a read (an evidence or app-log window included) throws or reads read-not-accepted. Its only
   // app-written input is rows.match-ledger's copied refund rows, which pass only when equal to the ledger read.
   'judges its own observer\'s ledger reads, never evidence windows': ['integrations/payments-stripe/verdict.mjs#judge'],
-  // NC2 item 2 (integrations/observers/pg-actor.mjs): parseLedger turns the actor capture's own SQL ledger read (ledgerSql's result
+  // The actor capture (integrations/observers/pg-actor.mjs): parseLedger turns the actor capture's own SQL ledger read (ledgerSql's result
   // rows, a fixed column list) into ledger entries; a row of any other shape throws. It takes no evidence or app-log window and
   // decides nothing.
   'parses its own capture\'s SQL ledger rows, never evidence windows': ['integrations/observers/pg-actor.mjs#parseLedger']

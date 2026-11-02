@@ -1,4 +1,4 @@
-// W3: claim rules on HTTP checks (src/http-claims.mjs). The reply only selects which records requirement
+// Claim rules on HTTP checks (src/http-claims.mjs). The reply only selects which records requirement
 // applies; the observers' records decide it. Pure unit tests over synthetic windows (no I/O).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,10 +20,10 @@ const says = reply => reading(text, { reply });
 const textClaim = spec => ({ trigger: { text: spec }, select: sel });
 const readsAs = (spec, reply) => reading(textClaim(spec), { reply });
 
-// Exact sentences (lead decision, 2026-10-10, after review round 5): free text is not parsed. A declared sentence decides
+// Exact sentences: free text is not parsed. A declared sentence decides
 // only when the whole reply, normalised (NFKC, lowercase, whitespace collapsed, one trailing . or ! dropped), is exactly
 // that sentence, optionally followed by exactly one declared courtesy template as a separate sentence.
-test('W3 exact sentence: the whole reply equal to one declared sentence decides; any other word, character or sentence reads ambiguous', () => {
+test('exact sentence: the whole reply equal to one declared sentence decides; any other word, character or sentence reads ambiguous', () => {
   // Decides: the declared sentence alone, in any case, with collapsed whitespace and one trailing . or !.
   assert.deepEqual(readClaim(text, ok({ reply: 'Refund has been issued.' })), { reading: 'success', phraseIndex: 0 });
   assert.deepEqual(readClaim(text, ok({ reply: 'REFUNDED   YOUR\u00a0ORDER!' })), { reading: 'success', phraseIndex: 1 });
@@ -64,7 +64,7 @@ test('W3 exact sentence: the whole reply equal to one declared sentence decides;
   assert.ok(performance.now() - started < 500);
 });
 
-test('W3 courtesy: exactly one declared courtesy template, as a separate sentence after the claim', () => {
+test('courtesy: exactly one declared courtesy template, as a separate sentence after the claim', () => {
   const polite = { pointer: '/reply', success: ['refund has been issued'], refusal: ['cannot issue a refund'], courtesy: ['Thank you', 'have a nice day'] };
   const r = reply => readsAs(polite, reply);
   for (const reply of ['Refund has been issued. Thank you.', 'Refund has been issued! Thank you!', 'Refund has been issued.\n\nHave a nice day', 'refund has been issued. THANK YOU', 'Refund has been issued.  thank   you.'])
@@ -80,10 +80,10 @@ test('W3 courtesy: exactly one declared courtesy template, as a separate sentenc
     assert.equal(says(reply), 'ambiguous', reply);
 });
 
-// The last open finding of review round 5 (86badd2): a word of one declared phrase beside another phrase's hit let a
+// Before exact sentences, a word of one declared phrase beside another phrase's hit let a
 // fluent retraction, condition or trailing conjunction decide. Exact sentences end the class: none of them is a
 // declared sentence.
-test('W3 round 6: a word of one declared phrase beside another declared phrase never decides', () => {
+test('a word of one declared phrase beside another declared phrase never decides', () => {
   const spec = { pointer: '/reply', success: ['refund has been issued', 'cancelled', 'issued', 'refund issued', 'order cancelled', 'refund has been issued or cancelled'], refusal: ['refund denied', 'cannot issue a refund'] };
   for (const reply of ['Your refund has been issued and cancelled.', 'When refund has been issued.', 'Refund has been issued or.', 'Refund has been issued, cancelled.', 'Issued and cancelled.', 'Refund issued cancelled.',
     'Cancelled refund issued.', 'Refund has been issued issued.', 'Order cancelled or.', 'If refund issued.', 'Refund issued when.', 'Refund has been issued and refund denied.', 'Issued, cancelled.', 'Refund issued or refund denied.',
@@ -96,7 +96,7 @@ test('W3 round 6: a word of one declared phrase beside another declared phrase n
   assert.deepEqual(readClaim(textClaim(spec), ok({ reply: 'Refund denied!' })), { reading: 'refusal', phraseIndex: 0 });
 });
 
-// Every text-trigger spec the round 1 to 5 tests used, as declared.
+// Every text-trigger spec the earlier tests used, as declared.
 const PRIOR_SPECS = [
   { pointer: '/reply', success: ["refund has been issued", "refunded your order"], refusal: ["cannot issue a refund"] },
   { pointer: '/reply', success: ["been refunded"] },
@@ -121,7 +121,7 @@ const PRIOR_SPECS = [
   { pointer: '/reply', success: ["refund has been issued", "refund issued"], refusal: ["refund denied"] },
   { pointer: '/reply', success: ["refunded", "will be refunded to you by them"], refusal: [] },
 ];
-// Every reply the round 1 to 5 tests asserted ambiguous, by spec (extracted from the test file at 86badd2 by recording
+// Every reply the earlier tests asserted ambiguous, by spec (extracted from the earlier test file by recording
 // each readClaim call; the two seeded fuzz tests are regenerated below instead).
 const PRIOR_AMBIGUOUS = [
   [0, [
@@ -553,7 +553,7 @@ const PRIOR_AMBIGUOUS = [
     "Refunded to you.",
   ]],
 ];
-// Every reply the round 1 to 5 tests asserted decided (success or refusal) or untriggered, by spec. Under exact
+// Every reply the earlier tests asserted decided (success or refusal) or untriggered, by spec. Under exact
 // sentences each reads ambiguous unless the whole reply is a declared sentence (STILL_DECIDED).
 const FORMER_DECIDED = [
   [0, [
@@ -678,8 +678,7 @@ const FORMER_DECIDED = [
     "Refund issued 12.5%.",
   ]],
 ];
-// Wordings quoted in the round 1 to 5 receipts (RECEIPT.md, RECEIPT-ADDENDUM-1.md to -4.md), the three round 6 wordings,
-// and the classes the receipts named, as replies.
+// Wordings quoted in earlier adversarial reviews, three later wordings, and the classes the reviews named, as replies.
 const RECEIPT_WORDINGS = [
   "No $25.00 refund has been issued.", "It has not.", "The payment did not go through.", "No.",
   "Nope!", "Not yet!", "I have not heard from Dr. Lee that the refund has been issued.", "The refund has been issued; however, it failed.",
@@ -706,17 +705,17 @@ const RECEIPT_WORDINGS = [
 ];
 const ROUND6_SPEC = { pointer: '/reply', success: ['refund has been issued', 'cancelled', 'refund issued', 'been refunded', 'refunded'], refusal: ['unable to refund', 'cannot issue a refund'] };
 
-test('W3 every prior adversarial wording reads ambiguous (rounds 1 to 6, tests and receipts)', () => {
+test('every prior adversarial wording reads ambiguous (earlier tests and reviews)', () => {
   const specs = [...PRIOR_SPECS, ROUND6_SPEC];
   for (const spec of specs) assert.doesNotThrow(() => validateClaims([textClaim(spec)], s => validateSelector(s, 'x', { fields: true })), JSON.stringify(spec));
   let checked = 0;
   for (const [i, list] of PRIOR_AMBIGUOUS) for (const reply of list) { assert.equal(readsAs(PRIOR_SPECS[i], reply), 'ambiguous', `spec ${i}: ${JSON.stringify(reply)}`); checked++; }
   assert.equal(checked, 388);
-  // Each receipt wording against every spec.
+  // Each of those wordings against every spec.
   for (const reply of RECEIPT_WORDINGS) for (const spec of specs) assert.equal(readsAs(spec, reply), 'ambiguous', `${JSON.stringify(reply)} ${JSON.stringify(spec)}`);
 });
 
-test('W3 replies the round 1 to 5 tests decided: ambiguous unless the whole reply is a declared sentence (recall, by design)', () => {
+test('replies the earlier tests decided: ambiguous unless the whole reply is a declared sentence (recall, by design)', () => {
   const STILL_DECIDED = [[5, 'Refund issued.', 'success', 2], [8, 'Has been issued.', 'success', 0], [10, 'Your refund issued, thank you.', 'success', 0], [11, 'Refund issued. Your case number is in the app.', 'success', 0]];
   const still = new Set(STILL_DECIDED.map(([i, reply]) => `${i} ${reply}`));
   let ambiguous = 0;
@@ -729,7 +728,7 @@ test('W3 replies the round 1 to 5 tests decided: ambiguous unless the whole repl
   for (const [i, reply, side, phraseIndex] of STILL_DECIDED) assert.deepEqual(readClaim(textClaim(PRIOR_SPECS[i]), ok({ reply })), { reading: side, phraseIndex }, reply);
 });
 
-test('W3 field trigger: type-strict; absent is untriggered; any other value is unreadable', () => {
+test('field trigger: type-strict; absent is untriggered; any other value is unreadable', () => {
   assert.equal(reading(field, { refund: { status: 'issued' } }), 'success');
   assert.equal(reading(field, { refund: { status: true } }), 'success');
   assert.equal(reading(field, { refund: { status: 'declined' } }), 'refusal');
@@ -741,7 +740,7 @@ test('W3 field trigger: type-strict; absent is untriggered; any other value is u
   assert.deepEqual(readClaim(field, ok({ refund: { status: false } })), { reading: 'refusal', valueIndex: 1 });
 });
 
-test('W3 declaration: bounded, exact-name selectors, plain declared sentences, no regex, observers required', () => {
+test('declaration: bounded, exact-name selectors, plain declared sentences, no regex, observers required', () => {
   const v = claims => validateDeclaredClaims(claims);
   assert.doesNotThrow(() => v([text, field]));
   const bad = (claims, pattern) => assert.throws(() => v(claims), pattern);
@@ -810,7 +809,7 @@ const refundSend = () => makeEffect({ source: 'http-egress', observer, seq: ++se
 const win = (events, coverage = 'complete') => ({ source: 'http-egress', instanceId: observer.instanceId, scope: { operations: ['send'], names: [PAY], actorAttribution: 'none', evidence: 'authoritative' }, coverage, reason: coverage === 'complete' ? null : 'egress-witness-not-received', events });
 const decide = (claims, readings, events, { coverage, role = 'boundary' } = {}) => decideEffects([], [win(events, coverage)], { role, claims, readings });
 
-test('W3 decisions: the records decide; the reply only selects the requirement; every unread case is inconclusive', () => {
+test('decisions: the records decide; the reply only selects the requirement; every unread case is inconclusive', () => {
   const one = (r, events, opts, claim = text) => decide([claim], [r], events, opts)[0];
   const success = { reading: 'success', phraseIndex: 0 }, refusal = { reading: 'refusal', phraseIndex: 0 };
   assert.deepEqual([one(success, [refundSend()]).verdict, one(success, [refundSend()]).kind], ['pass', 'effect.exists'], 'claim asserted, effect present: pass');
@@ -850,7 +849,7 @@ test('W3 decisions: the records decide; the reply only selects the requirement; 
 
 const meta = new Map([[observer.instanceId, { kind: 'http-egress-recorder', settleMs: 250 }]]);
 const declaredObservers = [{ id: 'sink', type: 'egress-recorder', settleMs: 250 }];
-test('W3 sealing: claims are stored apart from declared effects, keep no reply text, and are recomputed from the windows', () => {
+test('sealing: claims are stored apart from declared effects, keep no reply text, and are recomputed from the windows', () => {
   const windows = [win([refundSend()])];
   const decisions = decideEffects([{ kind: 'effect.exists', select: sel }], windows, { claims: [text, field], readings: [{ reading: 'success', phraseIndex: 0 }, { reading: 'unreadable' }] });
   const trace = effectTrace(decisions, windows, meta);
@@ -885,7 +884,7 @@ test('W3 sealing: claims are stored apart from declared effects, keep no reply t
   assert.throws(() => recomputeEffectTrace(empty, undefined, declaredObservers), /effect-trace/);
 });
 
-test('W3 settlement and pairing: a claim clause settles like a declared one; a pinned refusal needs a twin', () => {
+test('settlement and pairing: a claim clause settles like a declared one; a pinned refusal needs a twin', () => {
   const pinned = { ...text, select: { ...sel, resource: 'POST /v1/refunds' } };
   const target = { actors: { u: { principalId: 'u' } }, checks: [
     { id: 'R', severity: 'high', actorId: 'u', claims: [pinned] },
@@ -913,7 +912,7 @@ function fakeSink(plan, resources = []) {
   });
 }
 // guarded: the required control C proves an allowed send of the same actor (effect.exists), so R's unpinned claim is guarded
-// (FIX-07, src/http-pairing.mjs allowedUseGuards); C's window comes first in a fakeSink plan then.
+// (src/http-pairing.mjs allowedUseGuards: an absence that pins nothing needs a guard); C's window comes first in a fakeSink plan then.
 const claimProfile = ({ guarded = false } = {}) => ({ id: 'claims-app', name: 'Claims app', applicationId: 'claims-app', origin: 'http://127.0.0.1:9', buildLabel: 'b', contextId: 'synthetic', actors: { u: { principalId: 'u-1' } },
   observers: [{ id: 'sink', type: 'egress-recorder', port: 40998, routing: 'proxy', destinations: [{ host: PAY }], witness: { actorId: 'u', method: 'GET', path: '/ping', host: 'witness.scopehaven.invalid' }, settleMs: 250, quietMs: 150 }],
   requiredControlIds: ['C'], checks: [
@@ -921,7 +920,7 @@ const claimProfile = ({ guarded = false } = {}) => ({ id: 'claims-app', name: 'C
     { id: 'R', title: 'Refund reply matches the records', category: 'claims', severity: 'high', actorId: 'u', method: 'POST', path: '/refund', body: {}, evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 200 }], claims: [text] }] });
 const reply = text => async (origin, c) => ({ status: 200, complete: true, jsonParsed: true, json: c.path === '/refund' ? { reply: text } : {}, bytes: 2 });
 
-test('W3 connector: a lying build fails and an honest refusal passes; readings never change comparison compatibility', async () => {
+test('connector: a lying build fails and an honest refusal passes; readings never change comparison compatibility', async () => {
   // Guarded: C's own allowed send (an order) is its window (the plan's first entry), R's window comes next.
   const ORDER = ['POST /v1/orders'];
   const guarded = claimProfile({ guarded: true });
@@ -952,7 +951,7 @@ test('W3 connector: a lying build fails and an honest refusal passes; readings n
 // An allowed-use control proves its use works. A declared refusal on it passed the control on an honest refusal (no effect,
 // as claimed), so an app that refused everything established the actor and its refused boundary rows passed clean. The
 // regression is the load-time refusal and the saved-run refusal; the runs below show what a success-only control then reads.
-test('W3 controls: a claim rule on an allowed-use control declares success only; an honest refusal never establishes the actor', async () => {
+test('controls: a claim rule on an allowed-use control declares success only; an honest refusal never establishes the actor', async () => {
   const said = { trigger: { text: { pointer: '/reply', success: ['refund has been issued'] } }, select: sel };
   const status = { trigger: { field: { pointer: '/refund/status', success: ['issued'] } }, select: sel };
   const profile = controlClaims => ({ ...claimProfile(), checks: [
@@ -990,7 +989,7 @@ test('W3 controls: a claim rule on an allowed-use control declares success only;
   assert.throws(() => validateHttpRunEvidence(old), e => e.code === 'invalid-run-evidence' && e.detail === 'control-refusal-claim');
 });
 
-test('W3 limits: the 8000-character cap holds after NFKC expansion', () => {
+test('limits: the 8000-character cap holds after NFKC expansion', () => {
   const g = reply => readsAs({ pointer: '/reply', success: ['refund has been issued'], refusal: ['unable to refund your order'] }, reply);
   // U+FDFA expands to 18 characters under NFKC: 500 of them are 500 characters raw and 9000 normalised.
   assert.equal('\ufdfa'.normalize('NFKC').length, 18);
@@ -1012,7 +1011,7 @@ const BODIES = { success: ['your refund has been issued', 'we have issued the re
   refusal: ['we are unable to refund', 'we were unable to refund this', 'unable to refund', 'i am unable to refund it'] };
 const OPENING = ['hi', 'hello', 'thanks', 'thank you', 'good morning', 'dear customer'], APOLOGY = ['sorry', 'unfortunately', 'my apologies'];
 const CLOSING = ['have a great day', 'let me know if you need anything else', 'thank you for your patience', 'kind regards', 'please contact support', 'sorry for the delay'];
-// Round 4 generator, unchanged; it now also says whether the reply is exactly a declared sentence of `wide` (no opening,
+// The earlier fuzz generator, unchanged; it now also says whether the reply is exactly a declared sentence of `wide` (no opening,
 // no closing, and a body that is itself declared), which is the only case that may decide.
 function cleanOf(rand, side) {
   const parts = [];
@@ -1024,7 +1023,7 @@ function cleanOf(rand, side) {
   const reply = [...parts.join('').trimEnd()].map(ch => rand() < 0.3 ? ch.toUpperCase() : ch).join('').replace(/ /g, () => rand() < 0.2 ? '  ' : ' ');
   return { reply, exact: exact && ['refund issued', 'unable to refund'].includes(body) };
 }
-// The round 4 lists, frozen as they were at 86badd2 (R4_ALLOWED is the word allowlist the round 4 rule had), so the seeded
+// The earlier fuzz lists, frozen as they were (R4_ALLOWED is the word allowlist the earlier phrase rule had), so the seeded
 // generator below produces the same replies it did then.
 const R4_ALLOWED = new Set(["a","an","the","your","our","my","its","this","that","these","those","i","we","you","it","is","are","was","were","am","been","has","have","i've","we've","you've","it's","i'm","we're","you're","that's","for","of","on","in","at","with","from","into","and","hi","hello","there","dear","customer","good","morning","afternoon","evening","thanks","thank","again","many","very","much","so","patience","waiting","understanding","contacting","us","reaching","out","message","appreciate","let","me","know","if","need","anything","else","please","any","questions","other","feel","free","to","reach","contact","support","further","help","happy","glad","welcome","great","day","nice","wonderful","enjoy","take","care","regards","best","kind","warm","sincerely","cheers","team","sorry","inconvenience","delay","apologize","apologise","apologies","no","problem","worries","unfortunately","refund","issued","unable"]);
 const R4_NOISE = ['not', 'never', 'maybe', 'probably', 'kidding', 'lol', 'psych', 'false', 'untrue', 'draft', 'template', 'ignore', 'disregard', 'earlier', 'previously', 'now', 'later', 'pending', 'reversed', 'cancelled', 'failed',
@@ -1032,7 +1031,7 @@ const R4_NOISE = ['not', 'never', 'maybe', 'probably', 'kidding', 'lol', 'psych'
 const R4_SYMBOLS = ['?', '"', '`', '*', '~', '[', ']', '(', ')', ';', ':', '-', '/', '>', '<', '|', '_', '@', '&', '+', '=', '^', '{', '}', '\\', "'", '\u2026', '\u2717', '\u2718', '\u274c', '\u2713', '\u2705', '\u2610', '\u2022',
   '\u00bf', '\u203d', '\u201c', '\u00ab', '\u00b4', '\u{1F600}', '\u0007', '\u2013', '\u00a7'];
 const R4_MARKUP = [['~~', '~~'], ['**', '**'], ['_', '_'], ['`', '`'], ['<s>', '</s>'], ['- [ ] ', ''], ['* [ ] ', ''], ['- [x] ', ''], ['> ', ''], ['# ', ''], ['1) ', ''], ['- ', ''], ['| ', ' |'], ['[', '](x)']];
-// The hits of the round 4 fuzz claim in a generated reply (whose spaces may be doubled), as [start, end) spans.
+// The hits of the earlier fuzz claim in a generated reply (whose spaces may be doubled), as [start, end) spans.
 const hitSpans = s => ['refund has been issued', 'issued the refund', 'refund issued', 'unable to refund']
   .flatMap(phrase => [...s.toLowerCase().matchAll(new RegExp(phrase.split(' ').join(' +'), 'g'))].map(m => [m.index, m.index + m[0].length]));
 // Insertion points: the ends and every space or newline that is not inside a hit.
@@ -1043,7 +1042,7 @@ function insertionPoints(s) {
   return points;
 }
 const hitSpan = s => hitSpans(s)[0];
-test('W3 round 4 fuzz, kept: generated replies decide only when exactly a declared sentence; a word, symbol, markup or the other side always reads ambiguous', () => {
+test('word, symbol and markup fuzz, kept: generated replies decide only when exactly a declared sentence; a word, symbol, markup or the other side always reads ambiguous', () => {
   const rand = rng(20261010);
   let checked = 0, decided = 0;
   for (let n = 0; n < 400; n++) {
@@ -1067,10 +1066,10 @@ test('W3 round 4 fuzz, kept: generated replies decide only when exactly a declar
   assert.ok(decided > 0 && decided < 400, `decided ${decided}`);
 });
 
-// Round 5 generated wordings: every semi-modal, question-order, agent and patient frame built from the round-4 function
+// Generated wordings: every semi-modal, question-order, agent and patient frame built from the earlier allowlist's function
 // words around a hit, with random courtesy around it and random case, reads ambiguous.
 const R211 = { trigger: { text: { pointer: '/reply', success: ['refund is on its way', 'refund has been issued', 'refunded'], refusal: ['decline your refund', 'unable to refund'] } }, select: sel };
-test('W3 round 5 fuzz, kept: function-word frames around a hit never decide', () => {
+test('function-word fuzz, kept: function-word frames around a hit never decide', () => {
   const rand = rng(20261011);
   const before = ['to be', 'is to be', 'are to be', 'was to be', 'were to be', 'has to be', 'have to be', 'had to be', 'to have been', 'was to have been', 'has to have been', 'for you to be', 'it is for you to be', 'be',
     'and is', 'and has', 'and was', 'and were', 'and have', 'is', 'has', 'was', 'were', 'have', 'am', 'and', 'for', 'of', 'in', 'on', 'at', 'with', 'from', 'into',
@@ -1089,7 +1088,7 @@ test('W3 round 5 fuzz, kept: function-word frames around a hit never decide', ()
   assert.equal(checked, 600);
 });
 
-// Round 6 fuzz: start from a reply that is exactly a declared sentence (random case, whitespace, trailing . or !, and
+// Single-change fuzz: start from a reply that is exactly a declared sentence (random case, whitespace, trailing . or !, and
 // maybe one declared courtesy sentence) and check it decides; then change it once in each way the rule refuses (a word,
 // a symbol, a control or format character, markup or quotes, a second or third sentence, the other side, other final
 // punctuation, a greeting first) and check every variant reads ambiguous.
@@ -1099,7 +1098,7 @@ const SYMBOLS = [...R4_SYMBOLS, '#', '$', '%', ',', '\u2018', '\u2019', '\u02bc'
 const MARKUP = [...R4_MARKUP, ['"', '"'], ["'", "'"], ['\u201c', '\u201d'], ['(', ')'], ['*', '*']];
 const CONTROLS = ['\u0000', '\u0007', '\u000b', '\u000c', '\u0085', '\u00ad', '\u061c', '\u200b', '\u200e', '\u200f', '\u202a', '\u202e', '\u2060', '\u2066', '\u2069', '\ufeff', '\ue000', '\u0378'];
 const EXTRA_SENTENCES = ['Not.', 'Kidding.', 'Or not.', 'Just kidding.', 'Ignore that.', 'Thanks.', 'Sorry.', 'It was cancelled.', 'Pending.', 'Maybe.', 'LOL.', 'Update: reversed.', 'Hello.', 'Or', 'When'];
-test('W3 round 6 fuzz: an exact declared reply decides; any single change the rule refuses reads ambiguous', () => {
+test('single-change fuzz: an exact declared reply decides; any single change the rule refuses reads ambiguous', () => {
   const rand = rng(20261012);
   const caseOf = s => [...s].map(ch => rand() < 0.3 ? ch.toUpperCase() : ch).join('');
   const spaced = s => s.replace(/ /g, () => pick(rand, [' ', ' ', ' ', '  ', '\u00a0', '\t', '\n']));

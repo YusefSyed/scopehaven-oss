@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SURPASS-PASSK-01 command line, local files only:
+// pass^k command line, local files only:
 //   annotate --sarif ABS_IN --out ABS_NEW --k K (--gate ABS_GATE_JSON | --run ABS_RUN_JSON)
 //     writes a copy of a Scopehaven SARIF log with the pass^k column added: the
 //     column of a schema-2 gate summary (same k, same run), or the column of one

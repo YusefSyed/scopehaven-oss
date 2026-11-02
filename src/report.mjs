@@ -3,14 +3,14 @@ import { CONTROL_CUSTODY_LIMIT } from './custody.mjs';
 import { ADMISSION_FINDING, restsOnAdmissions } from './app-log-verdicts.mjs';
 // The stated scope of an absence pass an egress recorder or SMTP sink decided (presentation only, outside every hash).
 import { absenceScopeEntries, absenceScopeRule, ABSENCE_SCOPE_RULE } from './absence-scope.mjs';
-// A confined launch's record (FIX-01 option 2), when the run carries a valid one (presentation only, outside every hash).
+// A confined launch's record, when the run carries a valid one (presentation only, outside every hash).
 import { confinementOf } from './confinement-record.mjs';
 import { unpairedForwardedPasses } from './forwarded-pairing.mjs';
-// The declared-channel rule for absence (N11): which absence passes do not count, read from the saved run (outside every hash).
+// The declared-channel rule for absence: which absence passes do not count, read from the saved run (outside every hash).
 import { channelReadings, channelStatement, channelSentence, unlistedSentence } from './channels.mjs';
-// Typed claims and the residual (N5): what each verdict rests on, and what the run did not show (outside every hash).
+// Typed claims and the residual: what each verdict rests on, and what the run did not show (outside every hash).
 import { claimTypes, claimCounts, residualOf, CLAIM_RULE, CLAIM_TYPES, RESIDUAL_NOTE } from './residual.mjs';
-// Coverage (NC1 item 3): which actors with a boundary check have a required allowed-use control, read from the saved run, and the
+// Coverage: which actors with a boundary check have a required allowed-use control, read from the saved run, and the
 // operator's pre-run coverage report when the exporter is given its inventory, contract and profile (computed by the exporter from
 // integrations/coverage-report and handed here as lines, so this module imports nothing of it). Presentation only: it feeds no
 // verdict, count, comparison, gate outcome or hash.
@@ -20,7 +20,7 @@ export const scopeStatement = run => run.scopeLabel || (run.evidenceOrigin === "
 // Plain-language allowed-use line; display rounding only, stored counts stay exact.
 // "Fixed" stays reserved for the owned synthetic fixture. Any other restoration
 // count prints with its scope description beside it, so it can't be quoted
-// without its evidence limits (claims register v33). The observed label already
+// without its evidence limits. The observed label already
 // states its scope, and an incompatible pair claims no restoration at all.
 const restorationText = ({ restorationLabel: label, restorationDescription: description }) => label === 'Fixed' ? 'fixed'
   : label === 'Unverified changes' ? label
@@ -124,7 +124,7 @@ export const custodyEntries = row => (Array.isArray(row?.assertions) ? row.asser
     // An app-log admission (src/app-log-verdicts.mjs): the application's own action log decided this fail, against it.
     ...(a.appLog?.finding ? { appLog: a.appLog.finding, appLogSource: a.appLog.log } : {}) }));
 export const custodySentence = entry => `${entry.assertion}: ${custodyLabel(entry.custody)}.${entry.custodyReason ? ` Read as inconclusive (${entry.custodyReason}). ${entry.custodyUpgrade}` : ''}${entry.appLog ? ` Failed by an admission: the application's own action log (app log ${entry.appLogSource}) records it, so it fails against the application (${entry.appLog}); no observer held outside the application decided it.` : ''}`;
-// The label of a fail an app-log admission decided (addendum R1 m5): on the clause, and on a row whose fail rests only on admissions.
+// The label of a fail an app-log admission decided: on the clause, and on a row whose fail rests only on admissions.
 export const ADMISSION_LABEL = 'fail (app-admission)';
 export const assertionStatusLabel = a => a?.status === 'fail' && a?.appLog?.finding === ADMISSION_FINDING ? ADMISSION_LABEL : a?.status;
 export const rowStatusLabel = row => restsOnAdmissions(row) ? ADMISSION_LABEL : row?.status;

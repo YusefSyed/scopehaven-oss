@@ -1,5 +1,5 @@
 // The pg-snapshot collector identity (pg-snapshot/5, src/collector-identity.mjs): a pg-snapshot observer's run record names
-// the reader code that read it, read-back rules, N12's background-writer rules, the actor capture's join and the Supabase rules
+// the reader code that read it, read-back rules, the background-writer rules, the actor capture's join and the Supabase rules
 // included, and a run recorded before it (no collector, pg-snapshot/1 to /4) still validates.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,8 +11,8 @@ import { COLLECTOR_RECORDS, COLLECTOR_FILES, KNOWN_COLLECTOR_LABELS, collectorDi
 import { declaredObserverRecord } from '../src/http-effects.mjs';
 
 test('pg-snapshot/5: the record covers the observer, its wire client, the read-back and background-writer rules, the actor capture, the Supabase rules, and any edit to them moves it', async () => {
-  // N13: the catalog fingerprint the observer reads at each mark joins its files; N12 (pg-snapshot/2): the end barrier, the run lease,
-  // and the ignore-list reader with the two lists it reads at import; pg-snapshot/3: the actor capture (NC2 item 2) the join reads; /4: the Supabase rules (NC9 item 3).
+  // The catalog fingerprint the observer reads at each mark joins its files; pg-snapshot/2: the end barrier, the run lease,
+  // and the ignore-list reader with the two lists it reads at import; pg-snapshot/3: the actor capture the join reads; /4: the Supabase rules.
   assert.deepEqual(COLLECTOR_FILES['pg-snapshot'], ['factory.mjs', 'pg-wire.mjs', 'pg-snapshot.mjs', '../../src/pg-readback.mjs', 'catalog.mjs',
     'end-barrier.mjs', 'run-lease.mjs', 'ignore-lists/ignore-list.mjs', 'ignore-lists/supabase.json', 'ignore-lists/litestream.json', 'pg-actor.mjs', 'supabase-rules.mjs']);
   assert.equal(COLLECTOR_RECORDS['pg-snapshot'].label, 'pg-snapshot/5');

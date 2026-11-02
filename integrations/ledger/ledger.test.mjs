@@ -377,7 +377,7 @@ test('the CLI runs the whole cycle in a folder whose name has a space', async t 
   }
 });
 
-// EVID-SUBJECT (integrations/evid-subject) arrives in its own PR; until it is on main these skip.
+// EVID-SUBJECT (integrations/evid-subject): this test skips when its custody module is absent.
 const CUSTODY_MODULE = new URL('../evid-subject/custody.mjs', import.meta.url);
 test('the ledger is the operator-held, unwitnessed anchor EVID-SUBJECT checks a resealed truncation against', { skip: !existsSync(CUSTODY_MODULE) && 'integrations/evid-subject not present yet' }, async t => {
   const { anchorOf, verifyChain, subjectIntegrityVerdict } = await import(CUSTODY_MODULE);
@@ -415,7 +415,7 @@ test('the ledger is the operator-held, unwitnessed anchor EVID-SUBJECT checks a 
   }
 });
 
-test('review findings: rollback is visible only to a holder of the later checkpoint, signed appends leave no editable tail, and the writer refuses what it cannot verify', async t => {
+test('rollback is visible only to a holder of the later checkpoint, signed appends leave no editable tail, and the writer refuses what it cannot verify', async t => {
   // Rolling back to the size-2 checkpoint verifies on its own: transparency logs need the later head.
   const rolled = variant({ entries: text(linesOf(BASE.entries).slice(0, 2)), checkpoints: text([POINTS[0]]) });
   const back = verifyNode(rolled);
@@ -455,7 +455,7 @@ test('review findings: rollback is visible only to a holder of the later checkpo
   await assert.rejects(appendEnvelope(fresh, { envelope: oddEnvelope, files: oddFiles, evidenceKey: KEY.publicPem, now: at(1) }), /cannot be recorded/);
 });
 
-test('Node and Python agree on edge inputs the review found', { skip: !PYTHON && 'no Python 3 at a fixed path' }, async t => {
+test('Node and Python agree on edge inputs', { skip: !PYTHON && 'no Python 3 at a fixed path' }, async t => {
   const lines = linesOf(BASE.entries), dir = await scratch(t);
   await writeFile(join(dir, 'key.pem'), KEY.publicPem);
   const proof = inclusionProof({ log: LOG, lines, index: 1, treeSize: 4 });
@@ -484,7 +484,7 @@ test('anchors name only observer sources EVID-SUBJECT knows', { skip: !existsSyn
   }
 });
 
-// H1 of the round-2 re-review: someone who can write the folder but holds no key injects an entry while
+// Someone who can write the folder but holds no key injects an entry while
 // the operator's signed append is in progress. Whatever the timing, that entry is never signed.
 test('a concurrent write by someone without the key is never signed by the operator\'s append', async t => {
   const forge = async dir => {
@@ -758,7 +758,7 @@ test('a CLI append killed at any point leaves only whole files, and the document
   }
 });
 
-test('advice never calls a line unsigned just because this folder lost its checkpoint (a V repro)', async t => {
+test('advice never calls a line unsigned just because this folder lost its checkpoint', async t => {
   const dir = await scratch(t); await initLedger(dir, { now: at(0) });
   for (const i of [0, 1, 2]) await appendEnvelope(dir, { envelope: envelopes[i], files: files[i], evidenceKey: KEY.publicPem, privateKey: KEY.privatePem, now: at(i + 0.5) });
   const points = linesOf(await readFile(join(dir, 'checkpoints.jsonl')));
@@ -819,7 +819,7 @@ test('stray copies and temporary files never block a write, and odd file types g
   await assert.rejects(checkpointLedger(E, { privateKey: KEY.privatePem, now: at(4) }), /pending\.json is a symlink, a folder or too large/);
 });
 
-test('pending.json holds a signed intent, never a checkpoint: an abandoned one is no second head (lead A6)', async t => {
+test('pending.json holds a signed intent, never a checkpoint: an abandoned one is no second head', async t => {
   const fresh = async () => {
     const dir = await scratch(t); await initLedger(dir, { now: at(0) });
     for (const i of [0, 1]) await appendEnvelope(dir, { envelope: envelopes[i], files: files[i], evidenceKey: KEY.publicPem, privateKey: KEY.privatePem, now: at(i + 0.5) });

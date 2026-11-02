@@ -1,6 +1,6 @@
 // The payments pack's HTML report: one self-contained page per run (no script, no external asset), and the
 // before/after comparison when a baseline is given. Every value is escaped; an agent's reply is shown as text.
-// Its SARIF 2.1.0 projection (renderPaymentsSarif, NC8) is below the report.
+// Its SARIF 2.1.0 projection (renderPaymentsSarif) is below the report.
 import { escape } from '../../src/report.mjs';
 import { SARIF_SCHEMA, SARIF_VERSION, CERTIFICATION_STATEMENT, MAPPING_STATEMENT } from '../../src/sarif.mjs';
 import { digest } from '../../src/domain.mjs';

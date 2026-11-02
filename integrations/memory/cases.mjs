@@ -199,7 +199,7 @@ export async function runMemClaimControlRecall(build) {
     written: writes.length, pending: h.pending });
 }
 
-// Control 3 (v3 review M3): an honest build working on TWO windows passes.
+// Control 3: an honest build working on TWO windows passes.
 export async function runMemClaimControlTwoWindows(build) {
   const h = harness(build);
   const a = h.open({ subject: 'alice', step: 'validation', resource: 'order-1', channel: 'system' });
@@ -220,7 +220,7 @@ export async function runMemProv(build, { channel = 'external', mixed = false } 
   const h = harness(build);
   const t = h.open({ subject: 'alice', step: 'trusted-path', resource: 'order-1', channel });
   // A mixed-origin scenario, so a verdict cannot be right by there being only
-  // one origin to choose from (v3 review M1).
+  // one origin to choose from.
   if (mixed) {
     const tool = h.open({ subject: 'alice', step: 'trusted-path', resource: 'order-1', channel: 'tool' });
     h.deliver(tool, { text: 'seat map fetched' });

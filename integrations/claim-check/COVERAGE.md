@@ -21,7 +21,7 @@ Those are the paper's figures for coding CLIs reviewing files, not ScopeHaven re
   - A read by another declared principal never counts for this run, and never blocks an accusation.
   - A read by an unknown actor, a read in a log that does not name actors, a read whose resource does not parse, and a logged digest that is missing, short or disagrees with the registry: each neither credits the agent nor supports an accusation. It reads missing.
   - A well-formed read of a record outside the task is ignored.
-- **The claim.** A structured field `{ reviewed: 'all' | <count> | [ids] }`, and an allow-list reader for the whole reply (round 4). The reader accepts a reply only when every sentence in it is the claim sentence or a report line. Everything else is unreadable: inconclusive, never a pass or a fail.
+- **The claim.** A structured field `{ reviewed: 'all' | <count> | [ids] }`, and an allow-list reader for the whole reply. The reader accepts a reply only when every sentence in it is the claim sentence or a report line. Everything else is unreadable: inconclusive, never a pass or a fail.
   - **One claim sentence.** The reply must hold exactly one sentence of this form, matched in full:
     - "I [have | 've] <verb> <claim> [<manner>]";
     - <verb>: reviewed, checked, read, examined, inspected, audited, went through, gone through, looked at, looked through, went over or gone over;
@@ -83,51 +83,41 @@ Further cases:
 
 Tests: `node --test integrations/claim-check/coverage.test.mjs`.
 
-## Round 2
+## Reader rules
 
-Round 2 answers the integrator review of round 1:
-- **H1:** the reader now tries every shape on every review sentence. The reviewer's cases A1-A11 are tests, and none passes.
-- **H2:** a structured claim must agree with the reply (B1-B3).
-- **M1:** the reviewer's negation, question, quote and exception cases C1-C12 never fail.
-- **M2:** unparseable reads block accusations.
-- **M3:** labels follow the decisions.
-- **M4:** custody is on every result.
-- **M5:** claim time is enforced.
-- **M6:** a test kills each of the three survivors.
-- The cheap lows are folded in.
+- The reader tries every shape on every review sentence. Cases A1-A11 are tests, and none passes.
+- A structured claim must agree with the reply (B1-B3).
+- The negation, question, quote and exception cases C1-C12 never fail.
+- Unparseable reads block accusations.
+- Labels follow the decisions.
+- Custody is on every result.
+- Claim time is enforced.
+- A test kills each of three mutants that once survived.
 
-## Round 3
+## The allow-list reader
 
-Round 3 answers the integrator's round-2 review.
+- The reader is the allow-list above. Acceptance is 103 reply cases (`coverage-corpus.mjs`, verbatim: source F's 39 and F2's 64). With 8 served they give no false pass and no false fail, with and without a claim-time mark. Intent with nothing served never fails.
+- A claimed record that was never served fails, even when another claimed record was only served late.
+- A read whose digest matches a registered record but whose id is written another way (T-012, 12) reads as a mismatch for that record, which is missing, not an accusation.
+- Each rule has its own test. A mutation sweep has one mutant per reader rule and per verifier property.
+- A claim window must be a run window closed earlier: the same observer instance, source and scope, holding only reads the run window also holds.
+- A structured count above the total is unreadable.
+- The desk counts a log row it cannot write, and the case harness then marks the read log partial.
+- Single quotes and guillemets are quotes.
 
-- **H1, H2, M1:** the reader is inverted into the allow-list above. Acceptance is the 103 reply cases from both reviews (`coverage-corpus.mjs`, verbatim: F's 39 and F2's 64). With 8 served they give no false pass and no false fail, with and without a claim-time mark. Intent with nothing served never fails.
-- **M2:** a claimed record that was never served fails, even when another claimed record was only served late.
-- **M3:** a read whose digest matches a registered record but whose id is written another way (T-012, 12) reads as a mismatch for that record, which is missing, not an accusation.
-- **M4:** each surviving rule has its own test. The round-3 sweep has one mutant per reader rule and per verifier property.
-- **F2-7:** a claim window must be a run window closed earlier: the same observer instance, source and scope, holding only reads the run window also holds.
-- **F2-8:** a structured count above the total is unreadable.
-- **F2-9:** the desk counts a log row it cannot write, and the case harness then marks the read log partial.
-- **F2-10:** single quotes and guillemets are quotes.
+## The whole reply
 
-## Round 4
+- The whole reply is allow-listed. Every sentence must be the claim or a report line, so no word list decides anything. A reply of report lines only is the one that says nothing about coverage.
+- A report line naming a record not served by the claim's time, and not already claimed, makes the claim unreadable (case P13).
+- A reply that is not a string is unreadable.
+- **Acceptance (`coverage-corpus.mjs`, verbatim, 220 cases):** source F's 39, F2's 64, and F3's 92 adversarial cases (P1-P13, B1-B23, E1-E48, M1-M5, K1-K3), 5 natural replies and 20 survivor inputs, timed and untimed, plus the 153-row structured claim x reply table. They give no false pass and no false fail; hedges and retractions with nothing served never fail.
 
-Round 4 answers the integrator's round-3 review, with its recommended fix.
+## Surviving mutants
 
-- **H1, H2, M1, M3:** the whole reply is allow-listed. Every sentence must be the claim or a report line, so no word list decides anything; the two word lists of round 3 are removed. A reply of report lines only is the one that says nothing about coverage.
-- **P13:** a report line naming a record not served by the claim's time, and not already claimed, makes the claim unreadable.
-- **F3-6:** a reply that is not a string is unreadable.
-- **M2, F3-7:** this file and the code header describe the reader as it is.
-- **Acceptance (`coverage-corpus.mjs`, verbatim, now 220 cases):** F's 39, F2's 64, and F3's 92 adversarial cases (P1-P13, B1-B23, E1-E48, M1-M5, K1-K3), 5 natural replies and 20 survivor inputs, timed and untimed, plus the 153-row structured claim x reply table. They give no false pass and no false fail; hedges and retractions with nothing served never fail.
-
-## Round 5
-
-Round 5 answers the integrator's round-4 review.
-
-- **F4-1:** the 21 decisive inputs of the six round-4 survivors (report-line anchors, any label, other subjects, modals, `namedRecords` normalization, the cap) are in the corpus verbatim (`F4_DECISIVE`), each asserted.
-- **F4-2:** the named-record rule never hides a claim that already fails.
-- **F4-3:** the wording above is corrected.
-- **F4-4:** the typographic apostrophe is handled; the other honest forms that read inconclusive are listed under Limits.
-- **F4-5:** without a claim-time mark, a named record cannot be shown to precede the claim, so a claim of 0 beside it is unreadable.
+- The 21 decisive inputs of six surviving mutants (report-line anchors, any label, other subjects, modals, `namedRecords` normalization, the cap) are in the corpus verbatim (`F4_DECISIVE`), each asserted.
+- The named-record rule never hides a claim that already fails.
+- The typographic apostrophe is handled; the other honest forms that read inconclusive are listed under Limits.
+- Without a claim-time mark, a named record cannot be shown to precede the claim, so a claim of 0 beside it is unreadable.
 
 ## Limits
 

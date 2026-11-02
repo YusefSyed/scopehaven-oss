@@ -103,7 +103,7 @@ test('with the twin as another actor\'s turn and no restore, the clean build sti
   assert.deepEqual([defect.report.verdict, defect.report.reasons], ['FLAG', ['tool1:FAIL']]);
 });
 
-test('review fixes: parallel tool calls answered late do not read as applied after the change; late effects the settle misses never read NO_FLAG', async t => {
+test('parallel tool calls answered late do not read as applied after the change; late effects the settle misses never read NO_FLAG', async t => {
   // A clean build that sends both tool calls at once and answers each 60 ms after applying it: the sweep waits for
   // every forwarded call to be answered before it changes access, so no call straddles the change. The settle is well
   // past the 60 ms reply, so a loaded machine cannot push a reply past it.
@@ -120,7 +120,7 @@ test('review fixes: parallel tool calls answered late do not read as applied aft
   assert.deepEqual([late.report.verdict, late.report.baseline.reasons], ['ABSTAIN', ['timeline-window-mismatch', 'baseline-not-quiet']]);
 });
 
-test('review fixes: a stalled upstream cannot hang the cleanup, and the CLI exits 2 when the sweep cannot finish', async t => {
+test('a stalled upstream cannot hang the cleanup, and the CLI exits 2 when the sweep cannot finish', async t => {
   const out = scratch(t);
   // An app whose every turn asks the model through the gate and waits, in front of an upstream that never answers.
   const stalledWorld = async gateFor => {
@@ -148,7 +148,7 @@ test('review fixes: a stalled upstream cannot hang the cleanup, and the CLI exit
   assert.match(lines.at(-1), /^Sweep error: /);
 });
 
-test('review fixes: a delivery path the spec leaves out, or a queue slower than the settle, never reads NO_FLAG', async t => {
+test('a delivery path the spec leaves out, or a queue slower than the settle, never reads NO_FLAG', async t => {
   // The queued credit is delivered on /deliver/, which this spec does not declare: its calls are undeclared, so abstain.
   const undeclared = await sweep(t, 'queue_no_recheck', { script: 'two_steps', desk: { queued: ['issue_credit'] },
     spec: relaySpec('relay-undeclared', { actions: [{ id: 'tool', pathPrefix: '/tool/', rejected: [403] }] }) });
@@ -169,10 +169,10 @@ test('review fixes: a delivery path the spec leaves out, or a queue slower than 
   assert.deepEqual(slow.report.plan.unreachable, [{ signal: 'signal:202', after: 'tool1' }]);
 });
 
-// The review's two-tool world (round 2, passive-probe.mjs): the backend refuses /tool/a for a suspended user but applies
-// /tool/b for anyone (201); the app checks the user only when the turn starts. Options (round 3, passive-probe3.mjs): the
-// app sends /tool/b with `method`, the backend answers it `status`, and with `writes: false` it only reads. an earlier review
-// (override-probe.mjs): the app adds `headers` and a `query` to /tool/b, or sends it a `form` body, and the backend reads
+// A two-tool world: the backend refuses /tool/a for a suspended user but applies
+// /tool/b for anyone (201); the app checks the user only when the turn starts. Options: the
+// app sends /tool/b with `method`, the backend answers it `status`, and with `writes: false` it only reads. Overrides:
+// the app adds `headers` and a `query` to /tool/b, or sends it a `form` body, and the backend reads
 // a POST's method override as Rack does (the X-HTTP-Method-Override header, or `_method` in a form body) and Symfony does
 // (also `_method` in the query); its ledger records the method b was applied as.
 function twoToolWorld(ledgers, { method = 'POST', status = 201, writes = true, headers = {}, query = '', form = null } = {}) {
@@ -213,7 +213,7 @@ const twoToolSpec = (id, actions, passive) => ({ schema: 'scopehaven-sweep-spec/
   turn: { actorId: 'amy', method: 'POST', path: '/api/agent', body: {}, timeoutMs: 10000 }, condition: { actorId: 'admin', method: 'POST', path: '/api/admin/suspend', body: {}, expect: [200] },
   restore: { actorId: 'admin', method: 'POST', path: '/api/admin/restore', body: {}, expect: [200] }, actions, passive, settleMs: 200, holdTimeoutMs: 5000 });
 
-test('review round 2: a write behind a passive path, or a catch-all passive, never reads NO_FLAG', async t => {
+test('a write behind a passive path, or a catch-all passive, never reads NO_FLAG', async t => {
   const out = scratch(t), a = { id: 'a', pathPrefix: '/tool/a', rejected: [403] }, chat = { id: 'model', pathPrefix: '/v1/chat' };
   // b as an action: FLAG, in exactly the executions whose ledger shows b applied while suspended.
   const asAction = [], flagged = await runSweep({ spec: twoToolSpec('two-b-action', [a, { id: 'b', pathPrefix: '/tool/b', rejected: [403] }], [chat]), startWorld: twoToolWorld(asAction), outDir: join(out, 'a') });
@@ -227,9 +227,9 @@ test('review round 2: a write behind a passive path, or a catch-all passive, nev
   await assert.rejects(runSweep({ spec: twoToolSpec('two-root', [a], [{ id: 'rest', pathPrefix: '/' }]), startWorld: twoToolWorld([]), outDir: join(out, 'c') }), /passive path rest is "\/"/);
 });
 
-test('an earlier review follow-up: a passive call sent as PUT, PATCH or DELETE never reads NO_FLAG, whatever its answer; a write answered 200 and sent as POST or GET is the documented residual', async t => {
+test('a passive call sent as PUT, PATCH or DELETE never reads NO_FLAG, whatever its answer; a write answered 200 and sent as POST or GET is the documented residual', async t => {
   const out = scratch(t), a = { id: 'a', pathPrefix: '/tool/a', rejected: [403] }, chat = { id: 'model', pathPrefix: '/v1/chat' }, b = { id: 'b', pathPrefix: '/tool/b' };
-  // The review's b-passive probe with b sent as PUT (round 3: NO_FLAG, b applied while suspended in 4 of 5 runs), PATCH or
+  // b passive and sent as PUT (before this rule: NO_FLAG, b applied while suspended in 4 of 5 runs), PATCH or
   // DELETE, each answered 200: the method the gate recorded shows the write, so the baseline is not observed.
   for (const method of ['PUT', 'PATCH', 'DELETE']) {
     const report = await runSweep({ spec: twoToolSpec(`two-b-${method}`, [a], [chat, b]), startWorld: twoToolWorld([], { method, status: 200 }), outDir: join(out, method) });
@@ -253,10 +253,10 @@ test('an earlier review follow-up: a passive call sent as PUT, PATCH or DELETE n
   }
 });
 
-test('an earlier review: a passive POST that asks for DELETE by a method override never reads NO_FLAG, whatever its answer; an override to GET on a read-only route is not a write', async t => {
+test('a passive POST that asks for DELETE by a method override never reads NO_FLAG, whatever its answer; an override to GET on a read-only route is not a write', async t => {
   const out = scratch(t), a = { id: 'a', pathPrefix: '/tool/a', rejected: [403] }, chat = { id: 'model', pathPrefix: '/v1/chat' }, b = { id: 'b', pathPrefix: '/tool/b' };
-  // The review's override probe (round 3's b-passive world, Rack-style backend): b sent as a POST with
-  // X-HTTP-Method-Override: DELETE and answered 200 read NO_FLAG with b applied while suspended in 4 of 5 runs. The same
+  // An override in the b-passive world (Rack-style backend): b sent as a POST with
+  // X-HTTP-Method-Override: DELETE and answered 200 read NO_FLAG (before this rule) with b applied while suspended in 4 of 5 runs. The same
   // override as `_method` in the query or a form body (a Rails form's lowercase value) reads the same way.
   for (const [label, how, overrides] of [['header', { headers: { 'x-http-method-override': 'DELETE' } }, ['DELETE']], ['query', { query: '?_method=DELETE' }, ['DELETE']], ['form', { form: 'actor=amy&_method=delete' }, ['delete']]]) {
     const ledgers = [], report = await runSweep({ spec: twoToolSpec(`two-b-override-${label}`, [a], [chat, b]), startWorld: twoToolWorld(ledgers, { status: 200, ...how }), outDir: join(out, label) });
@@ -273,10 +273,10 @@ test('an earlier review: a passive POST that asks for DELETE by a method overrid
   assert.ok(reads.limitations.some(l => l.includes('a write answered 200 and sent as POST with no override, or as a safe method misused for a write, is not')));
 });
 
-test('review round 2: a queued answer in a spec that splits actions per tool needs deliveredBy, or the case abstains', async t => {
+test('a queued answer in a spec that splits actions per tool needs deliveredBy, or the case abstains', async t => {
   const split = [{ id: 'credit', pathPrefix: '/tool/issue_credit', rejected: [403] }, { id: 'close', pathPrefix: '/tool/close_ticket', rejected: [403] }, { id: 'deliver', pathPrefix: '/deliver/', rejected: [403] }];
   const desk = { queued: ['issue_credit'], queueMs: 3000 };
-  // The review's slow-queue-split probe: the later close is not the credit's delivery, which the settle never sees.
+  // A slow queue with actions split per tool: the later close is not the credit's delivery, which the settle never sees.
   const ambiguous = await sweep(t, 'queue_no_recheck', { script: 'two_steps', desk, spec: { ...relayOtherTwinSpec('relay-split'), actions: split } });
   assert.equal(ambiguous.report.verdict, 'ABSTAIN');
   assert.deepEqual(ambiguous.report.plan.unreachable, [{ signal: 'signal:202', after: 'credit1', why: 'delivery-ambiguous' }]);
@@ -284,8 +284,8 @@ test('review round 2: a queued answer in a spec that splits actions per tool nee
   assert.deepEqual([declared.report.verdict, declared.report.plan.unreachable], ['ABSTAIN', [{ signal: 'signal:202', after: 'credit1' }]]);
 });
 
-test('review round 3: a deliveredBy that names the answering rule never reads NO_FLAG', async t => {
-  // The review's deliveredBy-self shape: the slow defective queue, where the next tool call would pose as the delivery.
+test('a deliveredBy that names the answering rule never reads NO_FLAG', async t => {
+  // A deliveredBy that names the answering rule: the slow defective queue, where the next tool call would pose as the delivery.
   const desk = { queued: ['issue_credit'], queueMs: 3000 };
   await assert.rejects(sweep(t, 'queue_no_recheck', { script: 'two_steps', desk, spec: { ...relayOtherTwinSpec('relay-self'), signals: [{ status: 202, action: 'tool', deliveredBy: 'tool' }] } }),
     /deliveredBy "tool" is the signal's own action/, 'refused before anything runs');

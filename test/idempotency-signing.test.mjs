@@ -1,4 +1,4 @@
-// Verified signature headers (b', HMAC-SIG-DESIGN.md and its addendum R1), unit level: the declaration and its published form, the
+// Verified signature headers, unit level: the declaration and its published form, the
 // scheme menu's exact forms, key derivation, verification under exactly one declared secret, the head marker, the stored item, the
 // clash rules and the identity gate. Each property is shown with the re-sign it collapses and the adjacent case it must keep apart.
 // Every secret here is synthetic and built at run time; the reference HMAC below is written from RFC 2104, not node:crypto's HMAC.
@@ -59,7 +59,7 @@ test('declaration: each scheme normalizes; the published form names how many sec
   assert.deepEqual(idempotencyRecordOf({ type: 'egress-recorder', destinations: [{ host: HOST, idempotency: { header: 'x-event-id', signing: STRIPE } }] })[HOST], published);
 });
 
-test('declaration refusals: scheme shape, names, the E2a route beside it, dedupeSeconds and secretEnv', () => {
+test('declaration refusals: scheme shape, names, the timestamped volatile route beside it, dedupeSeconds and secretEnv', () => {
   const refused = (signing, extra = {}, options = {}) => assert.throws(() => validateIdempotencyDeclaration({ header: 'x-event-id', ...extra, signing }, options), /signing|volatile|signature route/, JSON.stringify([signing, extra]));
   refused({ ...STRIPE, scheme: 'github' });
   refused({ ...STRIPE, scheme: 'toString' });
@@ -74,7 +74,7 @@ test('declaration refusals: scheme shape, names, the E2a route beside it, dedupe
   refused({ ...STRIPE, signature: 'x-corr' }, {}, { correlationHeader: 'x-corr' });
   refused({ ...STANDARD, id: 'x-corr' }, { header: 'webhook-id' }, { correlationHeader: 'X-Corr' });
   refused(STRIPE, { volatile: ['x-hooks-signature'] }, {}, 'never in both');
-  refused(STRIPE, { volatile: ['webhook-signature'] }, {}, 'a timestamped E2a scheme beside signing');
+  refused(STRIPE, { volatile: ['webhook-signature'] }, {}, 'a timestamped volatile scheme beside signing');
   assert.doesNotThrow(() => validateIdempotencyDeclaration({ header: 'x-event-id', volatile: ['traceparent', 'x-hub-signature'], signing: STRIPE }), 'tracing and untimed names stay allowed');
   assert.doesNotThrow(() => validateIdempotencyDeclaration({ header: 'webhook-id', signing: { ...STANDARD, signature: 'webhook-signature' } }), 'a fixed-list name may move to signing');
   for (const dedupeSeconds of [0, 86401, 1.5, '300', null]) refused({ ...STRIPE, dedupeSeconds });
@@ -298,7 +298,7 @@ test('the run record: usable per declared slot, present exactly when signing is 
   assert.throws(() => consistentSigningRun([{ instanceId: 'egress-recorder-sink', scope: { idempotency: { [HOST]: validateIdempotencyDeclaration({ header: 'x-event-id' }) } }, events: [send(1)] }], run), /idempotency-signing/, 'an item on an undeclared host');
 });
 
-test('the menu and bounds are fixed; the wording module\'s copy of the timestamped names matches the E2a schemes', () => {
+test('the menu and bounds are fixed; the wording module\'s copy of the timestamped names matches the volatile schemes', () => {
   assert.deepEqual(Object.keys(IDEMPOTENCY_SIGNING_SCHEMES), ['stripe', 'standard-webhooks', 'slack-v0']);
   assert.deepEqual([SIGNING_BOUNDS.secrets, SIGNING_BOUNDS.secretsPerRecorder, SIGNING_BOUNDS.defaultDedupeSeconds, ...SIGNING_BOUNDS.dedupeSeconds], [4, 16, 300, 1, 86400]);
   assert.deepEqual(timestampedSignatureNames().sort(), Object.values(IDEMPOTENCY_SIGNATURE_SCHEMES).flatMap(s => [s.signature, s.timestamp]).filter(Boolean).sort());

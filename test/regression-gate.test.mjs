@@ -187,7 +187,7 @@ test('configured owned response contract uses contract-restored and never claims
     ] };
   const writeConfig = () => writeFile(configFile, JSON.stringify({ schemaVersion: 1, targets: [profile] }), { mode: 0o600 });
   await writeConfig();
-  // CMP-ROE-01: a configured target runs under a record that covers it (test/authorization.test.mjs pins the refusals).
+  // The authorization record: a configured target runs under a record that covers it (test/authorization.test.mjs pins the refusals).
   const authorizationFile = writeTestAuthorization(join(root, 'authorization.json'), { ...profile, actors: { member: { principalId: 'member', credentialEnv: 'SCOPEHAVEN_TARGET_TEST_ONLY' } } });
   const before = await runGate({ targetId: profile.id, configFile, authorizationFile, outputDirectory: out });
   assert.equal(before.exitCode, 1);
@@ -284,7 +284,7 @@ function asV1Rows(run) {
   return recount(copy);
 }
 
-// EVIDENCE-SPEC-01 difference D-01: Object.hasOwn coerces its key, so an evidence origin that is an array or an object holding a
+// Object.hasOwn coerces its key, so an evidence origin that is an array or an object holding a
 // known origin's name passed the origin check while every origin-specific validator, which compares with ===, was skipped.
 test('a run whose evidenceOrigin is not a string, or is not one this build registers, is refused by the gate and is not comparable', async t => {
   const out = await directory(t);
@@ -396,7 +396,7 @@ test('HTTP v2 identity: an actor with two required controls needs both, and a cr
 });
 
 // Connector v2 identity proof through the gate (actor-identity/2): injected observations only.
-// Core batch v2 (actor-identity/4 403 rule): the member also has a surface control, a required GET on a protected route
+// The actor-identity/4 403 rule: the member also has a surface control, a required GET on a protected route
 // ('member-own', last), so its refusal on 'member-denied' counts; without it that 403 reads inconclusive (surface-unproven).
 function sessionTarget(controlAssertions = [{ kind: 'status.equals', expected: 200 }], { surface = true } = {}) {
   return { id: 'session-cases', name: 'Synthetic session cases', applicationId: 'owned-session', origin: 'http://127.0.0.1:1', buildLabel: 'test', contextId: 'isolated', actors: { member: { principalId: 'member', credentialEnv: 'SCOPEHAVEN_TARGET_SESSION', identityValue: 'member@example.test' } }, requiredControlIds: ['whoami', ...(surface ? ['member-own'] : [])], checks: [
@@ -405,10 +405,10 @@ function sessionTarget(controlAssertions = [{ kind: 'status.equals', expected: 2
     ...(surface ? [{ id: 'member-own', title: 'Member lists own records', category: 'Control', severity: 'control', actorId: 'member', method: 'GET', path: '/own', evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 200 }] }] : []),
   ] };
 }
-// alive: the member's session is valid; publicControl: /me answers 200 to anyone (V3);
-// nullWhenSignedOut: /me answers 200 with JSON null to anyone signed out (V3b);
-// expireAfterControl: the session dies right after /me first succeeds (V4);
-// anonymousStatus: what /me answers without a credential (B3).
+// alive: the member's session is valid; publicControl: /me answers 200 to anyone;
+// nullWhenSignedOut: /me answers 200 with JSON null to anyone signed out;
+// expireAfterControl: the session dies right after /me first succeeds;
+// anonymousStatus: what /me answers without a credential.
 function sessionTransport({ alive = true, publicControl = false, nullWhenSignedOut = false, expireAfterControl = false, anonymousStatus } = {}) {
   let live = alive;
   return async (_, check, options) => {
@@ -428,20 +428,20 @@ const sessionRun = (target, options) => runHttpAssessment(target, { env: { SCOPE
 const sessionSuite = target => createRegistry({ profiles: [target], env: {} }).exportSuite(target.id);
 const identifyingControl = [{ kind: 'status.equals', expected: 200 }, { kind: 'json.equals', pointer: '/user/email', expected: 'member@example.test' }];
 
-test('HTTP v2 identity proof: V3, V3b, V4 and B3 never give a clean gate; a proven login does', async () => {
+test('HTTP v2 identity proof: a public control, a null signed-out answer, an expiring session and an unrefused anonymous request never give a clean gate; a proven login does', async () => {
   // The failing cases need no surface control; the proven login has one, so its refusal counts.
   const plain = sessionTarget(undefined, { surface: false }), strict = sessionTarget(identifyingControl, { surface: false }), provenTarget = sessionTarget(identifyingControl);
   const cases = [
-    ['V3', plain, { alive: false, publicControl: true }, 'no-identity-control'],
-    ['V3b', plain, { alive: false, nullWhenSignedOut: true }, 'no-identity-control'],
-    ['V4', strict, { expireAfterControl: true, nullWhenSignedOut: true }, 'bracket-not-passed'],
-    ['B3 500', strict, { anonymousStatus: 500 }, 'not-refused-without-credential'],
-    ['B3 429', strict, { anonymousStatus: 429 }, 'not-refused-without-credential'],
+    ['public control', plain, { alive: false, publicControl: true }, 'no-identity-control'],
+    ['null when signed out', plain, { alive: false, nullWhenSignedOut: true }, 'no-identity-control'],
+    ['session expires after the control', strict, { expireAfterControl: true, nullWhenSignedOut: true }, 'bracket-not-passed'],
+    ['anonymous 500', strict, { anonymousStatus: 500 }, 'not-refused-without-credential'],
+    ['anonymous 429', strict, { anonymousStatus: 429 }, 'not-refused-without-credential'],
   ];
   for (const [label, target, options, reason] of cases) {
     const run = await sessionRun(target, options);
-    // actor-identity/5: every row is withheld in every case. The other cases fail on the route itself. Re-pinned for Decision 3b
-    // (DECISIONS-2026-10-09, round 3): in V4 the expired session's identity probes answer 200 null, a complete 2xx that names no
+    // actor-identity/5: every row is withheld in every case. The other cases fail on the route itself. Re-pinned for the
+    // other-principal rule: when the session expires, its identity probes answer 200 null, a complete 2xx that names no
     // one, which identityRefused counts as a refusal, so the identity control's own row is withheld too and the gate also reports
     // required-controls-not-passed (the control kept its pass on the route proof while only refusal statuses counted).
     assert.deepEqual(run.results.map(row => row.status), ['inconclusive', 'inconclusive'], label);
@@ -459,7 +459,7 @@ test('HTTP v2 identity proof: V3, V3b, V4 and B3 never give a clean gate; a prov
   assert.deepEqual(summarizeGate({ candidate: bare, expectedSuite: sessionSuite(strict) }).reasons, ['inconclusive-evidence', 'prohibition-observed-identity-unproven']);
 });
 
-test('HTTP v2 B1: a control-only actor whose login is not proven never gives a clean gate, even when every row passes', async () => {
+test('HTTP v2: a control-only actor whose login is not proven never gives a clean gate, even when every row passes', async () => {
   const target = sessionTarget(identifyingControl, { surface: false }); target.checks = [target.checks[0]];
   const run = await sessionRun(target, { anonymousStatus: 503 });
   assert.deepEqual(run.results.map(row => row.status), ['inconclusive'], 'The control answered, but the login was not proven, so it cannot read as a pass anywhere.');
@@ -551,8 +551,8 @@ test('the gate refuses an HTTP run with an unsupported or mixed version pair eve
   }
 });
 
-// Round 5 gate: baseline identity (F1), identity binding to the suite (G1-G3) and evidence origin (G4).
-test('HTTP v2 F1: a baseline whose login was not proven gives baseline-identity-not-established and no restored rows', async () => {
+// The gate: baseline identity, identity binding to the suite and evidence origin.
+test('HTTP v2: a baseline whose login was not proven gives baseline-identity-not-established and no restored rows', async () => {
   const strict = sessionTarget(identifyingControl), suite = sessionSuite(strict);
   const expired = await sessionRun(strict, { alive: false, nullWhenSignedOut: true });
   const fresh = await sessionRun(strict, { nullWhenSignedOut: true });
@@ -563,7 +563,7 @@ test('HTTP v2 F1: a baseline whose login was not proven gives baseline-identity-
   assert.equal(summarizeGate({ candidate: fresh, baseline: fresh, expectedSuite: suite }).exitCode, 0);
 });
 
-test('HTTP v2 G1: the identity predicate is fixed per control, consistent across probes and bound to the suite', async () => {
+test('HTTP v2: the identity predicate is fixed per control, consistent across probes and bound to the suite', async () => {
   const twoPredicates = [...identifyingControl, { kind: 'json.equals', pointer: '/user/team', expected: 'blue' }];
   const target = sessionTarget(twoPredicates), suite = sessionSuite(target);
   const transport = sessionTransport({ nullWhenSignedOut: true });
@@ -579,7 +579,7 @@ test('HTTP v2 G1: the identity predicate is fixed per control, consistent across
   assert.equal(summarizeGate({ candidate: consistent, expectedSuite: suite }).exitCode, 2, 'The suite names predicate 0 as the identity predicate.');
 });
 
-test('HTTP v2 G2/G3/G4: identity controls, refusal statuses and evidence origin must match the expected suite', async () => {
+test('HTTP v2: identity controls, refusal statuses and evidence origin must match the expected suite', async () => {
   const target = sessionTarget(identifyingControl);
   target.checks.splice(1, 0, { ...target.checks[0], id: 'whoami-2', path: '/me-2' }); target.requiredControlIds = ['whoami', 'whoami-2', 'member-own'];
   const suite = sessionSuite(target), base = sessionTransport({ nullWhenSignedOut: true });
@@ -587,18 +587,18 @@ test('HTTP v2 G2/G3/G4: identity controls, refusal statuses and evidence origin 
   assert.deepEqual(run.identityEvidence.actors[0].identityControlIds, ['whoami', 'whoami-2']);
   assert.deepEqual(['before', 'after', 'anonymous', 'invalid'].map(kind => run.identityEvidence.actors[0][kind].map(p => p.controlId)), [['whoami', 'whoami-2', 'member-own'], ['whoami', 'whoami-2', 'member-own'], ['whoami', 'whoami-2'], ['whoami', 'whoami-2']], 'Every identity control is bracketed and probed, not only the first (the surface control is bracketed only).');
   assert.equal(summarizeGate({ candidate: run, expectedSuite: suite }).exitCode, 0);
-  // G2: dropping one identity control and all of its probes is internally consistent, but not what the suite declares.
+  // Dropping one identity control and all of its probes is internally consistent, but not what the suite declares.
   const subset = clone(run), entry = subset.identityEvidence.actors[0];
   entry.identityControlIds = ['whoami']; for (const kind of ['before', 'after', 'anonymous', 'invalid', 'cross']) entry[kind] = entry[kind].filter(p => p.controlId === 'whoami');
   // actor-identity/4 closes the documented limit: the dropped control is recomputed as a surface control, whose bracket
   // probes the edited evidence no longer carries, so the subset is refused even without the suite.
   assert.equal(summarizeGate({ candidate: subset }).exitCode, 2, 'A dropped identity control is refused without the suite (actor-identity/4).');
   assert.equal(summarizeGate({ candidate: subset, expectedSuite: suite }).exitCode, 2);
-  // G3: refusal statuses widened with an undeclared redirect.
+  // Refusal statuses widened with an undeclared redirect.
   const widened = clone(run); widened.identityEvidence.actors[0].refusalStatuses = [401, 403, 307];
   assert.equal(summarizeGate({ candidate: widened }).exitCode, 0, 'Consistent without the suite (no probe saw 307).');
   assert.equal(summarizeGate({ candidate: widened, expectedSuite: suite }).exitCode, 2);
-  // G4: an HTTP suite never accepts a run labelled with another evidence origin.
+  // An HTTP suite never accepts a run labelled with another evidence origin.
   const relabelled = clone(run); relabelled.evidenceOrigin = 'synthetic-local-http';
   assert.equal(summarizeGate({ candidate: relabelled, expectedSuite: suite }).exitCode, 2);
   assert.deepEqual(summarizeGate({ candidate: relabelled, expectedSuite: suite }).reasons, ['unexpected-suite-evidence']);
@@ -636,7 +636,7 @@ test('HTTP v2 probe lists and applied timeouts are recomputed: dropped, duplicat
   }
 });
 
-test('HTTP v2 G11: an actor cannot claim another actor\'s control as its identity control, even with consistent probes', async () => {
+test('HTTP v2: an actor cannot claim another actor\'s control as its identity control, even with consistent probes', async () => {
   const target = sessionTarget(identifyingControl);
   target.actors.other = { principalId: 'other', credentialEnv: 'SCOPEHAVEN_TARGET_SESSION_OTHER', identityValue: 'other@example.test' };
   target.checks.push({ ...target.checks[0], id: 'other-whoami', title: 'Other session', actorId: 'other', assertions: [{ kind: 'status.equals', expected: 200 }, { kind: 'json.equals', pointer: '/user/email', expected: 'other@example.test' }] });
@@ -671,7 +671,7 @@ test('HTTP v2 timed-out identity requests: a refusal status counts even if its b
   }
 });
 
-test('HTTP v2 G10: a probe the run budget never sent must be recorded as an unattempted timeout', async () => {
+test('HTTP v2: a probe the run budget never sent must be recorded as an unattempted timeout', async () => {
   const strict = sessionTarget(identifyingControl, { surface: false }), base = sessionTransport({ nullWhenSignedOut: true });
   const slow = async (o, c, opts) => { if (c.path === '/foreign') await new Promise(resolve => setTimeout(resolve, 200)); return base(o, c, opts); };
   const run = await runHttpAssessment(strict, { env: { SCOPEHAVEN_TARGET_SESSION: 'synthetic-session' }, transport: slow, limits: { requestTimeoutMs: 100, runTimeoutMs: 150, responseBytes: 1024 } });
@@ -683,8 +683,8 @@ test('HTTP v2 G10: a probe the run budget never sent must be recorded as an unat
   assert.equal(summarizeGate({ candidate: relabelled }).exitCode, 2);
 });
 
-// R6 (R5B-1, R5B-2): a pair must agree on actors, login modes and identity controls, and a same-profile baseline is held to the suite.
-test('R5B-1: an edited baseline that drops an unproven actor\'s identity binding never shows a fix', async () => {
+// A pair must agree on actors, login modes and identity controls, and a same-profile baseline is held to the suite.
+test('an edited baseline that drops an unproven actor\'s identity binding never shows a fix', async () => {
   const target = sessionTarget(identifyingControl); target.checks[1].assertions = [{ kind: 'status.equals', expected: 403 }];
   const suite = sessionSuite(target);
   const expired = await sessionRun(target, { alive: false, nullWhenSignedOut: true }), fresh = await sessionRun(target, { nullWhenSignedOut: true });
@@ -708,7 +708,7 @@ test('R5B-1: an edited baseline that drops an unproven actor\'s identity binding
   assert.equal(unbound.exitCode, 1); assert(unbound.reasons.includes('incompatible-baseline'));
 });
 
-test('R5B-2: without a suite, a candidate whose identity binding was edited never compares as restored', async () => {
+test('without a suite, a candidate whose identity binding was edited never compares as restored', async () => {
   const target = sessionTarget(identifyingControl);
   target.checks.splice(1, 0, { ...target.checks[0], id: 'whoami-2', path: '/me-2' }); target.requiredControlIds = ['whoami', 'whoami-2', 'member-own'];
   const base = sessionTransport({ nullWhenSignedOut: true });
@@ -719,8 +719,8 @@ test('R5B-2: without a suite, a candidate whose identity binding was edited neve
   entry.identityControlIds = ['whoami']; for (const kind of ['before', 'after', 'anonymous', 'invalid', 'cross']) entry[kind] = entry[kind].filter(p => p.controlId === 'whoami');
   const widened = clone(run); widened.identityEvidence.actors[0].refusalStatuses = [401, 403, 307];
   // actor-identity/4: dropping an identity control is refused on its own (the dropped control's surface brackets are missing).
-  assert.equal(summarizeGate({ candidate: subset }).exitCode, 2, 'G2 identity control dropped: refused alone (actor-identity/4)');
-  for (const [label, edited] of [['G2 identity control dropped', subset], ['G3 refusal status added', widened]]) {
+  assert.equal(summarizeGate({ candidate: subset }).exitCode, 2, 'identity control dropped: refused alone (actor-identity/4)');
+  for (const [label, edited] of [['identity control dropped', subset], ['refusal status added', widened]]) {
     if (edited === widened) assert.equal(summarizeGate({ candidate: edited }).exitCode, 0, `${label}: consistent alone (documented limit)`);
     const comparison = compareRuns(baseline, edited);
     assert.equal(comparison.compatible, false, label); assert(comparison.reasons.includes('Actors, login modes or identity controls differ between the runs.'), label);
@@ -733,7 +733,7 @@ test('R5B-2: without a suite, a candidate whose identity binding was edited neve
   assert.match(honest.evidenceScope, /^Response comparison only/);
 });
 
-test('R6: honest pairs are unchanged: same-profile v2 pairs stay comparable and another profile is incompatible, not invalid', async () => {
+test('honest pairs are unchanged: same-profile v2 pairs stay comparable and another profile is incompatible, not invalid', async () => {
   const target = sessionTarget(identifyingControl), suite = sessionSuite(target);
   const a = await sessionRun(target, { nullWhenSignedOut: true }), b = await sessionRun(target, { nullWhenSignedOut: true });
   assert.equal(compareRuns(a, b).compatible, true); assert.equal(summarizeGate({ candidate: b, baseline: a, expectedSuite: suite }).exitCode, 0);

@@ -35,7 +35,7 @@ test('custody is derived from the sealed independence lineage, so they cannot dr
   // Outside the subject: the request-path gate, and the loopback sinks (egress, SMTP), which hold
   // their records in the observer's own process. The app can add a record (a send), never alter or remove one.
   // The provider feed: entries the provider stub signs with a key the app never holds, kept by the observer once read.
-  // The WAL observer (NC9 item 4, an explicit decision): the server writes the WAL and the observer's own session holds its slot, so an
+  // The WAL observer (an explicit decision): the server writes the WAL and the observer's own session holds its slot, so an
   // absence decided on it is held outside the app; it holds for an absence only (src/custody.mjs ABSENCE_ONLY_SOURCES).
   assert.deepEqual(Object.entries(CUSTODY_BY_SOURCE).filter(([, c]) => c !== 'subject-writable'), [['hold-proxy', 'independent'], ['http-egress', 'independent'], ['smtp-capture', 'independent'], ['provider-feed', 'independent'], ['sql-wal', 'observer-held']]);
   assert.deepEqual(ABSENCE_ONLY_SOURCES, ['sql-wal']);
@@ -107,14 +107,14 @@ test('a malformed support window degrades instead of throwing', () => {
   }
 });
 
-// The false passes the review found in v1 and v2.
+// False passes that earlier versions of the rule allowed.
 test('a non-deciding independent window cannot rescue a pass', () => {
   const v = subjectIntegrityVerdict({ proposed: 'pass', select: SELECT, support: [SUBJECT_LOG_WINDOW, FAILED_GATE] });
   assert.equal(v.verdict, 'inconclusive');
   assert.ok(v.reasons.includes('subject-writable-custody'), String(v.reasons));
 
   // A resealed tamper leaves no chain trace, so only custody can stop it. With a
-  // non-deciding gate beside the subject's log, these are the v1/v2 false passes.
+  // non-deciding gate beside the subject's log, these are the false passes earlier versions allowed.
   for (const mode of ['spoof-principal', 'truncate-tail']) {
     const run = runForgingSubject(mode, { reseal: true });
     const decided = subjectIntegrityVerdict({ proposed: naiveVerdict(run), select: SELECT,
@@ -254,7 +254,7 @@ test('only a pass is degraded; every other verdict keeps its own meaning', () =>
 });
 
 // A subject that recomputes the chain after tampering leaves records that verify
-// among themselves. This is M03 C5: truncation is not detectable from the chain
+// among themselves. Truncation is not detectable from the chain
 // alone. It is the case the externally held anchor exists for.
 test('a resealed chain verifies on its own, so the external anchor is load-bearing', () => {
   const held = anchorOf(runForgingSubject('honest').entries);
@@ -286,7 +286,7 @@ test('without an external anchor, a resealed truncation is caught only by custod
 
 // Mutation sweep. Each mutant removes exactly one guard and the sweep records
 // which forgery modes newly reach a pass. Coarse mutations hid real gaps in the
-// control-tamper round, so each mutation isolates one guard.
+// earlier control-tamper sweep, so each mutation isolates one guard.
 const MUTANTS = [
   { id: 'no-anchor-check', find: 'if (entries.length !== anchor.count || head !== anchor.head) reasons.unshift(\'chain-head-mismatch\');',
     // forge-authorize is absent: entry-after-effect catches it independently,

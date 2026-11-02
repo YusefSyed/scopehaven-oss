@@ -1,4 +1,4 @@
-// The request budget for a stage-2 invocation (N14, STAGE-2.md "Spend cap and limits"): one budget per invocation, shared by every
+// The request budget for a stage-2 invocation (its spend cap and limits): one budget per invocation, shared by every
 // request that goes to Stripe test mode (the read-back's reads and the forwarder's writes). take() waits for the next slot, at most
 // perSecond requests a second, and refuses once max requests were taken or once the budget stopped. note(status) stops the budget on
 // the first 429 (Stripe's rate limit or lock_timeout): every later take() refuses, so the invocation stops instead of retrying.

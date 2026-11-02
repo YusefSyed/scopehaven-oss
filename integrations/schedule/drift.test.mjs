@@ -1,4 +1,4 @@
-// CMP-SCHEDULE-01: scheduled re-runs with a drift summary. Owned synthetic fixture only (the
+// Scheduled re-runs with a drift summary. Owned synthetic fixture only (the
 // built-in demo targets); no model, provider, customer system or network. The local runner runs
 // in a private temporary directory; the workflow and launchd template are checked as text.
 import test from 'node:test';

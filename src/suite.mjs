@@ -147,6 +147,6 @@ export const LIMITATIONS = [
   ...FIXTURE_2_LIMITATIONS.slice(2),
 ];
 
-// The database catalog a run was judged against (N13): the run's catalog identity, beside the suite identity above. It lives
+// The database catalog a run was judged against: the run's catalog identity, beside the suite identity above. It lives
 // in its own module (src/catalog-identity.mjs) so the HTTP evaluator identity, whose validator reads it, covers its bytes.
 export { CATALOG_IDENTITY_SCHEMA, CATALOG_RECORD_SCHEMA, CATALOG_OBSERVER_TYPES, CATALOG_RECORD_KINDS, catalogIdentity, validCatalogIdentity } from './catalog-identity.mjs';

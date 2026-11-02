@@ -1,5 +1,5 @@
-// Regression tests for the W6 adversarial review, round 2 (review record, not in this repository).
-// The locus findings (C1, C2, I1, I2, I4, M1, M2) are pinned in locus.test.mjs; these cover the tap and identity.
+// Regression tests from a second adversarial review. The enforcement-locus findings are pinned in locus.test.mjs;
+// these cover the tap and identity.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, request } from 'node:http';
@@ -39,7 +39,7 @@ function raw(base, path, headerPairs, body) {
 }
 const A = 'a'.repeat(64), B = 'b'.repeat(64);
 
-test('R2-I3: a model list taken inside the window that disagrees makes the window partial', async t => {
+test('a model list taken inside the window that disagrees makes the window partial', async t => {
   let list = [['q:latest', A]];
   const origin = await upstream(t, (req, res) => {
     if (req.url === '/api/tags') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(tagsBody(list)); }
@@ -55,7 +55,7 @@ test('R2-I3: a model list taken inside the window that disagrees makes the windo
   assert.equal(id.state, 'partial'); assert.ok(id.reasons.includes('model-replaced-in-window'), String(id.reasons));
 });
 
-test('R2-M3: hop-by-hop and Connection-named headers stop at the tap; duplicate request headers pass', async t => {
+test('hop-by-hop and Connection-named headers stop at the tap; duplicate request headers pass', async t => {
   let seen = null;
   const origin = await upstream(t, (req, res) => {
     if (req.url === '/api/tags') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(tagsBody([])); }
@@ -72,7 +72,7 @@ test('R2-M3: hop-by-hop and Connection-named headers stop at the tap; duplicate 
   assert.deepEqual(values(seen, 'accept-encoding'), ['identity']); assert.equal(values(seen, 'host').length, 1);
 });
 
-test('R2-M4: a window whose lines were re-chained up to its end is still partial', async t => {
+test('a window whose lines were re-chained up to its end is still partial', async t => {
   const origin = await upstream(t, (req, res) => {
     if (req.url === '/api/tags') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(tagsBody([['q:latest', A], ['g:latest', B]])); }
     res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ model: JSON.parse(req.headers['x-m'] ?? '"q"'), done: true }));
@@ -95,7 +95,7 @@ test('R2-M4: a window whose lines were re-chained up to its end is still partial
   assert.equal(id.state, 'partial'); assert.ok(id.reasons.includes('log-chain-break'), String(id.reasons));
 });
 
-test('R2-M5: a model is graded by fingerprint only when every call carried one', async t => {
+test('a model is graded by fingerprint only when every call carried one', async t => {
   let n = 0;
   const origin = await upstream(t, (req, res) => {
     if (req.url === '/api/tags') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(tagsBody([])); }
@@ -107,7 +107,7 @@ test('R2-M5: a model is graded by fingerprint only when every call carried one',
   assert.equal(modelIdentity(readTapLog(path)).strength, 'vendor-model-string');
 });
 
-test('R2-M6: an upstream failure after the headers reaches the application as an abort', async t => {
+test('an upstream failure after the headers reaches the application as an abort', async t => {
   // A chunked reply whose trailer holds a byte the HTTP parser rejects: the error comes after the headers went out.
   const server = createNetServer(sock => { let buf = ''; sock.on('data', d => { buf += d; if (!buf.includes('\r\n\r\n')) return;
     const json = JSON.stringify({ model: 'm' });

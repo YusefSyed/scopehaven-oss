@@ -1,4 +1,4 @@
-// Typed claims and the residual (N5, lead-queue item 6). An auditor reads a report's scope and its limitations first: what each
+// Typed claims and the residual. An auditor reads a report's scope and its limitations first: what each
 // verdict rests on, and what the run did not show. Offline verification has identifiability limits (two runs, one safe and one
 // harmful, can leave the same visible evidence), so every row says how strong its claim is and every export lists what is left.
 //

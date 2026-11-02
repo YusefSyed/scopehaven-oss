@@ -182,14 +182,14 @@ test('a capture is taken only from a response whose status assertion passed: an 
 });
 
 // ---------------------------------------------------------------------------
-// Core batch v2. R3 (review of v1): a malformed capture pointer passed profile validation, and the creating
+// A malformed capture pointer once passed profile validation, and the creating
 // request was sent before it threw. Pointers are now parsed with the connector's own parser when the profile loads.
 const pointerProfile = pointer => ({ id: 'pointer-check', name: 'Pointer check', applicationId: 'pointer', origin: 'http://127.0.0.1:9', buildLabel: 'b', contextId: 'synthetic', actors: { anon: { principalId: 'anon' } }, requiredControlIds: ['CREATE'],
   checks: [
     { id: 'CREATE', title: 'c', category: 'Setup', severity: 'control', actorId: 'anon', method: 'POST', path: '/notes', body: {}, evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 201 }], capture: { note: { pointer, type: 'id' } } },
     { id: 'USE', title: 'u', category: 'Object access', severity: 'high', actorId: 'anon', method: 'DELETE', path: '/notes/{{note}}', evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 403 }] },
   ] });
-test('R3: a malformed capture pointer is refused when the profile loads, before any request is sent', async () => {
+test('a malformed capture pointer is refused when the profile loads, before any request is sent', async () => {
   for (const pointer of ['not-a-pointer', 'id', '/a~2b', '/a~', '/__proto__', '/x/constructor', `/${'a'.repeat(512)}`]) {
     assert.throws(() => validateTargetFile({ schemaVersion: 1, targets: [pointerProfile(pointer)] }), /check "CREATE": capture "note" needs a valid JSON pointer/, pointer);
     let calls = 0;
@@ -199,9 +199,9 @@ test('R3: a malformed capture pointer is refused when the profile loads, before 
   for (const pointer of ['/id', '', '/a~1b', '/a~0b', '/items/0/id']) validateTargetFile({ schemaVersion: 1, targets: [pointerProfile(pointer)] });
 });
 
-// A01 (review of v1, mutation gap): the capture digest key is fresh for every run, so the same captured value
+// The capture digest key is fresh for every run, so the same captured value
 // gives unrelated digests in two runs, and none of them is a keyless digest of the value.
-test('A01: the capture digest key is fresh per run: the same value never gives the same digest twice', async () => {
+test('the capture digest key is fresh per run: the same value never gives the same digest twice', async () => {
   const transport = async (origin, check) => ({ status: check.method === 'POST' ? 201 : 403, complete: true, jsonParsed: true, json: { id: 'n-1' }, bytes: 8 });
   const digests = [];
   for (let i = 0; i < 3; i++) {
@@ -215,11 +215,11 @@ test('A01: the capture digest key is fresh per run: the same value never gives t
   for (const keyless of [digest({ name: 'note', value: 'n-1' }), digest('n-1'), digest({ key: '00'.repeat(32), name: 'note', value: 'n-1' }), digest({ key: '', name: 'note', value: 'n-1' })]) assert.ok(!digests.includes(keyless));
 });
 
-// R4 (review of v1, privacy claim scope): the capture records never hold a captured value, but observer
+// Privacy claim scope: the capture records never hold a captured value, but observer
 // evidence keeps the resource identifiers the application reports, which can be that value. The claim is narrowed
 // (docs, run limitation and module header) rather than tokenizing observer resources: matching a pinned resource
-// and the observers' own unkeyed content digests would still carry the value (see the core batch v2 receipt).
-test('R4: the narrowed claim: capture records hold only a keyed digest, and every statement says observer evidence can hold the value', async () => {
+// and the observers' own unkeyed content digests would still carry the value.
+test('the narrowed claim: capture records hold only a keyed digest, and every statement says observer evidence can hold the value', async () => {
   const { makeEffect } = await import('../src/effect-events.mjs');
   const { sealWindows } = await import('../src/http-effects.mjs');
   const { readFile } = await import('node:fs/promises');
@@ -240,15 +240,15 @@ test('R4: the narrowed claim: capture records hold only a keyed digest, and ever
 });
 
 // ---------------------------------------------------------------------------
-// Core batch v2 review: the reviewer's RV-2, RV-3 and RV-4 probes shipped as assertions (F7, F8), and F3 (a surface
-// control cannot use a captured value). Injected transport only.
+// Probes shipped as assertions (a captured value's length, a query placeholder's place, a dependent row's creator login),
+// and a surface control cannot use a captured value. Injected transport only.
 import { PRECONDITION_REASONS, IDENTITY_ASSERTION } from '../src/contracts.mjs';
 const reply2 = (status, json = {}) => ({ status, complete: true, jsonParsed: true, json, bytes: 2 });
 const ctl2 = (id, actorId, path, extra = []) => ({ id, title: id, category: 'Allowed use', severity: 'control', actorId, method: 'GET', path, evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 200 }, ...extra] });
 const me2 = (id, actorId, value) => ctl2(id, actorId, '/me', [{ kind: 'json.equals', pointer: '/user', expected: value }]);
 const base2 = id => ({ id, name: 'n', applicationId: id, origin: 'http://127.0.0.1:9', buildLabel: 'b', contextId: 'synthetic' });
 
-test('F8 (RV-3): a captured value longer than 200 characters is invalid, so its dependent check is not sent', async () => {
+test('a captured value longer than 200 characters is invalid, so its dependent check is not sent', async () => {
   assert.equal(captureValueValid('x'.repeat(200), 'id'), true);
   assert.equal(captureValueValid('x'.repeat(201), 'id'), false);
   assert.equal(captureValueValid('x'.repeat(201), 'string'), false);
@@ -261,7 +261,7 @@ test('F8 (RV-3): a captured value longer than 200 characters is invalid, so its 
   validateHttpRunEvidence(run);
 });
 
-test('F8 (RV-4): a query placeholder must be a whole query value; one embedded in a value or used as a parameter name is refused when the profile loads', () => {
+test('a query placeholder must be a whole query value; one embedded in a value or used as a parameter name is refused when the profile loads', () => {
   const p = path => ({ ...base2('rv-query'), actors: { anon: { principalId: 'anon' } }, requiredControlIds: ['CREATE'],
     checks: [{ id: 'CREATE', title: 'c', category: 'Setup', severity: 'control', actorId: 'anon', method: 'POST', path: '/notes', body: {}, evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 201 }], capture: { note: { pointer: '/id', type: 'id' } } },
       { id: 'USE', title: 'u', category: 'Boundary', severity: 'high', actorId: 'anon', method: 'GET', path, evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 403 }] }] });
@@ -271,7 +271,7 @@ test('F8 (RV-4): a query placeholder must be a whole query value; one embedded i
   assert.throws(() => validateTargetFile({ schemaVersion: 1, targets: [p('/notes?{{note}}=1')] }), /never a parameter name/);
 });
 
-test('F7 (RV-2, as an assertion): an authentic run whose dependent row carries creator-login-unproven validates, the validator recomputes that reason, and restoring the pass is refused', async () => {
+test('an authentic run whose dependent row carries creator-login-unproven validates, the validator recomputes that reason, and restoring the pass is refused', async () => {
   const env = { SCOPEHAVEN_TARGET_ALICE: 'tok-alice', SCOPEHAVEN_TARGET_BOB: 'tok-bob' };
   const p = { ...base2('rv-creator2'), actors: { alice: { principalId: 'alice', credentialEnv: 'SCOPEHAVEN_TARGET_ALICE', identityValue: 'alice' }, bob: { principalId: 'bob', credentialEnv: 'SCOPEHAVEN_TARGET_BOB', identityValue: 'bob' } },
     requiredControlIds: ['ALICE-ME', 'ALICE-CREATE', 'BOB-ME', 'BOB-OWN'],
@@ -299,7 +299,7 @@ test('F7 (RV-2, as an assertion): an authentic run whose dependent row carries c
   assert.throws(() => validateHttpRunEvidence(forged), e => e.code === 'invalid-run-evidence');
 });
 
-test('F3: a surface control cannot use a captured value (its probe points would re-send the raw placeholder), as an identity control cannot; a control that is not re-sent may', () => {
+test('a surface control cannot use a captured value (its probe points would re-send the raw placeholder), as an identity control cannot; a control that is not re-sent may', () => {
   const p = { ...base2('surface-capture'), actors: { member: { principalId: 'member', credentialEnv: 'SCOPEHAVEN_TARGET_MEMBER', identityValue: 'member' } }, requiredControlIds: ['WHOAMI', 'OWN'],
     checks: [{ ...me2('WHOAMI', 'member', 'member'), capture: { who: { pointer: '/user', type: 'id' } } }, ctl2('OWN', 'member', '/notes/{{who}}'),
       { id: 'FOREIGN', title: 'f', category: 'Object access', severity: 'high', actorId: 'member', method: 'GET', path: '/foreign', evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 403 }] }] };

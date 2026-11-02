@@ -1,5 +1,5 @@
-// In-doubt resolution R2, read-back of the system of record (IDR-3): the declaration and every refusal, the records, templates, the sealed
-// shapes, every derivation row (ADDENDUM-R2 sections 1 to 4, m1, m2, m5, m8), the profile and value clashes, and the reader against a loopback
+// In-doubt resolution by read-back of the system of record: the declaration and every refusal, the records, templates, the sealed
+// shapes, every derivation row, the profile and value clashes, and the reader against a loopback
 // system of record through a real egress recorder: each read failure (a 5xx, an unproven or non-JSON reply, a list over the cap or of another
 // shape, ids missing, the complete signal false, a timeout, an abandoned pre-image) reads in doubt, the pre-image is taken before any member is
 // forwarded, and no id, path value, token or proof secret is ever written. Owned synthetic data and dummy secrets in env objects only (never the
@@ -83,7 +83,7 @@ test('1. the declaration: a full one normalizes; every rule refuses what breaks 
     const rec = json(C.RECORDS.full.readBack); edit(rec.hosts[C.CRM].routes[0]);
     assert.equal(validReadBackRecord(rec), false);
   }
-  // DP6 read endpoints (ENV-DP6-DELTA R1, env-reads-dp6.v2): an object read with a change log, a declined lifecycle with non-final words, no
+  // Read endpoints of another shape: an object read with a change log, a declined lifecycle with non-final words, no
   // complete field (single-object completeness), eventual consistency and possible removal all declare (and can then only confirm).
   const e3 = C.declaration(); e3.destinations[0].readBack.routes[0] = { write: 'POST /tickets/{ticket}/notes', read: 'GET /tickets/{ticket}/notes', items: '/changes', id: '/id', author: { pointer: '/author', serverAssigned: true }, settleMs: 500,
     lifecycle: { pointer: '/to', applied: ['cancelled'], notApplied: ['shipped', 'delivered'], nonFinal: ['pending'] }, guarantees: { consistency: 'eventual', completeness: 'single-object', removal: 'possible', settleMs: 500, source: 'ENV-DP6 section R1' },
@@ -124,7 +124,7 @@ test('3. the sealed shapes (m2): per send and per read, counts, flags and times 
   assert.ok(validReadBackRead(notRun));
 });
 
-// --- The derivation, row by row (ADDENDUM-R2 2.2 to 2.4, sections 1, 3 and 4) ------------------------------------------------------------
+// --- The derivation, row by row ----------------------------------------------------------------------------------------------------------
 // One group on T-1 under the app's credential. members: [{ outcome, ...send fields }]; read: the group's sealed read (C.honest by default).
 function decide(members, read, { variant = 'full', others = [], effects = [C.EXISTS, C.count(0), C.count(1)] } = {}) {
   let n = 0;
@@ -146,15 +146,15 @@ const lists = ({ pre = [], s1 = pre, s2 = s1, s3 = s2, M = [], counts = {}, last
 };
 
 test('4. derivation: refutation, confirmation, the exact count and its assignment within one identity', () => {
-  // RB: nothing new on S1 or S2, sighted through the control item: refuted; the agent-write exists fails, exactly zero passes (before any
+  // Reset before apply: nothing new on S1 or S2, sighted through the control item: refuted; the agent-write exists fails, exactly zero passes (before any
   // later stage), exactly one fails.
   const rb = decide([{ outcome: 'reset' }], C.honest());
   assert.deepEqual([rb.r2, rb.verdicts, rb.fates], [['refutes'], ['fail', 'pass', 'fail'], ['refuted']]);
   assert.equal(attemptBasis(rb.events[0]).by, 'r2');
-  // RA: the write's own note (G's identity, matching): confirmed; exists and exactly one pass.
+  // Reset after apply: the write's own note (G's identity, matching): confirmed; exists and exactly one pass.
   const ra = decide([{ outcome: 'reset' }], C.honest({ added: [NOTE('n1')] }));
   assert.deepEqual([ra.r2, ra.verdicts], [['confirms'], ['pass', 'fail', 'pass']]);
-  // A proven retry beside a reset (the PS1 shape): its minted note is the only new item, so the reset is refuted as a further application.
+  // A proven retry beside a reset: its minted note is the only new item, so the reset is refuted as a further application.
   const ps1 = decide([{ outcome: 'reset' }, { outcome: 'applied' }], C.honest({ added: [NOTE(`m${C.START + 1}`)], M: [`m${C.START + 1}`], counts: { groupSends: 2 } }));
   assert.deepEqual([ps1.r2, ps1.verdicts], [['refutes', null], ['pass', 'fail', 'pass']]);
   // ... and a second note beside the minted one, under another key, is the reset's: confirmed, and exactly one fails (two applications).
@@ -163,9 +163,9 @@ test('4. derivation: refutation, confirmation, the exact count and its assignmen
   // Two resets and one note: exactly one of them applied. Within one identity the first is confirmed and the second refuted; exactly one passes.
   const two = decide([{ outcome: 'reset' }, { outcome: 'reset' }], C.honest({ added: [NOTE('n1')], counts: { groupSends: 2 } }));
   assert.deepEqual([two.r2, two.verdicts], [['confirms', 'refutes'], ['pass', 'fail', 'pass']]);
-  // PR373-REVIEW major 1. Two resets under one key and one body (one identity to R2 and to the key collapse): on a backend that dedupes the key
+  // Two resets under one key and one body (one identity to read-back and to the key collapse): on a backend that dedupes the key
   // (one note) the first is confirmed and the second refuted, and every keyed and plain clause reads one application. On one that does not
-  // (two notes) R2 would confirm both while the collapse reads them as one, so it confirms nothing: in doubt, as without read-back.
+  // (two notes) read-back would confirm both while the collapse reads them as one, so it confirms nothing: in doubt, as without read-back.
   const KEYED = [C.KEYED_COUNT(1), C.KEYED_COUNT(2), C.count(1), C.count(2), C.EXISTS];
   const dedupes = decide([{ outcome: 'reset' }, { outcome: 'reset' }], C.honest({ added: [NOTE('n1')], counts: { groupSends: 2 } }), { effects: KEYED });
   assert.deepEqual([dedupes.r2, dedupes.verdicts], [['confirms', 'refutes'], ['pass', 'fail', 'pass', 'fail', 'pass']], 'a deduping backend');
@@ -183,9 +183,9 @@ test('4. derivation: refutation, confirmation, the exact count and its assignmen
   assert.deepEqual(r2Of([{ outcome: 'reset' }, { outcome: 'applied', sendAt: null }], C.honest({ added: [NOTE(`m${C.START + 1}`)], M: [`m${C.START + 1}`], counts: { groupSends: 2 } })), ['silent', null], 'beside a proven member of another identity');
   // Nothing new at all refutes every member whatever their identities.
   assert.deepEqual(r2Of([{ outcome: 'reset' }, { outcome: 'reset', sendAt: null }], C.honest({ counts: { groupSends: 2 } })), ['refutes', 'refutes']);
-  // A member R0 refuted (never connected) leaves D, so a group of a refused send and a reset with one note confirms the reset.
+  // A member the transport record refuted (never connected) leaves D, so a group of a refused send and a reset with one note confirms the reset.
   assert.deepEqual(r2Of([{ outcome: 'refused' }, { outcome: 'reset' }], C.honest({ added: [NOTE('n1')], counts: { groupSends: 2 } })), [null, 'confirms']);
-  // Lifecycle (DP6's decline): G's own note in a declared notApplied state is a final non-application, so the exact count refutes; a pending one blocks.
+  // Lifecycle (a declined state): G's own note in a declared notApplied state is a final non-application, so the exact count refutes; a pending one blocks.
   assert.deepEqual(r2Of([{ outcome: 'reset' }], C.honest({ added: [NOTE('d1', { state: 'declined' })], lifecycle: true }), { variant: 'lifecycle' }), ['refutes']);
   assert.deepEqual(r2Of([{ outcome: 'reset' }], C.honest({ added: [NOTE('d1', { state: 'pending' })], lifecycle: true }), { variant: 'lifecycle' }), ['silent']);
   // Another identity's identical note (another credential) is not G's: the exact count is P, so G is refuted; it never confirms G.
@@ -200,8 +200,8 @@ test('4. derivation: refutation, confirmation, the exact count and its assignmen
   assert.deepEqual(r2Of([{ outcome: 'reset' }], C.honest({ added: [NOTE('n1'), NOTE('n2')] })), ['failed:read-conflict']);
 });
 
-test('4b. PR373-REVIEW blocker 1: refutation and the cap read a missing new item, so they hold only on a POST whose host declares minted ids; a write that changes an item in place, or a host without minted ids, only confirms', () => {
-  // The reviewer's probe: note N1 exists; the in-doubt write applied and changed N1 in place, so S1 to S3 list the same ids as S0.
+test('4b. refutation and the cap read a missing new item, so they hold only on a POST whose host declares minted ids; a write that changes an item in place, or a host without minted ids, only confirms', () => {
+  // Note N1 exists; the in-doubt write applied and changed N1 in place, so S1 to S3 list the same ids as S0.
   const N1 = NOTE('N1', { text: 'older' }), inPlace = C.honest({ pre: [N1] });
   for (const [variant, resource] of [['patch', 'PATCH /tickets/T-1/notes'], ['put', 'PUT /tickets/T-1/notes']]) {
     const clauses = [{ ...C.count(0), select: C.sel(resource, 'resolved') }, { ...C.EXISTS, select: C.sel(resource, 'resolved') }];
@@ -235,7 +235,7 @@ test('5. derivation: every read failure and bound violation fails the group; eve
   failed(r => { r.s2.atMono = r.s1.atMono + C.SETTLE - 1; r.s2.doneMono = r.s2.atMono + 5; r.s2.atWall = C.OFFSET + r.s2.atMono; }, 'reads-too-close');
   failed(r => { r.s3.atMono = r.s2.doneMono - 1; }, 'read-order');
   failed(r => { r.pre.doneMono = 2000; r.pre.atMono = 1999; r.pre.atWall = C.OFFSET + 1999; }, 'pre-image-late');
-  // PR373-REVIEW minor 2: the sealed forward start must follow the pre-image's end (the recorder makes every member's forward wait for it).
+  // The sealed forward start must follow the pre-image's end (the recorder makes every member's forward wait for it).
   assert.deepEqual([r2Of([{ outcome: 'reset', forwardMono: 1000 }], C.honest()), r2Of([{ outcome: 'reset', forwardMono: null }], C.honest())], [['failed:pre-image-late'], ['failed:pre-image-late']]);
   failed(r => { r.group = 'f'.repeat(64); }, 'group-mismatch');
   failed(r => { r.credential = C.CRED.jobs; }, 'credential-mismatch');
@@ -246,7 +246,7 @@ test('5. derivation: every read failure and bound violation fails the group; eve
   assert.deepEqual(r2Of([{ outcome: 'reset' }], C.honest({ s3extra: [NOTE('late', { author: null })] })), ['failed:read-late-item']);
   assert.deepEqual(r2Of([{ outcome: 'reset' }], C.honest({ s3extra: [NOTE('late')], counts: { laterCred: 1, laterTouching: 1 } })), ['refutes'], 'explained by a later send under the credential');
   // A pre-image item gone at S3 with no later removal sent: withdrawn. A later non-POST send to the object explains it, so the group is not
-  // failed, but refutation still needs every pre-image id on S1, S2 and S3 (ADDENDUM-R1 4.2): silent.
+  // failed, but refutation still needs every pre-image id on S1, S2 and S3: silent.
   const old = NOTE('old', { text: 'older' });
   assert.deepEqual(r2Of([{ outcome: 'reset' }], lists({ pre: [old], s3: [] })), ['failed:read-late-removal']);
   assert.deepEqual(r2Of([{ outcome: 'reset' }], lists({ pre: [old], s3: [], counts: { laterRemovals: 1 } })), ['silent']);
@@ -276,7 +276,7 @@ test('5. derivation: every read failure and bound violation fails the group; eve
   assert.deepEqual(r2Of([{ outcome: 'reset' }, { outcome: 'applied', minted: null }], C.honest({ counts: { groupSends: 2 } })), ['silent', null]);
 });
 
-test('6. derivation: refutation needs every positive control and documented guarantee (ADDENDUM-R2 M1, M4, m1, m8); confirmation needs exclusivity (4.3, m5)', () => {
+test('6. derivation: refutation needs every positive control and documented guarantee; confirmation needs exclusivity', () => {
   const rb = C.honest(), ra = C.honest({ added: [NOTE('n1')] });
   // C1: a proven member's minted note not visible on S1 or S2: blind. C2: no item of G's identity on S1, S2 or a control read: blind.
   // A minted note never listed also trips S3's removal alarm (failed); one listed only at S3 leaves S1 and S2 blind (silent).
@@ -322,13 +322,13 @@ test('7. the profile clashes: the read credential is ScopeHaven\'s alone (names 
   assert.equal(readBackSecretValueClash(p, { ...env, SCOPEHAVEN_TARGET_CRM_APP: 'app-value-0002' }), null);
 });
 
-test('8. timing (ADDENDUM-R2 m3): the plan reserves two settles and three reads per observed check, the run end reserves the same, and a route settle past the horizon is refused', () => {
+test('8. timing: the plan reserves two settles and three reads per observed check, the run end reserves the same, and a route settle past the horizon is refused', () => {
   const p = { ...C.profileOf([[C.EXISTS], [C.count(1)]]), timing: { effectHorizonMs: 1000, runBudgetMs: 600000 } };
   const terms = plannedTimingTerms(p, { controlPlan: identityControlPlan(p) });
   assert.equal(readBackReserveMs(p.observers), 2 * C.SETTLE + 3 * 1000);
   assert.equal(terms.readBack, 2 * (2 * C.SETTLE + 3 * 1000));
   const plain = { ...C.profileOf([[C.EXISTS]], { readBack: false }), timing: { effectHorizonMs: 1000, runBudgetMs: 600000 } };
-  assert.equal(Object.hasOwn(plannedTimingTerms(plain, { controlPlan: identityControlPlan(plain) }), 'readBack'), false, 'no read-back: main\'s plan');
+  assert.equal(Object.hasOwn(plannedTimingTerms(plain, { controlPlan: identityControlPlan(plain) }), 'readBack'), false, 'no read-back: the plan as without it');
   const slow = structuredClone(p); slow.observers[0].destinations[0].readBack.routes[0].settleMs = 2000; slow.observers[0].destinations[0].readBack.routes[0].guarantees.settleMs = 2000;
   assert.throws(() => validateTiming(slow, { controlPlan: identityControlPlan(slow) }), /timing-read-back-settle/);
   assert.ok(READ_BACK_BOUNDS.preImageMs === 1000);
@@ -402,7 +402,7 @@ test('9. the reader: reset after and before apply, each read failure in doubt, t
   const pr = readOf(pair.records[0]);
   assert.deepEqual([pr.groupSends, pair.stub.log.reads.filter(r => r.ticket === 'T-1').length >= 4, pair.stub.log.writes.length], [2, true, 2]);
   assert.ok(pair.stub.log.reads.find(r => r.ticket === 'T-1').at < Math.min(...pair.stub.log.writes.map(w => w.at)), 'the pre-image reached the backend before either write');
-  // Scope headers (ADDENDUM-R2 section 3): two writes to T-1 under different X-Tenant values are two groups, each read with its own header copied;
+  // Scope headers: two writes to T-1 under different X-Tenant values are two groups, each read with its own header copied;
   // a tenant header from the fixed list that the destination does not declare is flagged on the send.
   const tenants = await recorderRun(t, { plan: () => ({ reply: 'reset' }), extra: { scopeHeaders: ['x-tenant'] }, sends: [{ key: 'k-a', extraHeaders: { 'x-tenant': 'tenant-a' } }, { key: 'k-b', extraHeaders: { 'x-tenant': 'tenant-b' } }] });
   assert.equal(new Set(tenants.records.map(x => x.records[0].read.group)).size, 2, 'two groups');

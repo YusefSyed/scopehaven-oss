@@ -26,13 +26,13 @@ export const LEDGER_EFFECTS = Object.freeze({
 
 // Rows added to a ledger between before and after, diffed BY ID where the rows carry one,
 // and by a clean-append check where they do not.
-// A length diff was wrong and silently so (review finding 3): before [r1, r2] and
+// A length diff was wrong and silently so: before [r1, r2] and
 // after [r2, r3] has the same length, so slice() returned nothing and a real commit was
 // invisible. A ledger that lost or rewrote a row is not "no effects" either, it is a
 // coverage problem, so it is reported as such and the caller marks the request unreadable.
 // A row's identity. SQLite row ids are integers, and a SQLite ledger is the likeliest source an
 // adopter writes, so a numeric id is an id; treating only strings as ids brought the length diff
-// back with no warning (review H3). The kind is kept so a ledger that mixes them is
+// back with no warning. The kind is kept so a ledger that mixes them is
 // visible rather than silently collapsing 1 and "1".
 const idOf = row => {
   if (typeof row?.id === 'string' && row.id.length > 0) return { key: `s:${row.id}`, kind: 'string' };
@@ -50,11 +50,11 @@ const rowId = row => (typeof row?.id === 'string' && row.id.length > 0 ? row.id 
 // cannot read at all is not a row this can place.
 // The store, not the application instance: two instances of an app over ONE ledger see the
 // same row at the same position, and keying by instance made them two different rows, so a
-// request that was correctly refused was charged with its twin's commit (review round 6 M1,
-// B4). The store comes from the SOURCE, as a statement about where it read. Round 7 took it
-// from the trace, so the application chose how its own rows were compared: a "refund
-// processed" lie was excused by its twin's row, and a trace naming two stores silenced it
-// (review round 7 H1). A source that names none leaves rows unseparated, which is the
+// request that was correctly refused was charged with its twin's commit. The store comes
+// from the SOURCE, as a statement about where it read. Taking it from the trace let the
+// application choose how its own rows were compared: a "refund processed" lie was excused
+// by its twin's row, and a trace naming two stores silenced it. A source that names none
+// leaves rows unseparated, which is the
 // conservative direction: they collide and are charged to no request.
 const keyOf = (store, ledger, position, row) => {
   const content = fingerprint(row);
@@ -81,12 +81,12 @@ const fingerprintOf = row => {
 // Three properties this has to keep, each of which it lost once (the length-diff defect
 // that started it is described at LEDGER_EFFECTS above, and is not repeated here):
 //  1. A lost or rewritten row is a COVERAGE problem, not "no effects"; but the rows that
-//     are genuinely new still committed, and dropping them was the round-1 missed alert
-//     that round 2 reported as fixed and was not (review H1).
-//  2. An id is an id whether it is a string or a finite number (H3).
+//     are genuinely new still committed, and dropping them made a real commit invisible
+//     again.
+//  2. An id is an id whether it is a string or a finite number.
 //  3. With no ids at all, the length fallback is sound only when the ledger grew AND the
 //     shared prefix is unchanged. Equal lengths, or a changed prefix, is a rewrite this
-//     cannot see, so it is unreadable and says why (H3).
+//     cannot see, so it is unreadable and says why.
 // Linear in the row count: the previous version was quadratic (30k rows took 646 ms).
 export function ledgerDiff(before, after) {
   const b = rows(before), a = rows(after);
@@ -120,7 +120,7 @@ export function ledgerDiff(before, after) {
 
 // Plans that moved from active to cancelled. A status transition is not an appended row.
 // The statuses this source can read. "Any move away from active" was wrong in both
-// directions (review round 9, N3): active to past_due or paused is not a cancellation, so a
+// directions: active to past_due or paused is not a cancellation, so a
 // failure lie about one went silent, and trialing to canceled raised a false high. An
 // unknown status is not a guess, it is a reading this source cannot make.
 const ACTIVE_STATUS = 'active';
@@ -133,12 +133,12 @@ function cancelled(before, after) {
   const b = rows(before), a = rows(after);
   if (b === null || a === null) return [];
   // Only rows that CAN be followed. Keying on r.id paired every id-less row through
-  // was.get(undefined), so with round 11's soft cost keeping the window readable an
+  // was.get(undefined), so with the soft cost keeping the window readable an
   // id-less row added already-cancelled invented a cancellation, and a real one was
-  // missed (review round 11, M2).
+  // missed.
   // Followable means: it has an id, and that id appears exactly ONCE on this side. A duplicated
   // id would otherwise be followed to its last copy, inventing a cancellation from an earlier
-  // one (review round 12, low). Marking the window unreadable is not enough on its own, because
+  // one. Marking the window unreadable is not enough on its own, because
   // a commit is never dropped for unreadability.
   const once = rows => { const n = new Map();
     for (const r of rows) if (rowId(r) !== null) n.set(r.id, (n.get(r.id) ?? 0) + 1);
@@ -147,37 +147,36 @@ function cancelled(before, after) {
   const was = new Map(b.filter(r => rowId(r) !== null && onceInBefore(r.id)).map(r => [r.id, r.status]));
   // A move from active to one of the statuses this source KNOWS means cancelled: 'canceled'
   // and 'closed' are the same fact as 'cancelled', and matching one spelling exactly let a
-  // failure lie go silent and an honest 'canceled' raise a false high (review round 8,
-  // V8-M4). It is not "any move away from active", which was the round-9 defect: past_due
-  // and paused are not cancellations (review round 9, N3).
+  // failure lie go silent and an honest 'canceled' raise a false high. It is not "any move
+  // away from active" either: past_due and paused are not cancellations.
   return a.filter(r => rowId(r) !== null && onceInAfter(r.id) && was.get(r.id) === ACTIVE_STATUS && CANCELLED_STATUSES.has(r.status)).map(r => r.id);
 }
 // A subscription row this source can no longer see is not a subscription that did nothing.
 // The other ledgers read exactly this way, and this one did not.
 // Why this source cannot read the subscriptions window, if it cannot: null when it can.
-// The two reasons are not the same cost (review round 10). A LOST row means the diff itself
+// The two reasons are not the same cost. A LOST row means the diff itself
 // cannot be trusted, which is how every other ledger behaves. An UNKNOWN STATUS means only
 // that a cancellation cannot be told from anything else; it says nothing about the refunds or
-// the notes, and round 10 let it make the whole observation unreadable, so an honest refund
-// got a medium and a gap because an unrelated subscription read 'trialing'.
+// the notes, and letting it make the whole observation unreadable gave an honest refund a
+// medium and a gap because an unrelated subscription read 'trialing'.
 function subscriptionsUnreadable(before, after) {
   const b = rows(before), a = rows(after);
   // Neither side carries the ledger: there is nothing here to read, which is not a failure.
   if (b === null && a === null) return null;
-  // ONE side carries it. Round 11 returned null here, so a window whose after-snapshot simply
-  // dropped the key read as readable and an "I couldn't cancel your plan" lie went silent and
-  // was counted as an absence answer. That is the round-7 "readable on BOTH sides" rule broken
-  // again (review round 11, M1).
+  // ONE side carries it. Returning null here let a window whose after-snapshot simply
+  // dropped the key read as readable, so an "I couldn't cancel your plan" lie went silent and
+  // was counted as an absence answer. That breaks the "readable on BOTH sides" rule the other
+  // ledgers follow.
   if (b === null || a === null) return 'ledger-missing';
   const hasId = r => rowId(r) !== null;
   // The hard tests run before the soft ones: a ledger only one side carries (above), a
-  // duplicated id, then a lost row. Round 11 asked about id-less rows first, which made a LOST
+  // duplicated id, then a lost row. Asking about id-less rows first made a LOST
   // id'd row merely a soft cost whenever any id-less row was present. A row is lost if an id
   // from before is gone, or if there are fewer id-less rows after than before.
   // A duplicated id cannot be followed either: `cancelled()` builds a Map keyed by id, so with
   // two copies the LAST one wins and an earlier cancellation can be charged to this window.
   // Every other ledger already reports this through ledgerDiff as ledger-duplicate-ids, and
-  // this one did not (review round 12, low). It is the hard cost for the same reason a lost row
+  // this one did not. It is the hard cost for the same reason a lost row
   // is: the diff itself cannot be trusted.
   const duplicated = rows => { const seen = new Set();
     return rows.filter(hasId).some(r => (seen.has(r.id) ? true : (seen.add(r.id), false))); };
@@ -204,9 +203,9 @@ const SUBSCRIPTIONS_HARD = new Set(['ledger-rows-removed', 'ledger-missing', 'le
 // is not otherwise observable from a saved run. The README and the limitations say so.
 //
 // Every resume that precedes a commit is returned, not only the last: taking the last one
-// let a stale commit be excused by a later twin's resume (review H2, FN11).
+// let a stale commit be excused by a later twin's resume.
 // With no resume event at all there is no commit-time observation, so atCommit is null and
-// the access rules go unjudged rather than inventing equality from the request's start (M4).
+// the access rules go unjudged rather than inventing equality from the request's start.
 function authorityOf(evidence) {
   const events = Array.isArray(evidence.events) ? evidence.events : [];
   const resumes = events.filter(e => record(e) && e.type === 'interleaving' && e.data?.stage === 'resumed' && record(e.data))
@@ -225,19 +224,18 @@ function authorityOf(evidence) {
 
 // One request's traffic, as the monitor's rules want it.
 // What a claim on this operation is a claim ABOUT. Without this, any committed effect
-// "supported" any success claim, so a reply about a refund was satisfied by a filed note
-// (review finding 1).
+// "supported" any success claim, so a reply about a refund was satisfied by a filed note.
 // Operations the fixture can pause and resume. A commit on one of these with NO resume
 // event is a gap: the grants rule turns on a commit-time view that was never recorded, so
 // an application that stops emitting the event would read clean. An operation that is never
-// interleaved has no such view to miss (review H1).
+// interleaved has no such view to miss.
 // The fixture's own pausable operation. An adopter declares their own.
 export const FIXTURE_INTERLEAVABLE_OPERATIONS = Object.freeze(['refund-task']);
 export const INTERLEAVABLE_OPERATIONS = FIXTURE_INTERLEAVABLE_OPERATIONS;
 // When NOTHING is declared, every operation counts as pausable. That is the safe default
 // for an adopter: hard-coding the fixture's one name meant an application whose
 // approve-payout committed with no resume event read coverageGaps 0, which is the same hole
-// for every application that is not this fixture (review M1). A caller that knows
+// for every application that is not this fixture. A caller that knows
 // which of its operations can be interleaved declares them and gets a tighter number; a
 // caller that declares nothing gets the conservative one.
 export const CLAIMED_EFFECT_BY_OPERATION = Object.freeze({
@@ -252,14 +250,14 @@ export function observationFromAttempt(attempt, { interleavableOperations = null
   if (!record(ev) || !record(ev.actor) || typeof ev.operation !== 'string') return null;
   // The ledger store these snapshots were read from, as the SOURCE names it. Never read
   // from the trace: that is the application's own account of where its rows live, and
-  // attribution may not rest on it (review round 7 H1).
+  // attribution may not rest on it.
   const store = typeof ledgerStore === 'string' && ledgerStore.length > 0 ? ledgerStore : null;
   const storeKey = store ?? 'unnamed-store';
   const committed = [], notes = [], knownResources = [];
   // A snapshot has to BE a snapshot. before = after = null, a non-object snapshot, or one
   // carrying none of the declared ledgers all read as "this fixture does not carry these
   // ledgers", so a truncated trace came out clean and invented three success-claim alerts
-  // on top of it (review H2, FN2c).
+  // on top of it.
   const snapshotOf = side => (record(side) ? side : null);
   const before = snapshotOf(ev.before), after = snapshotOf(ev.after);
   const carries = snap => snap !== null && Object.keys(LEDGER_EFFECTS).some(key => Array.isArray(snap[key]));
@@ -275,12 +273,12 @@ export function observationFromAttempt(attempt, { interleavableOperations = null
   // Which effect names this window could have answered for: the ledger that would carry
   // the name was an array on both sides, so its absence from `committed` is a fact rather
   // than a gap in the reading. An adopter's own name, a differently-cased one, or a ledger
-  // that only one snapshot carries are all outside this (review round 7 M1).
+  // that only one snapshot carries are all outside this.
   const answerable = [];
   // What each window saw of each ledger, as fingerprints. The position key assumes every
-  // window of a store sees one shared append-only order; round 6 assumed it and nothing
-  // checked it, so a per-user filtered view silently charged a refused request with another
-  // request's row (review round 6 M1, B5). attributeEffects reads these to check it.
+  // window of a store sees one shared append-only order; left unchecked, a per-user filtered
+  // view silently charged a refused request with another request's row. attributeEffects
+  // reads these to check it.
   const ledgerWindows = {};
   for (const [key, name] of Object.entries(LEDGER_EFFECTS)) {
     const diff = ledgerDiff(before?.[key], after?.[key]);
@@ -288,11 +286,11 @@ export function observationFromAttempt(attempt, { interleavableOperations = null
     const present = Array.isArray(before?.[key]) || Array.isArray(after?.[key]);
     if (present && !diff.readable) { ledgerReadable = false; note(`${key}: ${diff.reason}`); }
     // Even when the window is unreadable, the rows that ARE new still committed. Dropping
-    // them was the round-1 missed alert (review H1).
+    // them made a real commit invisible again.
     // A row with no id still has content, and the fingerprint already in this file can key
     // it. Sending every id-less effect to unattributableByShape was wrong twice over: a row
     // only one window shows IS attributable, and the counter sat outside coverageGaps, so a
-    // lone stale commit on an id-less ledger read as 0 alerts and 0 gaps (review H1).
+    // lone stale commit on an id-less ledger read as 0 alerts and 0 gaps.
     diff.added.forEach((row, n) => {
       const id = rowId(row);
       // Instance, ledger, position, content. Position is what tells two identical rows apart
@@ -309,7 +307,7 @@ export function observationFromAttempt(attempt, { interleavableOperations = null
         before: sideOf(before?.[key]), after: sideOf(after?.[key]) };
     }
     // Ids already in `before`: an idempotent retry naming one of these is not a false
-    // success claim, it is a report about work that already landed (review M3, FA7).
+    // success claim, it is a report about work that already landed.
     for (const row of Array.isArray(before?.[key]) ? before[key] : []) { const id = rowId(row); if (id !== null) knownResources.push(id); }
   }
   // Answerable only when both sides are there, no id is duplicated, no row went missing between
@@ -339,7 +337,7 @@ export function observationFromAttempt(attempt, { interleavableOperations = null
     // The effect names whose absence this window can answer for, and where the ledger
     // readings came from. The snapshots are the application's own, which the report says.
     answerableEffects: [...new Set(answerable)], ledgerSource: 'target-snapshots',
-    // No attribution exemption. v5 labelled this source 'per-request' to stop identical
+    // No attribution exemption. An earlier version labelled this source 'per-request' to stop identical
     // id-less rows colliding, and the label was FALSE: the fixture snapshots the whole shared
     // state (src/fixture.mjs: one `state` object, `snapshot()` clones all of it), so the
     // collision check was skipped exactly where it was needed. Position in the append-only
@@ -371,8 +369,8 @@ export function observationsFromRun(run, { interleavableOperations = FIXTURE_INT
     for (const attempt of Array.isArray(row.attempts) ? row.attempts : []) {
       const obs = observationFromAttempt(attempt, { interleavableOperations, ledgerStore });
       // An attempt whose evidence could not be read is a gap in coverage, not a quiet
-      // nothing. Round 2 dropped these silently, so a run where every attempt failed
-      // reported 0 observations and 0 alerts (review M5, FN3).
+      // nothing. Dropping these silently made a run where every attempt failed report
+      // 0 observations and 0 alerts.
       if (obs) out.push({ ...obs, checkId: typeof row.id === 'string' ? row.id : null });
       else dropped += 1;
     }
@@ -396,8 +394,8 @@ export function observationsFromRun(run, { interleavableOperations = FIXTURE_INT
 //     stop it meaning anything. It is counted and named on its own.
 //
 // The key is the effect NAME plus whatever places the row, because a row id is unique only
-// within its own table: integer ids from two ledgers collided under an id-only key (M2 b and
-// c). What places a row is its id, or failing that its position, carried in contentKey. Only
+// within its own table: integer ids from two ledgers collided under an id-only key. What
+// places a row is its id, or failing that its position, carried in contentKey. Only
 // an effect with neither is unattributable by shape.
 // A row id is unique inside the STORE that issued it, not across stores. Leaving the store
 // out meant two checks of one run, each with its own fixture instance and the same seeded
@@ -441,7 +439,7 @@ const orderOf = observations => {
   // And the case one store's windows cannot show: SEVERAL stores over what may be one
   // ledger. Two instances of an app sharing a ledger key the same row under two stores, so
   // each window looks like the only one that saw it and a refused request is charged with
-  // its twin's commit (review round 6 M1, B4). A source that NAMES its stores is believed,
+  // its twin's commit. A source that NAMES its stores is believed,
   // because saying they are different is then a statement the source made; a window with no
   // store named is not, so a ledger reached through more than one unnamed store is unplaceable.
   for (const [ledger, stores] of storesOf) {
@@ -449,7 +447,7 @@ const orderOf = observations => {
   }
   return broken;
 };
-// N1 (review round 9): attributeEffects iterated obs.committed unguarded, so a VALID
+// attributeEffects used to iterate obs.committed unguarded, so a VALID
 // observation that omits it threw, and the live path's catch then observed the whole batch
 // unattributed: a refused request was charged 2 critical and 1 high, and a lie went silent.
 const effectsOf = obs => (Array.isArray(obs?.committed) ? obs.committed.filter(record) : []);
@@ -460,10 +458,10 @@ export function attributeEffects(observations) {
   // A row id is unique inside the store that issued it, so the same id from the same store
   // in two windows is one row. Content identifies nothing here: an id-less row is placed by
   // its POSITION, and no source is exempt from the check, because the one source that
-  // claimed an exemption was wrong about itself (review H1).
+  // claimed an exemption was wrong about itself.
   // Grouped twice: by the store-qualified key, and by the name and id alone. Within a
   // name-and-id group, a member with no store named makes the WHOLE group one row, because
-  // nothing says they are different ledgers (review round 8, V8-M3).
+  // nothing says they are different ledgers.
   const byRow = new Map();
   for (const obs of observations) for (const e of effectsOf(obs)) if (identified(e)) {
     seen.set(effectKey(e), (seen.get(effectKey(e)) ?? 0) + 1);
@@ -486,10 +484,8 @@ export function attributeEffects(observations) {
       if (!identified(e)) shapeless.push(e);
       else if (collided.has(effectKey(e)) || ambiguousRows.has(rowKey(e))) theirs.push(e);
       // A position key from a store whose windows do not fit one order places nothing, so the
-      // row is charged to no request. Round 6 did this only while access was CHANGING, on the
-      // grounds that charging the wrong request is worst there (r6 M1); round 8 removed that
-      // qualifier (r8 M4), so it now holds whether or not access changed, and this comment
-      // said otherwise until round 11. What it costs is stated as a coverage gap, not hidden.
+      // row is charged to no request, whether or not access changed. What it costs is stated
+      // as a coverage gap, not hidden.
       else if (e.resource === null && broken.has(`${e.store ?? 'unnamed-store'}\u0001${e.ledger ?? ''}`)) theirs.push(e);
       else mine.push(e);
     }
@@ -518,21 +514,21 @@ export async function pollSource({ monitor, read, ticks = 1, intervalMs = 50 }) 
   if (!Number.isInteger(intervalMs) || intervalMs < 0 || intervalMs > 60000) throw new TypeError('intervalMs must be 0 to 60000.');
   const raised = [];
   // Counted, not swallowed. A read() that threw and a batch entry the monitor refused are
-  // both gaps in what was watched, and round 2 reported neither, so a source that failed
-  // every tick read as a quiet clean run (review M5 and M6).
+  // both gaps in what was watched; reporting neither let a source that failed every tick
+  // read as a quiet clean run.
   let readErrors = 0, invalid = 0, batches = 0;
   for (let tick = 0; tick < ticks; tick++) {
     if (tick > 0 && intervalMs > 0) await new Promise(done => setTimeout(done, intervalMs).unref?.());
     let batch;
     try { batch = await read(tick); batches += 1; } catch { readErrors += 1; continue; }
     // One malformed observation used to end the whole poll; now it is counted and the
-    // rest of the batch is still watched (M6).
+    // rest of the batch is still watched.
     const rows = Array.isArray(batch) ? batch.filter(record) : [];
     const malformed = (Array.isArray(batch) ? batch.length : 0) - rows.length;
     // And the malformed ENTRIES inside an observation's own effects list. attributeEffects
     // filters them out, so whether one was counted depended on whether that observation also
     // collided and was therefore rebuilt: alone it reached the monitor and counted 1, beside a
-    // collision it vanished with no count at all (review round 10, Q4a).
+    // collision it vanished with no count at all.
     invalid += malformed;
     // Attributed across the windows this batch delivered together. A row two of them share
     // is charged to neither, exactly as on a saved run; windows that arrive in separate
@@ -544,7 +540,7 @@ export async function pollSource({ monitor, read, ticks = 1, intervalMs = 50 }) 
     // A malformed entry inside an observation's own effects list. Where the observation is
     // returned untouched the monitor refuses it and counts it; where attributeEffects REBUILDS
     // it the entry is filtered away and the monitor never sees it, so whether it cost anything
-    // depended on whether that observation happened to collide (review round 10, Q4a). The
+    // depended on whether that observation happened to collide. The
     // rebuild reports what it dropped, and that is what is counted here.
     invalid += attributed.reduce((n, obs) => n + droppedEffectsOf(obs), 0);
     for (const obs of attributed) {

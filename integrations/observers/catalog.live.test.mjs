@@ -132,14 +132,14 @@ test('live catalog: a lasting change reads schema-drift against the baseline, at
     'CREATE VIEW public.v2 AS SELECT 1 AS one', 'CREATE OR REPLACE VIEW public.v_orders AS SELECT id, total, tenant FROM public.orders',
     'CREATE RULE r_no_delete AS ON DELETE TO public.orders DO INSTEAD NOTHING', 'ALTER TABLE public.orders ADD CONSTRAINT c_total CHECK (total >= 0) NOT VALID',
     'ALTER TABLE public.orders RENAME COLUMN tenant TO org', 'CREATE SCHEMA app2', 'ALTER TABLE public.events DETACH PARTITION public.events_2026_10',
-    // Review round 1: an extension member's grants, a partition's own trigger state, grants and row-level security, the
-    // foreign keys' internal triggers, replica identity (also beside a TRUNCATE), inheritance, and the kinds added then.
+    // An extension member's grants, a partition's own trigger state, grants and row-level security, the
+    // foreign keys' internal triggers, replica identity (also beside a TRUNCATE), inheritance, and further object kinds.
     'GRANT EXECUTE ON FUNCTION public.digest(text, text) TO PUBLIC', 'REVOKE EXECUTE ON FUNCTION public.gen_salt(text) FROM PUBLIC', 'CREATE EXTENSION "uuid-ossp" SCHEMA public',
     'ALTER TABLE public.events_2026_10 DISABLE TRIGGER t_events', 'ALTER TABLE public.refs DISABLE TRIGGER ALL', 'GRANT SELECT ON public.events_2026_10 TO PUBLIC',
     'ALTER TABLE public.events_2026_10 ENABLE ROW LEVEL SECURITY', 'ALTER TABLE public.orders REPLICA IDENTITY FULL', 'ALTER TABLE public.orders REPLICA IDENTITY FULL; TRUNCATE public.orders',
     'ALTER TABLE public.kid NO INHERIT public.base', 'CREATE FOREIGN DATA WRAPPER sh_w0; CREATE SERVER sh_s0 FOREIGN DATA WRAPPER sh_w0', 'CREATE PUBLICATION sh_pub0 FOR TABLE public.orders',
     'ALTER DEFAULT PRIVILEGES GRANT SELECT ON TABLES TO PUBLIC', 'CREATE OPERATOR public.=== (LEFTARG = int, RIGHTARG = int, FUNCTION = int4eq)', 'CREATE CAST (public.status AS text) WITH INOUT',
-    // Review round 2: an extension member's column grant, view option and SECURITY DEFINER; a partition's column grant; a
+    // An extension member's column grant, view option and SECURITY DEFINER; a partition's column grant; a
     // grant on a leaf two levels down.
     'GRANT SELECT (query) ON public.pg_stat_statements TO PUBLIC', 'ALTER VIEW public.pg_stat_statements SET (security_invoker = true)', 'ALTER FUNCTION public.digest(text, text) SECURITY DEFINER',
     'GRANT SELECT (body) ON public.events_2026_10 TO PUBLIC', 'GRANT SELECT ON public.ml_1_a TO PUBLIC']) {
@@ -271,7 +271,7 @@ test('live catalog: the server\'s own database (on a Supabase image, its platfor
   }
 });
 
-test('live (review round 1): a lock on a relation a view or policy names delays the catalog read at most a second and reads catalog-unreadable; the marks and pg-wal\'s slot stay', { skip }, async t => {
+test('live catalog: a lock on a relation a view or policy names delays the catalog read at most a second and reads catalog-unreadable; the marks and pg-wal\'s slot stay', { skip }, async t => {
   const { db, common } = await observerDb(t);
   const [, user, password, port] = live;
   await db.query('CREATE TABLE public.locked (id int); CREATE VIEW public.v_locked AS SELECT id FROM public.locked; CREATE POLICY p_sub ON public.orders USING (EXISTS (SELECT 1 FROM public.locked))');

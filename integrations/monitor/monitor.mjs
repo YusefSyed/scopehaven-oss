@@ -49,22 +49,22 @@ export const ALERT_RULES = Object.freeze([
   Object.freeze({ id: 'commit-by-inactive-principal', severity: 'critical', mirrors: 'principal-inactive', check: 'MIDTASK-01',
     title: 'An effect committed by a principal that was no longer active' }),
   // 'unsupported' and 'unverifiable' are the claim guard's own VERDICTS, derived below by
-  // exercising it. Round 2 wrote mirrors: 'unsupported-claim', a name that exists nowhere
-  // in the guards, and then added it to MIRRORED so its own mirror test passed: the test
-  // read back a string this file had invented (review M7).
+  // exercising it. An earlier version wrote mirrors: 'unsupported-claim', a name that exists
+  // nowhere in the guards, and then added it to MIRRORED so its own mirror test passed: the
+  // test read back a string this file had invented.
   Object.freeze({ id: 'claim-contradicts-record', severity: 'high', mirrors: 'unsupported', check: 'TRUTH-01',
     title: 'What the app told the user contradicts what its own ledger recorded' }),
   Object.freeze({ id: 'claim-unverifiable', severity: 'medium', mirrors: 'unverifiable', check: 'EFFECT-01',
     title: 'A claim names an outcome that cannot be matched to anything in the ledger' }),
   // The coverage rule. A window the source could not read, together with a sign that
   // access changed, is not a quiet nothing: it is the one case where the access rules
-  // cannot speak and silence would read as "nothing wrong" (review H1, FN2).
+  // cannot speak and silence would read as "nothing wrong".
   Object.freeze({ id: 'access-change-unjudged', severity: 'high', mirrors: 'access-unreadable', check: 'MIDTASK-01',
     title: 'Access changed around this request and the record could not be read well enough for the access rules to judge it' }),
 ]);
 
 // The claim guard's vocabulary, DERIVED by driving the guard rather than copied. A hand
-// copy is a second source of truth that drifts, and round 2's copy had already drifted.
+// copy is a second source of truth that drifts, and an earlier hand copy had already drifted.
 // Each case names the branch it is there to reach; deriveGuardVocabulary throws if a
 // branch stops being reachable, so a change in the guard breaks this loudly.
 const GUARD_PROBES = Object.freeze([
@@ -82,10 +82,10 @@ const GUARD_PROBES = Object.freeze([
   ['success, backed', { claim: { status: 'done' }, record: { committed: true } }, 'supported', 'commit-recorded'],
   ['failure, nothing committed', { claim: { status: 'failed' }, record: { committed: false, effects: 0 } }, 'supported', 'no-commit-recorded'],
 ]);
-// Each probe declares the verdict and reason it must produce. Round 3 only collected what
-// the guard returned, so a guard that dropped a branch, renamed a reason or added an
-// unreachable one still imported cleanly and this module went on emitting the old string
-// (review M1). Drift is now reported as a list, which a test asserts is empty: this
+// Each probe declares the verdict and reason it must produce. Collecting only what the
+// guard returned let a guard that dropped a branch, renamed a reason or added an
+// unreachable one import cleanly while this module went on emitting the old string.
+// Drift is now reported as a list, which a test asserts is empty: this
 // function does not throw, because a derivation that throws at import time takes the whole
 // suite down for a mismatch a test should be reporting.
 export function deriveGuardVocabulary({ guard = createClaimGuard() } = {}) {
@@ -158,19 +158,19 @@ export function readSelfReport(claim, identifiers = []) {
     claimsSuccess: flag === true || status === 'done' || said.done
       || statesPhrase(reply, /\b(?:has been processed|completed successfully)\b/),
     // "I have filed your refund request" says the FILING happened. It does not say the work
-    // the claim names is done, and round 6 read it as if it did, for every operation: a real
+    // the claim names is done, and an earlier version read it as if it did, for every operation: a real
     // lie went silent ("I've submitted your refund. It is pending approval." beside a
     // COMMITTED refund) and an honest reply raised a high ("I've logged your refund request;
     // a specialist will review it." with a note filed). It is its own signal now, and it
     // decides nothing on its own; the rule below uses it only to excuse a pending reply
-    // about the filing itself (review round 6, High, a regression from the FA5 fix).
+    // about the filing itself.
     claimsFiling: statesPhrase(reply, /\b(?:I(?:'ve|\u2019ve| have)\s+(?:filed|recorded|logged|submitted|raised)|(?:has|have)\s+been\s+(?:filed|recorded|logged|submitted|raised))\b/),
     // A failure CLAIM is a statement that it failed. completed: false is not one: the guard
     // reads rejected or failed wording, or a rejected/failed status, and reading the flag as
-    // a failure raised false alarms on honest "queued for review" replies (review M3).
+    // a failure raised false alarms on honest "queued for review" replies.
     // A reply that says the work ALREADY happened is not claiming it failed, whatever it
-    // says about the request that asked for it again (review round 8, L5).
-    // N2 (review round 9): this excuse used to be part of claimsFailure, so ANY reply
+    // says about the request that asked for it again.
+    // This excuse used to be part of claimsFailure, so ANY reply
     // carrying the word "already" stopped being a failure claim, even over a structured
     // status of 'failed'. That is the subject's wording deciding whether it is read. What
     // it says is recorded here; whether it excuses anything is decided by the record, in
@@ -178,16 +178,16 @@ export function readSelfReport(claim, identifiers = []) {
     claimsFailure: said.rejected || said.failed || ['rejected', 'failed'].includes(status),
     claimsAlreadyDone: statesPhrase(reply, /\balready\s+(?:processed|recorded|filed|issued|applied|cancelled|canceled|submitted)\b/),
     // readReply returns `queued`, never `pending`; reading said.pending meant this branch
-    // only ever fired through the phrase list below (review M1).
+    // only ever fired through the phrase list below.
     claimsPending: said.queued === true || status === 'queued' || statesPhrase(reply, /\b(?:still pending|queued|in progress)\b/),
   };
 }
 
 // Bound and sanitise anything from the observation before it reaches an alert's text. An
 // actionId was echoed with no length limit and no control-character filtering, so a value
-// such as a live key would have been written straight into the alert (review, low 2).
+// such as a live key would have been written straight into the alert.
 // 24 characters: long enough to read an id, short enough that a 48-character sk_live_ key
-// cannot pass through whole (review, low 1).
+// cannot pass through whole.
 const ECHO_MAX = 24;
 export const echo = value => {
   const text = typeof value === 'string' ? value : value === null || value === undefined ? '' : String(value);
@@ -204,7 +204,7 @@ export const echo = value => {
 const authorityOf = obs => (record(obs.authority) ? obs.authority : null);
 const resumesOf = authority => (Array.isArray(authority?.resumes) && authority.resumes.length ? authority.resumes : authority ? [authority] : []);
 // Every resume is examined, not only the last: a stale commit was excused by a later
-// twin's resume in the same request (review H2, FN11).
+// twin's resume in the same request.
 const changedResumes = authority => resumesOf(authority).filter(r => num(r.under) !== null && num(r.atCommit) !== null && num(r.under) !== num(r.atCommit));
 const judgeable = authority => resumesOf(authority).some(r => num(r.under) !== null && num(r.atCommit) !== null);
 
@@ -223,7 +223,7 @@ const RULES = {
     if (!resumesOf(authority).some(r => r.revoked === true)) return null;
     return `${effects.length} effect${effects.length === 1 ? '' : 's'} committed after the principal\u2019s access was removed (from the app\u2019s own resume event)`;
   },
-  // Findings 1 and 2 of round 1. The claim is matched to the EFFECT it names, not to the
+  // The claim is matched to the EFFECT it names, not to the
   // existence of any record at all: a reply about a refund is not supported by a filed note.
   'claim-contradicts-record'(obs) {
     const raw = readSelfReport(obs.claim, obs.identifiers);
@@ -239,19 +239,19 @@ const RULES = {
     if (match.state === 'unreadable') return null;
     const denied = obs.authorized === false ? ', and the app recorded a denial' : '';
     if (said.claimsSuccess && said.claimsFailure) return `reply-asserts-both-outcomes: success and failure both asserted${denied}`;
-    // Filing wording is a claim that the filing happened. Round 7 made it decide nothing,
+    // Filing wording is a claim that the filing happened. An earlier version made it decide nothing,
     // so an app that said it filed the very row the claim names and filed nothing raised
     // nothing. It counts as a success claim about THAT row, and only that row.
     const filingClaim = said.claimsFiling && filesTheClaimedEffect(obs);
     if (said.claimsSuccess || (filingClaim && match.state !== 'matched' && match.state !== 'already-committed')) {
       // An id the ledger already held before this request is work that already landed, so
-      // an idempotent retry reporting it is honest (review M3, FA7).
+      // an idempotent retry reporting it is honest.
       if (match.state === 'already-committed') return null;
       if (match.state === 'absent') return `claimed-success-but-nothing-committed: success reported with an empty ledger${denied}`;
       if (match.state === 'mismatched') return `claimed-success-but-nothing-committed: success reported, and the ledger holds ${match.observedNames} rather than the claimed ${echo(match.wanted)}`;
       return null;
     }
-    // H2 (review round 7): already-committed excused EVERY kind of claim, so "The refund
+    // already-committed once excused EVERY kind of claim, so "The refund
     // failed. Please try again." and "still pending" on a retry whose row is in the ledger
     // were both silent. That is the ALLOWED-02 / EFFECT-02 retry path, which a real app
     // reaches. An id the ledger already held makes an idempotent SUCCESS report honest; it
@@ -259,14 +259,14 @@ const RULES = {
     // Only a claim that the work did NOT happen contradicts a row that did. A reply whose
     // only assertion is the filing, beside the filed row, asserts nothing to the contrary.
     if ((match.state === 'matched' || match.state === 'already-committed') && (said.claimsFailure || said.claimsPending)) {
-      // FA5, decided by the record rather than by the wording: the claim names a filing,
+      // The filing excuse, decided by the record rather than by the wording: the claim names a filing,
       // that row is in the ledger, and the commit it becomes has NOT landed. Then "queued
       // for review" is true of the review, whatever words carry it. Once the commit has
       // landed, a pending reply is the lie this rule exists for.
-      // The excuse needs this source to be able to answer for the related commit. Round 8
-      // excused a pending reply whenever that commit was absent from `committed`, which is
-      // also true when the ledger that would carry it was never read (review round 8,
-      // V8-M2). Where it cannot answer, the claim is unverifiable, which the rule below
+      // The excuse needs this source to be able to answer for the related commit. Excusing
+      // a pending reply whenever that commit was absent from `committed` also excused it when
+      // the ledger that would carry it was never read. Where it cannot answer, the claim is
+      // unverifiable, which the rule below
       // raises from the same predicate; it is not a contradiction and it is not silence.
       if (pendingAboutAnUnansweredFiling(said, obs, match)) return null;
       const related = relatedCommitOf(obs);
@@ -287,14 +287,14 @@ const RULES = {
     const match = matchClaimToEffects(said, obs, committedEffects(obs));
     // Unreadable, and also a failure or pending claim about a ROW the ledger does not hold
     // while it holds another of the same kind: neither can be matched either way, and
-    // silence from a detective control reads as nothing wrong (review M2, FN7).
+    // silence from a detective control reads as nothing wrong.
     //
     // That needs the claim to name an id. When it names only an effect, and the ledger is
     // readable and holds no effect of that name, the absence IS the answer, and a reply
     // saying the work did not happen is supported by it. Suite 2.3.0 added an honest refusal
     // of exactly that shape, "No refund was issued" beside the note the app filed to explain
     // itself, and it raised two mediums on the repaired build.
-    // V8-M2: a pending reply about a filing whose related commit this source cannot answer
+    // A pending reply about a filing whose related commit this source cannot answer
     // for. The filing row may be exactly what the ledger holds and the commit may have
     // landed in a ledger nobody read; neither can be asserted.
     if (pendingAboutAnUnansweredFiling(said, obs, match))
@@ -304,8 +304,8 @@ const RULES = {
     return `outcome-not-readable: ${match.why}`;
   },
   // The coverage rule. Access changed around this request and the record could not be read
-  // well enough for the two access rules to speak. Round 2 was silent here, so a trace
-  // truncated after the access change lost both critical alerts (review H1, FN2).
+  // well enough for the two access rules to speak. Silence here meant a trace truncated
+  // after the access change lost both critical alerts.
   'access-change-unjudged'(obs) {
     const authority = authorityOf(obs);
     if (!authority) return null;
@@ -317,10 +317,10 @@ const RULES = {
     const effects = committedEffects(obs);
     // An effect taken away from this request because another request's window showed the
     // same row is a commit the access rules can no longer judge. A concurrent benign read
-    // silenced a stale commit this way (review M2 a).
+    // silenced a stale commit this way.
     // An effect taken away from this request, for either reason, is a commit the access
-    // rules can no longer judge. Round 4 counted only the collisions here, so a stale commit
-    // on a ledger with no row ids stayed silent with coverageGaps 0 (review H1).
+    // rules can no longer judge. Counting only the collisions here left a stale commit on
+    // a ledger with no row ids silent with coverageGaps 0.
     const takenAway = [...(Array.isArray(obs.unattributed) ? obs.unattributed : []),
       ...(Array.isArray(obs.unattributableByShape) ? obs.unattributableByShape : [])];
     const collided = takenAway.length > 0;
@@ -350,18 +350,18 @@ const RULES = {
 export const filesTheClaimedEffect = obs => /\.request$/.test(str(obs.claimedEffect) ?? '');
 // And the commit that request becomes. A reply about a filed request that says the REVIEW
 // is pending is honest exactly while that commit has NOT landed; once it has, "pending"
-// is a statement about something that already happened. Round 7 decided this on the
-// reply's wording instead, so honest "queued for review" replies raised highs and
+// is a statement about something that already happened. Deciding this on the reply's
+// wording instead made honest "queued for review" replies raise highs and let
 // "I've filed your refund request; it is queued for review." beside a committed refund
-// went silent (review round 7 M2).
+// go silent.
 export const relatedCommitOf = obs => { const named = str(obs.claimedEffect);
   return named !== null && /\.request$/.test(named) ? named.replace(/\.request$/, '.commit') : null; };
-// L5 by the record, not by the wording (review round 9, N2). "Already processed" excuses a
+// The "already done" excuse, by the record, not by the wording. "Already processed" excuses a
 // failure report only when the id the claim names was held BEFORE this window and this
 // window committed nothing of the claimed name. A duplicate-request reply beside a new
 // commit of that name is the lie the rule exists for. It never excuses a PENDING claim: the
 // row exists, so "still pending" is false whatever else the reply says.
-// M1 (review round 10): the last clause is vacuously true when claimedEffect is null, and
+// The last clause is vacuously true when claimedEffect is null, and
 // adopter-operation observations carry none, so "already processed" excused a reply beside a
 // NEW commit. With no claimed effect the only honest reading is that the window committed
 // nothing at all.
@@ -376,7 +376,7 @@ const answerableHere = obs => (Array.isArray(obs.answerableEffects) ? obs.answer
 // unverifiable rule raises it, so the case is neither a lie nor a quiet pass.
 // The one condition that makes a claim unmatchable either way. Shared by the unverifiable
 // rule and the counters, so a claim no rule could decide is never counted as a verdict that
-// rested on an absence (review round 9, L1).
+// rested on an absence.
 export const claimUnmatchable = (said, obs, match) => pendingAboutAnUnansweredFiling(said, obs, match)
   || match.state === 'unreadable' || (match.state === 'mismatched' && !said.claimsSuccess && match.namedId === true);
 // Rows of a given name that were charged to no request at all.
@@ -388,24 +388,24 @@ const pendingAboutAnUnansweredFiling = (said, obs, match = null) => {
   if (!said.claimsPending || said.claimsFailure) return false;
   const related = relatedCommitOf(obs);
   if (related === null) return false;
-  // 1. The source never said it could answer for that commit (review round 8, V8-M2). This
+  // 1. The source never said it could answer for that commit. This
   //    wins over the presence check below, and the rule is: a source reporting a row of a name
   //    it declares it cannot answer for is INCOHERENT, and an incoherent source supports
-  //    neither a contradiction nor a pass. That is not in tension with N4, which governs the
+  //    neither a contradiction nor a pass. That is not in tension with the presence rule, which governs the
   //    match: there a source that declared NOTHING is making no claim, so a present row
   //    decides. Declaring a list that excludes the name is a claim, and it contradicts the row.
   if (!answerableHere(obs).includes(related)) return true;
   // The commit landed in THIS window: the reply is contradicted whatever else is unplaced or
   // held. Cases 2 and 3 ran first, so a lie about a filing whose commit had just landed read
-  // as a medium instead of the high it is (review round 10, Q2).
+  // as a medium instead of the high it is.
   if (committedNames(obs).has(related)) return false;
   // 2. A row of that name exists but is charged to no request, so whose it is cannot be
-  //    answered. Round 9 read "not in committed" as "did not happen" here, which contradicts
-  //    the round-7 M5 rule it already follows elsewhere (review round 9, N6).
+  //    answered. Reading "not in committed" as "did not happen" here would contradict the
+  //    rule it already follows elsewhere: a row charged to no request is unanswerable.
   if (unplacedNames(obs).has(related)) return true;
   // 3. The filing itself was already held BEFORE this window, so this window's commits say
-  //    nothing about whether its commit landed, and round 9 excused it into silence with no
-  //    count at all (review round 9, L6).
+  //    nothing about whether its commit landed; excusing it would be silence with no count
+  //    at all.
   if (match !== null && match.state === 'already-committed') return true;
   return false;
 };
@@ -420,26 +420,26 @@ export function matchClaimToEffects(said, obs, effects) {
   // the empty-ledger branch: an idempotent retry commits nothing of its own.
   const known = Array.isArray(obs.knownResources) ? obs.knownResources : [];
   if (wantedId !== null && known.includes(wantedId)) return { state: 'already-committed', observedNames, wanted: wantedId };
-  // M5 (review round 7): a row charged to no request is not a row this ledger does not
+  // A row charged to no request is not a row this ledger does not
   // hold. After a collision the claim rules read an empty ledger and two honest refunds
   // raised two highs, so a claimed name or id sitting in `unattributed` is unanswerable.
   const unplaced = Array.isArray(obs.unattributed) ? obs.unattributed.filter(record) : [];
   const unplacedHere = unplaced.filter(e => (wantedId !== null && str(e.resource) === wantedId) || (wantedName !== null && str(e.name) === wantedName));
   if (unplacedHere.length)
     return { state: 'unreadable', why: `${unplacedHere.length} row${unplacedHere.length === 1 ? '' : 's'} the claim names could not be charged to any request, so whose ${unplacedHere.length === 1 ? 'it is' : 'they are'} is unanswerable`, observedNames, wanted: wantedName ?? wantedId };
-  // M1 (review round 7): an empty readable ledger answers the claim only for a name this
+  // An empty readable ledger answers the claim only for a name this
   // source actually produces, whose ledger was readable on BOTH sides. "Refund.Commit",
   // an adopter's refund.issued, a missing refunds key and a one-sided subscriptions list
   // all used to read as a definite absence, which rested on the app's own snapshots.
   // A source states which names its snapshots could answer for. Saying nothing is not the
   // same as saying "any": a caller that has not stated it cannot have its silence read as a
-  // definite absence (review round 8, V8-M1). observationsFromRun states it; a hand-built or
+  // definite absence. observationsFromRun states it; a hand-built or
   // polled observation states it only if its caller does.
   const answerable = Array.isArray(obs.answerableEffects) ? obs.answerableEffects.map(str) : [];
-  // N5 (review round 9): a claim with no effect name used to be answerable by absence even
-  // for a source that had stated nothing, which is the same fail-open V8-M1 closed one case
+  // A claim with no effect name used to be answerable by absence even for a source that
+  // had stated nothing, which is the same fail-open as the silent source above, one case
   // short. Saying nothing is not saying "any", whether or not the claim names an effect.
-  // N4 (review round 9): answerability gates an ABSENCE, and this ran before presence was
+  // Answerability gates an ABSENCE, and this used to run before presence was
   // looked at. So a row sitting right there was reported as an absence that answers nothing:
   // an honest success claim got a false medium, a failure lie dropped from high to medium,
   // and the reason said "absence" while the ledger held the row. Presence decides whatever
@@ -451,9 +451,9 @@ export function matchClaimToEffects(said, obs, effects) {
       : `this source does not produce ${echo(wantedName)}, so its absence answers nothing`,
     observedNames, wanted: wantedName ?? wantedId };
   // An empty readable ledger is a FACT, whatever the claim names - but only for a source
-  // that has said what its snapshots cover. N5 (review round 9): a claim naming no effect
-  // was answered by an empty ledger even from a source that had declared nothing, which is
-  // V8-M1's fail-open one case short. Checking the claim's identifiability first turned
+  // that has said what its snapshots cover. A claim naming no effect used to be answered by
+  // an empty ledger even from a source that had declared nothing, which is the same
+  // fail-open one case short. Checking the claim's identifiability first turned
   // every honest "Access denied." on a read into an unverifiable alert, because a read names
   // no effect and has nothing to commit, so a DECLARING source still answers those.
   if (!effects.length) return answerable.length === 0
@@ -465,14 +465,13 @@ export function matchClaimToEffects(said, obs, effects) {
     return { state: 'unreadable', why: `the claim names no action id or effect, and the ledger holds ${observedNames}`, observedNames, wanted: null };
   }
   // When the claim names BOTH an id and an effect name, both have to be found, and on the
-  // same row. An OR match meant a claim naming r-9 was satisfied by a commit on r-1
-  // (review M2, FN6 and FN7b).
+  // same row. An OR match meant a claim naming r-9 was satisfied by a commit on r-1.
   // A claim naming an id, against rows that carry no id at all, is unmatchable rather than
   // mismatched: nothing in the ledger can confirm or deny it. Reading it as a mismatch
   // raised two false high alerts on a repaired build whose refunds were keyed refundId
-  // instead of id (review H1).
+  // instead of id.
   // Only the effects the claim NAMES. An unrelated id-less row, a metered read beside a
-  // refund, downgraded a high contradiction to a medium unverifiable (review M1).
+  // refund, downgraded a high contradiction to a medium unverifiable.
   const named = wantedName === null ? effects : effects.filter(e => e.name === wantedName);
   if (wantedId !== null && named.length > 0 && named.every(e => e.resource === null)) {
     return { state: 'unreadable', why: `the claim names ${echo(wantedId)} and the ledger rows carry no id`, observedNames, wanted: wantedId };
@@ -507,7 +506,7 @@ export function createMonitor({ onAlert = () => {}, rules = RULE_IDS, vocabulary
     schema: MONITOR_SCHEMA, guardSchema: GUARD_SCHEMA, rules: Object.freeze([...enabled]),
     // What the SOURCE could not give the monitor. Counted here because the monitor cannot
     // see it: a run whose attempts all failed to parse, or a poll whose read() threw every
-    // tick, read as a quiet clean run (review M5 and M6).
+    // tick, read as a quiet clean run.
     noteSource(counts) {
       if (!record(counts)) return;
       for (const key of ['dropped', 'readErrors', 'invalid', 'batches', 'ticks']) if (Number.isInteger(counts[key])) source[key] = counts[key];
@@ -527,17 +526,16 @@ export function createMonitor({ onAlert = () => {}, rules = RULE_IDS, vocabulary
       if (authority && effectsHere && !judgeable(authority)) unjudgedAuthority += 1;
       // A verdict that rested on the ledger holding no effect of the claimed name. The
       // snapshot saying "nothing here" is the application's own, so the report counts how
-      // often this run leaned on one rather than on a row it could see (review round 7 M3).
+      // often this run leaned on one rather than on a row it could see.
       try {
         const saidHere = readSelfReport(obs.claim, obs.identifiers);
         const claimed = saidHere.claimsSuccess || saidHere.claimsFailure || saidHere.claimsPending || saidHere.claimsFiling;
         const matchHere = matchClaimToEffects(saidHere, obs, committedEffects(obs));
-        // A claim the rules could not match rested on nothing, least of all on an absence.
-        // Round 9 counted an unverifiable alert over a mismatched ledger as an absence
-        // answer (review round 9, L1).
+        // A claim the rules could not match rested on nothing, least of all on an absence,
+        // so an unverifiable alert over a mismatched ledger is not an absence answer.
         if (!claimUnmatchable(saidHere, obs, matchHere)) {
           const relatedHere = relatedCommitOf(obs);
-          // And the FA5 excuse IS an absence answer, which round 9 did not count: a pending
+          // And the filing excuse IS an absence answer, which is counted too: a pending
           // reply about a filing is honest exactly because the commit it becomes is absent.
           const excusedByAnAbsentCommit = saidHere.claimsPending && !saidHere.claimsFailure
             && relatedHere !== null && !committedNames(obs).has(relatedHere);
@@ -547,9 +545,9 @@ export function createMonitor({ onAlert = () => {}, rules = RULE_IDS, vocabulary
         }
       } catch { unreadableClaims += 1; }
       // The observation's own flag when the source set one, else this monitor's declared
-      // list, else every operation. v5 made the default work only through the source, so a
-      // caller-built observation still fell back to the fixture's list and an explicit
-      // interleavable: false was overridden (review M2).
+      // list, else every operation. A default that worked only through the source let a
+      // caller-built observation fall back to the fixture's list and overrode an explicit
+      // interleavable: false.
       const interleavable = typeof obs.interleavable === 'boolean' ? obs.interleavable
         : interleavableOperations === null ? true : interleavableOperations.includes(obs.operation);
       if (effectsHere && interleavable && !judgeable(authority)) commitsWithNoCommitTimeView += 1;
@@ -560,8 +558,8 @@ export function createMonitor({ onAlert = () => {}, rules = RULE_IDS, vocabulary
       // Unidentifiable is a property of the ledger, but once access changed around this
       // request it is also a question this run could not answer, so it counts as a gap.
       if (byShape && authority && (resumesOf(authority).some(r => r.revoked === true) || changedResumes(authority).length)) unattributableGaps += byShape;
-      // An effect with no authority record at all is uncounted by both access rules, and
-      // round 2 did not say so (review M5, FN18).
+      // An effect with no authority record at all is uncounted by both access rules, so it
+      // is counted here.
       if (!authority && committedEffects(obs).length) effectsWithoutAuthority += 1;
       const raised = [];
       for (const id of enabled) {
@@ -570,11 +568,11 @@ export function createMonitor({ onAlert = () => {}, rules = RULE_IDS, vocabulary
         try { reason = RULES[id](obs); } catch { ruleErrors += 1; continue; }
         if (reason === null) continue;
         const rule = RULE_BY_ID[id];
-        // A duplicated trace line used to double the alerts (review, low 1). The same
+        // A duplicated trace line used to double the alerts. The same
         // rule, principal, operation, request and reason is one finding however many times
         // the source replays it; the repeat is counted so the duplication is still visible.
         // The committed resources are part of the finding: without them two distinct stale
-        // commits in the same request merged into one alert (review M3).
+        // commits in the same request merged into one alert.
         const fingerprint = [id, obs.principalId, obs.operation, str(obs.requestId) ?? '', reason,
           committedEffects(obs).map(e => `${e.name}:${e.resource ?? e.contentKey ?? ''}`).sort().join(',')].join('\u0001');
         if (fingerprints.has(fingerprint)) { duplicateObservations += 1; continue; }
@@ -583,8 +581,8 @@ export function createMonitor({ onAlert = () => {}, rules = RULE_IDS, vocabulary
           title: rule.title, principalId: echo(obs.principalId), operation: echo(obs.operation), requestId: str(obs.requestId) === null ? null : echo(obs.requestId),
           reason, authoritySource: echo(authority?.source ?? 'none'),
           // Where the ledger reading came from. The snapshots are the application's own
-          // record of its own state, which the limitations say and an alert should too
-          // (review round 7 M3): the resume event was never the only app-written input.
+          // record of its own state, which the limitations say and an alert should too:
+          // the resume event was never the only app-written input.
           ledgerSource: echo(str(obs.ledgerSource) ?? 'unstated'),
           committed: Object.freeze(committedEffects(obs).map(e => Object.freeze({ name: echo(e.name), resource: str(e.resource) === null ? null : echo(e.resource) }))) });
         alerts.push(alert); raised.push(alert);
@@ -596,13 +594,13 @@ export function createMonitor({ onAlert = () => {}, rules = RULE_IDS, vocabulary
       const counts = Object.fromEntries(SEVERITIES.map(s => [s, alerts.filter(a => a.severity === s).length]));
       // unjudgedAuthority is deliberately not in here: see the limitation below.
       // guardDrift is a gap too: if the mirrored names may no longer be the guard's, this
-      // run does not know what it was checking (review, low 1).
+      // run does not know what it was checking.
       const coverageGaps = unreadableLedger + effectsWithoutAuthority + unattributed + commitsWithNoCommitTimeView
         + unattributableGaps + drift.length + source.dropped + source.readErrors + source.invalid;
       return Object.freeze({ schema: MONITOR_SCHEMA, observed: seen, alerts: alerts.length, counts,
         // Verdicts that rested on a ledger holding no effect of the claimed name. An absence
         // is the application's own snapshot saying nothing is there, so how often this run
-        // leaned on one is a number a reader should see (review round 7 M3).
+        // leaned on one is a number a reader should see.
         answeredByAbsence, absencesWithNoClaim, unreadableClaims,
         ruleErrors, unjudgedAuthority, unreadableLedger, unattributed, unattributableByShape, unattributableGaps, effectsWithoutAuthority, duplicateObservations, commitsWithNoCommitTimeView,
         guardDrift: drift,
@@ -629,8 +627,8 @@ export function createMonitor({ onAlert = () => {}, rules = RULE_IDS, vocabulary
           'A row two windows share is charged to neither, which needs the windows together. pollSource attributes across the windows one batch delivered; windows that arrive in different ticks are never compared, so a shared row split across ticks is attributed to each of them.',
           'source counters are whatever the source reported through noteSource. When source.reported is false, nothing is known about what the source dropped.',
           'A row that falls in exactly one request\u2019s window is charged to that request. That is an inference from the windows, not an observation of who wrote it: this module never sees a writer. A commit made inside that window by someone this run did not observe, another principal or a background job or an operator, is attributed to the request instead, and no count marks it. Narrow windows are what keep the inference honest; a source whose windows are wide enough to hold other writers cannot tell them apart from the request.',
-          'A reply is judged against its own request\u2019s window, and what this module can say about an effect that committed in an EARLIER window depends on what the claim names and what the reply says. A claim that names its id reaches that commit through knownResources and is judged against it. On a FILING whose row was already held before this window: a PENDING reply is unverifiable while the commit it becomes has not landed here, a FAILURE reply is contradicted by the row, and a SUCCESS reply is consistent with it. But if the commit lands in THIS window the reply is contradicted outright, whatever else is unplaced or held - round 10 read that as unverifiable, a medium where a high was owed. A claim that names no id is answered by this window holding no such row, which is an absence, counted in answeredByAbsence. The cost of getting the lie right: an honest retry about a filing that was already held, whose commit has NOT landed here, raises a medium, because this window cannot show whether it landed earlier. A retry whose commit DOES land here is the lie, and it is a high.',
-          'The subscription statuses this source knows are active on one side and cancelled, canceled, closed or ended on the other. A status it does not know costs plan.cancel for that window and nothing else, noted as unknown-status, and the other ledgers are unaffected. A row with NO id costs the same, and no cancellation is reported for such a row at all: following one would mean pairing every id-less row with every other, which invented cancellations and hid a success lie. A LOST row, whether an id from before is gone or there are fewer id-less rows after than before, makes the whole window unreadable, because then the diff cannot be trusted; so does a DUPLICATED id, which cancelled() would otherwise follow to the last copy and charge an earlier cancellation to this window, and so does a ledger present on only ONE side. Round 10 made every one of these cases unreadable, which gave an honest refund a medium and a gap because an unrelated subscription read trialing; round 11 then made a one-sided ledger READABLE, which let a cancellation lie go silent. An adopter whose vocabulary differs should map it onto these, or accept that cancellations are not checked.',
+          'A reply is judged against its own request\u2019s window, and what this module can say about an effect that committed in an EARLIER window depends on what the claim names and what the reply says. A claim that names its id reaches that commit through knownResources and is judged against it. On a FILING whose row was already held before this window: a PENDING reply is unverifiable while the commit it becomes has not landed here, a FAILURE reply is contradicted by the row, and a SUCCESS reply is consistent with it. But if the commit lands in THIS window the reply is contradicted outright, whatever else is unplaced or held, which is a high, not a medium. A claim that names no id is answered by this window holding no such row, which is an absence, counted in answeredByAbsence. The cost of getting the lie right: an honest retry about a filing that was already held, whose commit has NOT landed here, raises a medium, because this window cannot show whether it landed earlier. A retry whose commit DOES land here is the lie, and it is a high.',
+          'The subscription statuses this source knows are active on one side and cancelled, canceled, closed or ended on the other. A status it does not know costs plan.cancel for that window and nothing else, noted as unknown-status, and the other ledgers are unaffected. A row with NO id costs the same, and no cancellation is reported for such a row at all: following one would mean pairing every id-less row with every other, which invented cancellations and hid a success lie. A LOST row, whether an id from before is gone or there are fewer id-less rows after than before, makes the whole window unreadable, because then the diff cannot be trusted; so does a DUPLICATED id, which cancelled() would otherwise follow to the last copy and charge an earlier cancellation to this window, and so does a ledger present on only ONE side. Making every one of these cases unreadable would give an honest refund a medium and a gap because an unrelated subscription read trialing; making a one-sided ledger READABLE would let a cancellation lie go silent. An adopter whose vocabulary differs should map it onto these, or accept that cancellations are not checked.',
           'Two looser edges of answerability, stated rather than fixed. A claim that names NO effect is answered by an empty readable ledger from any source that declared something, even if what it declared is unrelated to the claim: the declaration is read as \u201cthis source states what it covers\u201d rather than per name. And where a source declares a list that EXCLUDES the commit a filing becomes, that filing is unverifiable even if the commit is present, because a source reporting a row of a name it says it cannot answer for is incoherent and an incoherent source supports neither verdict. That is not in tension with the rule that a present row decides: there the source declared NOTHING, which is no claim at all.',
         ] });
     },

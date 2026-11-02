@@ -1,4 +1,4 @@
-// The catalog identity (N13) through the connector: each database observer's catalog() record read after the final mark,
+// The catalog identity through the connector: each database observer's catalog() record read after the final mark,
 // recorded in the run as its catalog identity (src/catalog-identity.mjs catalogIdentity), validated by the shared HTTP validator, and
 // named by the exported suite. Owned synthetic data only: in-memory observers with an injected transport, then the owned
 // example app (examples/observed-support-app.mjs) with its real SQLite observers on a private copy, every listener on
@@ -51,7 +51,7 @@ test('the run records each database observer\'s catalog record as its catalog id
     { ...run, catalog: catalogIdentity(run.catalog.observers.map(r => ({ ...r, kinds: { table: { objects: 1, sha256: 'x' } } }))) }];
   for (const bad of tampered) assert.throws(() => validateHttpRunEvidence(bad), /invalid-run-evidence|run evidence/i);
   const { catalogSchema: _s, catalogObservers: _o, ...plainSuite } = suite;
-  assert.throws(() => validateHttpRunEvidence(run, { expectedSuite: plainSuite }), /unexpected-suite-evidence|suite/i, 'a suite exported before N13 names no catalog');
+  assert.throws(() => validateHttpRunEvidence(run, { expectedSuite: plainSuite }), /unexpected-suite-evidence|suite/i, 'a suite exported before the catalog identity names no catalog');
   assert.throws(() => validateHttpRunEvidence(run, { expectedSuite: { ...suite, catalogObservers: suite.catalogObservers.slice(1) } }), /unexpected-suite-evidence|suite/i, 'an observer the suite does not name');
   // An observer outside the catalog types (here a trace observer) never contributes a record, whatever it exposes.
   const withTraces = { ...p, observers: [...p.observers, { id: 'traces', type: 'otel', port: 4318, services: ['support'], tools: ['refund'], principals: [], settleMs: 250 }] };

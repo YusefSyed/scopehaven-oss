@@ -12,8 +12,7 @@
 // not read as a declared success (ambiguous, unreadable or untriggered): the app answered as if it allowed the use, and its reply
 // may be a refusal in undeclared words. A control's claim rules declare success only, so an honest refusal reads that way. It is
 // reported beside the rate and never counted in it: the reading cannot tell a refusal from a success in other words.
-// The allowed-use number always travels with its limits (claims register C32,
-// product output wording v33): every label and the meaning field carry them.
+// The allowed-use number always travels with its limits: every label and the meaning field carry them.
 import { restsOnAdmissions } from './app-log-verdicts.mjs';
 
 // A control whose fail rests only on app-log admissions (src/app-log-verdicts.mjs: the application's own action log records a

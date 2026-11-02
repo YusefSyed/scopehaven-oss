@@ -29,7 +29,7 @@ test('the gate holds a matching request until release and records it as one comm
   } finally { await gate.stop(); await up.close(); }
 });
 
-test('review P7: a full gate timeline makes later windows partial, never a silent pass', async () => {
+test('a full gate timeline makes later windows partial, never a silent pass', async () => {
   const up = await listen((req, res) => { req.resume(); req.on('end', () => res.writeHead(200).end('{}')); });
   const gate = createHoldGate({ upstream: up.url, rules: [], timelineLimit: 6 }); await gate.start();
   const o = gate.observer();
@@ -58,7 +58,7 @@ test('the gate refuses foreign Host and cross-origin requests and never forwards
   assert.throws(() => createHoldGate({ upstream: 'http://example.com:80' }), /loopback/);
 });
 
-test('L8 fix 2: a container reaches the gate as host.docker.internal; only the Host is widened', async () => {
+test('a container reaches the gate as host.docker.internal; only the Host is widened', async () => {
   const hosts = [];
   const up = await listen((req, res) => { hosts.push(req.headers.host); req.resume(); req.on('end', () => res.writeHead(200).end('{}')); });
   const gate = createHoldGate({ upstream: up.url, rules: [{ id: 'model', pathPrefix: '/v1/chat' }] }); await gate.start();
@@ -89,7 +89,7 @@ test('L8 fix 2: a container reaches the gate as host.docker.internal; only the H
   } finally { await gate.stop(); await up.close(); }
 });
 
-test('review N3: a request matching a rule after its hold budget keeps the rule id and counts as an effect', async () => {
+test('a request matching a rule after its hold budget keeps the rule id and counts as an effect', async () => {
   const up = await listen((req, res) => { req.resume(); req.on('end', () => res.writeHead(200).end('{}')); });
   const gate = createHoldGate({ upstream: up.url, rules: [{ id: 'refund', pathPrefix: '/tools/refund', holds: 1 }] }); await gate.start();
   const o = gate.observer();
@@ -105,7 +105,7 @@ test('review N3: a request matching a rule after its hold budget keeps the rule 
   } finally { await gate.stop(); await up.close(); }
 });
 
-test('round 4: gate rules match the decoded, case-folded path, keep the rule id on another method, and refuse non-path targets', async () => {
+test('gate rules match the decoded, case-folded path, keep the rule id on another method, and refuse non-path targets', async () => {
   let reached = 0;
   const up = await listen((req, res) => { reached++; req.resume(); req.on('end', () => res.writeHead(200).end('{}')); });
   const gate = createHoldGate({ upstream: up.url, rules: [{ id: 'refund', method: 'POST', pathPrefix: '/tools/refund', holds: 0 }] }); await gate.start();
@@ -127,7 +127,7 @@ test('round 4: gate rules match the decoded, case-folded path, keep the rule id 
   } finally { await gate.stop(); await up.close(); }
 });
 
-test('round 5 (P2): the gate proves only what it never forwarded; a denied, failed or broken forward is unknown', async () => {
+test('the gate proves only what it never forwarded; a denied, failed or broken forward is unknown', async () => {
   let mode = 403;
   const up = await listen((req, res) => {
     req.resume();
@@ -153,7 +153,7 @@ test('round 5 (P2): the gate proves only what it never forwarded; a denied, fail
   } finally { await gate.stop(); await up.close(); }
 });
 
-test('round 5: a held request that was dropped never reached upstream and is not an effect', async () => {
+test('a held request that was dropped never reached upstream and is not an effect', async () => {
   let reached = 0;
   const up = await listen((req, res) => { reached++; req.resume(); req.on('end', () => res.writeHead(200).end('{}')); });
   const gate = createHoldGate({ upstream: up.url, rules: [{ id: 'refund', pathPrefix: '/tools/refund' }] }); await gate.start();
@@ -168,7 +168,7 @@ test('round 5: a held request that was dropped never reached upstream and is not
   } finally { await gate.stop(); await up.close(); }
 });
 
-test('an earlier review: the gate records the method overrides each request carries, as sent, and forwards the request unchanged', async () => {
+test('the gate records the method overrides each request carries, as sent, and forwards the request unchanged', async () => {
   const received = [];
   const up = await listen((req, res) => { const c = []; req.on('data', x => c.push(x)); req.on('end', () => { received.push([req.method, req.headers['x-http-method-override'] ?? null, Buffer.concat(c).toString()]); res.writeHead(200).end('{}'); }); });
   const gate = createHoldGate({ upstream: up.url, rules: [{ id: 'b', pathPrefix: '/tool/b' }] }); await gate.start();
@@ -177,7 +177,7 @@ test('an earlier review: the gate records the method overrides each request carr
   const part = (name, value) => `--x\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n--x--\r\n`;
   // [path, request, the overrides the gate records]
   const cases = [
-    // The review's Rack-style probe: a POST that asks for DELETE by header (held, then released).
+    // Rack style: a POST that asks for DELETE by header (held, then released).
     ['/tool/b', { headers: { ...json, 'x-http-method-override': 'DELETE' }, body: '{"actor":"amy"}' }, ['DELETE']],
     ['/tool/b', { headers: { ...json, 'x-http-method': 'PATCH' }, body: '{}' }, ['PATCH']],
     ['/tool/b', { headers: { ...json, 'x-method-override': 'PUT' }, body: '{}' }, ['PUT']],
@@ -196,7 +196,7 @@ test('an earlier review: the gate records the method overrides each request carr
     ['/tool/b', { headers: multipart, body: part('_method', 'patch') }, ['']],
     ['/tool/b', { headers: multipart, body: part('file', 'x') }, []],
     ['/tool/b', { method: 'GET', headers: json }, []],
-    // A body of a type the gate does not parse that names _method: '' since the an earlier review (Minor 1), [] before.
+    // A body of a type the gate does not parse that names _method: '' (earlier builds recorded []).
     ['/tool/b', { headers: { 'content-type': 'text/plain' }, body: '_method=DELETE' }, ['']],
     // Any request line; repeated headers, joined as Node joins them; every channel at once, in order.
     ['/tool/b', { method: 'GET', headers: { 'x-http-method-override': 'DELETE' } }, ['DELETE']],
@@ -219,7 +219,7 @@ test('an earlier review: the gate records the method overrides each request carr
   } finally { await gate.stop(); await up.close(); }
 });
 
-test('an earlier review: the gate reads an override in the bodies and spellings the frameworks read, and records what it cannot read as \'\'', { timeout: 60000 }, async () => {
+test('the gate reads an override in the bodies and spellings the frameworks read, and records what it cannot read as \'\'', { timeout: 60000 }, async () => {
   const received = [];
   const up = await listen((req, res) => { const c = []; req.on('data', x => c.push(x)); req.on('end', () => { received.push(Buffer.concat(c)); res.writeHead(200).end('{}'); }); });
   const gate = createHoldGate({ upstream: up.url, rules: [{ id: 'b', pathPrefix: '/tool/b' }] }); await gate.start();
@@ -227,40 +227,40 @@ test('an earlier review: the gate reads an override in the bodies and spellings 
   const type = t => ({ 'content-type': t }), form = type('application/x-www-form-urlencoded');
   const part = (name, value) => `--x\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n--x--\r\n`;
   const pair = '_method=DELETE', doc = '{"_method":"DELETE"}';
-  // [the review's probe, path, request, the overrides the gate records]
+  // [probe, path, request, the overrides the gate records]
   const cases = [
-    // Minor 1: a compressed body, which Express's body-parser inflates before method-override reads it. Identity, and an
+    // A compressed body, which Express's body-parser inflates before method-override reads it. Identity, and an
     // encoded request with no body, are read as before.
     ['form, gzip', '/tool/b', { headers: { ...form, 'content-encoding': 'gzip' }, body: gzipSync(pair) }, ['']],
     ['form, deflate', '/tool/b', { headers: { ...form, 'content-encoding': 'deflate' }, body: deflateSync(pair) }, ['']],
     ['JSON, gzip', '/tool/b', { headers: { ...type('application/json'), 'content-encoding': 'gzip' }, body: gzipSync(doc) }, ['']],
     ['form, identity', '/tool/b', { headers: { ...form, 'content-encoding': 'Identity' }, body: pair }, ['DELETE']],
     ['gzip, no body', '/tool/b?_method=GET', { headers: { ...form, 'content-encoding': 'gzip' } }, ['GET']],
-    // Minor 1: the media type ends at ',' or whitespace too (Rack, PHP).
+    // The media type ends at ',' or whitespace too (Rack, PHP).
     ['form, then a comma', '/tool/b', { headers: type('application/x-www-form-urlencoded, text/plain'), body: pair }, ['DELETE']],
     ['form, then a space', '/tool/b', { headers: type('application/x-www-form-urlencoded x'), body: pair }, ['DELETE']],
-    // Minor 1: any multipart type (Rack parses multipart/mixed and multipart/related too), and any type with /json or +json
+    // Any multipart type (Rack parses multipart/mixed and multipart/related too), and any type with /json or +json
     // in it, as Laravel reads it.
     ['multipart/mixed', '/tool/b', { headers: type('multipart/mixed; boundary=x'), body: part('_method', 'DELETE') }, ['']],
     ['multipart/related', '/tool/b', { headers: type('multipart/related; boundary=x'), body: part('_method', 'DELETE') }, ['']],
     ['multipart/form-data, then a comma', '/tool/b', { headers: type('multipart/form-data, x; boundary=x'), body: part('_method', 'DELETE') }, ['']],
     ['text/json', '/tool/b', { headers: type('text/json'), body: doc }, ['DELETE']],
     ['JSON, then a comma', '/tool/b', { headers: type('application/json, text/plain'), body: doc }, ['DELETE']],
-    // Minor 1: any body the gate does not parse that names _method or .method; one that names neither is not read.
+    // Any body the gate does not parse that names _method or .method; one that names neither is not read.
     ['text/plain, .method', '/tool/b', { headers: type('text/plain'), body: '.method=DELETE' }, ['']],
     ['multipart, .method', '/tool/b', { headers: type('multipart/form-data; boundary=x'), body: part('.method', 'DELETE') }, ['']],
     ['text/plain, method', '/tool/b', { headers: type('text/plain'), body: 'method=DELETE' }, []],
-    // The review's controls on the same gate: each read as before.
+    // Controls on the same gate: each read as before.
     ['form', '/tool/b', { headers: form, body: pair }, ['DELETE']],
     ['form, charset', '/tool/b', { headers: type('application/x-www-form-urlencoded; charset=UTF-8'), body: pair }, ['DELETE']],
     ['mixed case', '/tool/b', { headers: type('Application/X-WWW-Form-URLEncoded'), body: pair }, ['DELETE']],
     ['percent-encoded key', '/tool/b', { headers: form, body: '%5Fmethod=DELETE' }, ['DELETE']],
     ['invalid UTF-8 around the pair', '/tool/b', { headers: form, body: Buffer.concat([Buffer.from([0xff]), Buffer.from(`&${pair}&`), Buffer.from([0xfe])]) }, ['DELETE']],
     ['JSON, charset', '/tool/b', { headers: type('application/json; charset=utf-8'), body: doc }, ['DELETE']],
-    // Minor 2: a header spelled with '_', which a CGI server gives the same name.
+    // A header spelled with '_', which a CGI server gives the same name.
     ['X_HTTP_METHOD_OVERRIDE', '/tool/b', { headers: { ...type('application/json'), X_HTTP_METHOD_OVERRIDE: 'DELETE' }, body: '{}' }, ['DELETE']],
     ['x_method_override', '/tool/b', { headers: { ...type('application/json'), x_method_override: 'PUT' }, body: '{}' }, ['PUT']],
-    // Minor 2: keys Rack 2 folds ([_method], _method]) and PHP folds (.method, and ` method`, which PHP reads as `method`
+    // Keys Rack 2 folds ([_method], _method]) and PHP folds (.method, and ` method`, which PHP reads as `method`
     // but the gate reads as `_method`), in a form and in the query; a key that nests under _method gives ''.
     ['[_method]', '/tool/b', { headers: form, body: '[_method]=DELETE' }, ['DELETE']],
     ['_method]', '/tool/b', { headers: form, body: '_method]=DELETE' }, ['DELETE']],
@@ -268,7 +268,7 @@ test('an earlier review: the gate reads an override in the bodies and spellings 
     ['query .method', '/tool/b?.method=PUT', { headers: type('application/json'), body: '{}' }, ['PUT']],
     ['query  method', '/tool/b?%20method=DELETE', { headers: type('application/json'), body: '{}' }, ['DELETE']],
     ['query  _method', '/tool/b?%20%20_method=PATCH', { headers: type('application/json'), body: '{}' }, ['PATCH']],
-    // The an earlier review: PHP ends a key at its first NUL, so `_method%00x` is `_method`, and a GET beside it does not hide
+    // PHP ends a key at its first NUL, so `_method%00x` is `_method`, and a GET beside it does not hide
     // the DELETE PHP applies (its last value wins).
     ['_method%00x', '/tool/b', { headers: form, body: '_method%00x=DELETE' }, ['DELETE']],
     ['_method, then _method%00', '/tool/b', { headers: form, body: '_method=GET&_method%00=DELETE' }, ['GET', 'DELETE']],
@@ -295,7 +295,7 @@ test('an earlier review: the gate reads an override in the bodies and spellings 
   } finally { await gate.stop(); await up.close(); }
 });
 
-test('an earlier review: a reply the upstream cuts off after its status line is one upstream fault, even after a 2xx, and the client\'s reply is cut off too; a reply that ends in full is not a fault', { timeout: 120000 }, async () => {
+test('a reply the upstream cuts off after its status line is one upstream fault, even after a 2xx, and the client\'s reply is cut off too; a reply that ends in full is not a fault', { timeout: 120000 }, async () => {
   // A raw upstream that answers each call as its query asks: the status line and part of a body (`length` declares 100 bytes,
   // `chunked` sends one chunk, `close` has no length), the whole reply (`full`), or nothing (`none`). It then closes cleanly
   // (`fin`) or resets (`rst`): before any answer for `none`, once the client has the partial body, or once the full reply is over.

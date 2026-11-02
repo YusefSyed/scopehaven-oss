@@ -11,7 +11,7 @@
 // then happen where no hold gate (or no settle) can see it. A passive call answered 201, 202 or 204, or sent with a
 // method, or a method override, other than GET, HEAD, OPTIONS, TRACE or POST, wrote something the spec says it does not,
 // so the baseline is not observed. Every run waits the settle once more after its end mark: the quiet window, where any call
-// shows the turn was not over. Every execution then runs its allowed-use twin (FIX-07): access restored and the same
+// shows the turn was not over. Every execution then runs its allowed-use twin: access restored and the same
 // turn again, or the spec's twin turn by an actor the change did not touch, with an effect.exists control on each
 // action the baseline applied, in the same run and through the same gate, so a prohibition never passes on an
 // application that has stopped acting. The generator reads the spec and the baseline run only: never a label, a build

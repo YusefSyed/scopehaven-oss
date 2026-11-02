@@ -1,4 +1,4 @@
-// Readiness gap 1, part 2: profile size caps (PROFILE_LIMITS) and the load-time request bound (requestPlan), which counts what
+// Profile size caps (PROFILE_LIMITS) and the load-time request bound (requestPlan), which counts what
 // the connector would send before it sends anything.
 import test from 'node:test';
 import assert from 'node:assert/strict';

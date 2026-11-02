@@ -30,7 +30,7 @@ const server = createServer((req, res) => {
   res.end(JSON.stringify({ body: sentinel }));
 });
 const receipts = [];
-// A configured target runs only under an authorization record that covers it (CMP-ROE-01): one per owned target here.
+// A configured target runs only under an authorization record that covers it: one per owned target here.
 let origin;
 async function authorizationFor(target) {
   const at = ms => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z'), path = join(directory, `${target}.authorization.json`);

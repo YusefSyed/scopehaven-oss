@@ -120,7 +120,7 @@ test('observeHttp sends PUT, PATCH and DELETE over loopback with their JSON body
   assert.equal(seen.length, before, 'a refused method never reaches the target');
 });
 
-// actor-identity/4 (core batch v2): the member's refusals count only after its earlier complete 2xx on a protected route,
+// actor-identity/4: the member's refusals count only after its earlier complete 2xx on a protected route,
 // so the end-to-end runs give it a surface control (a required GET of its own orders).
 const withOwnOrders = target => { target.checks.push({ id: 'OWN-ORDERS', title: 'OWN-ORDERS', category: 'Writes', severity: 'control', actorId: 'member', method: 'GET', path: '/orders/mine', evidenceRequirement: 'response', assertions: [status(200)] }); target.requiredControlIds.push('OWN-ORDERS'); return target; };
 test('end to end: a PUT, PATCH or DELETE run decides status and JSON assertions exactly as the same POST run, and each write is sent once', async t => {
@@ -241,7 +241,7 @@ test('not_applicable must match the exported suite: a failing row relabelled not
   assert.equal(evidenceCode(run, { expectedSuite: undeclared }), 'unexpected-suite-evidence:applicability-mismatch');
 });
 
-// Review M1 (probe p5): a write is a real change on the target. An owned app holds one record, A-4, owned by
+// A write is a real change on the target. An owned app holds one record, A-4, owned by
 // alice; the vulnerable build lets bob DELETE it. Nothing resets the app between the two runs unless reset() is called.
 async function orderApp(t) {
   // B-1 is bob's own order: his surface control reads it (actor-identity/4), so his refusals count.

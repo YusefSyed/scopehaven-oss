@@ -1,4 +1,4 @@
-// One signed evidence pack (NC8 item 2): every export of one run in one new private folder, the thing a buyer hands on.
+// One signed evidence pack: every export of one run in one new private folder, the thing a buyer hands on.
 //   ./scopehaven evidence-pack --run UUID --data ABSOLUTE_STORE --out ABSOLUTE_NEW_DIR [--baseline UUID]
 //       [--coverage-inventory ABS --coverage-contract ABS --coverage-targets ABS] [--signing-key-dir ABSOLUTE_DIR]
 //   ./scopehaven evidence-pack --payments-run ABSOLUTE_RUN.json --out ABSOLUTE_NEW_DIR [--payments-baseline ABSOLUTE_RUN.json] [--signing-key-dir ABSOLUTE_DIR]

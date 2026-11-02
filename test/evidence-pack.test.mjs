@@ -1,4 +1,4 @@
-// One signed evidence pack (NC8 item 2): `./scopehaven evidence-pack` writes every export of one run into a new 0700 folder, each
+// One signed evidence pack: `./scopehaven evidence-pack` writes every export of one run into a new 0700 folder, each
 // with its DSSE envelope, plus the signer's public key, a copy of the Python verifier, a VERIFY.md with the exact commands and one
 // envelope over the whole folder; all or nothing. The exports are made by the existing exporters, so each file here is compared with
 // what `export` (or `payments export`) writes. Owned synthetic data only: the synthetic fixture, an injected transport for the HTTP
@@ -110,7 +110,7 @@ test('a run pack holds every export with its envelope, the public key, the verif
     assert.equal(direct.signature.keyid, result.keyid);
     assert.deepEqual(await readFile(join(out, name)), await readFile(join(w.direct, name)), name);
   }
-  // VERIFY.md: the key id, the runs, the #507 sentence, one command per envelope, and no path of this machine.
+  // VERIFY.md: the key id, the runs, the signature-meaning sentence, one command per envelope, and no path of this machine.
   const text = await readFile(join(out, VERIFY_FILE), 'utf8');
   assert.ok(text.includes(SIGNATURE_MEANING)); assert.ok(text.includes(result.keyid)); assert.ok(text.includes(w.candidate.id)); assert.ok(text.includes(w.baseline.id));
   // Trust rests on the key id the verifiers print, matched against the signer's word over another channel; never on this folder.

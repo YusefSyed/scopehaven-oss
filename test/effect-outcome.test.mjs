@@ -1,6 +1,6 @@
-// Readiness edge E1: the upstream outcome of a forwarded egress send (src/effect-outcome.mjs) and how the evaluator
+// The upstream outcome of a forwarded egress send (src/effect-outcome.mjs) and how the evaluator
 // judges `upstream: "applied"` (src/effect-events.mjs). Unknown never reads as "not applied", only declared statuses
-// read rejected, and a profile that never declares forward judges exactly as at d349c7c, main before E1 (frozen fixture).
+// read rejected, and a profile that never declares forward judges exactly as the frozen earlier recorder does.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
@@ -201,7 +201,7 @@ test('mutation guards: one per property, each would let a pass through', () => {
   assert.equal(Object.hasOwn(baseSelector(sel({ upstream: 'applied' })), 'upstream'), false);
 });
 
-test('differential compat against d349c7c: a profile that never declares forward judges exactly as before', () => {
+test('differential compat against the frozen recorder: a profile that never declares forward judges exactly as before', () => {
   seq = 0;
   const captured = (status, value) => ({ captured: status === 'captured' ? { status, values: { '/amount': { type: 'number', value } } } : { status, values: {} } });
   const egress = [send(captured('captured', 25)), send(captured('captured', 250)), send(captured('not-json')), send(), send({ outcome: 'unknown' }), send({ name: HOOKS }), send({ resource: 'POST *' })];

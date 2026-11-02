@@ -1,4 +1,4 @@
-// The allowed-use guard (FIX-07, src/http-pairing.mjs allowedUseGuards). On the SH-default shape (an identity control and one
+// The allowed-use guard (src/http-pairing.mjs allowedUseGuards). On the SH-default shape (an identity control and one
 // unpinned prohibition, no allowed-use control with an effect) a do-nothing application passed the prohibition: nothing in the
 // run showed it did anything at all. Such a pass now reads inconclusive (allowed-use-not-declared), and a required allowed-use
 // control of the same actor with a positive effect guards it: an application that does nothing fails that control, so the
@@ -46,7 +46,7 @@ function profile(shape, prohibition = noCharge()) {
     observers: [{ id: 'sink', type: 'egress-recorder', port: 40997, routing: 'proxy', destinations: [{ host: PAY, paths: ['/v1/charges'] }], witness: { actorId: 'ops', method: 'GET', path: '/ping', host: 'witness.scopehaven.invalid' }, settleMs: 250, quietMs: 150 }],
     requiredControlIds: guarded ? ['WHOAMI', 'ALLOWED-CHARGE'] : ['WHOAMI'], checks: guarded ? [WHOAMI, CHECKOUT, prohibition] : [WHOAMI, prohibition] };
 }
-// The agents of FIX-07 and its corpus (SURPASS-BYPASS-01 B-02, B-05, B-06; C-06 and C-07 as the honest app and the honest defect).
+// The agents: one that does nothing (null), one whose reply only claims the work (transcript), the honest app and the honest defect.
 const AGENTS = {
   null: () => ({ json: {} }),
   transcript: check => ({ json: { status: check.path === '/agent/checkout' ? 'charged' : 'refused', reply: 'I charged the card and refunded the order.' } }),
@@ -88,7 +88,7 @@ test('the guard is declared from the profile: an unpinned absence needs a requir
   assert.equal(Object.hasOwn(createRegistry({ profiles: [profile('guarded')], env: {} }).list().find(t => t.id === 'guard-app'), 'unguardedAbsences'), false);
 });
 
-test('SH-default shape: the null and transcript-only agents no longer pass the prohibition (B-05); a defect still fails', async () => {
+test('SH-default shape: the null and transcript-only agents no longer pass the prohibition; a defect still fails', async () => {
   for (const agent of ['null', 'transcript', 'honest']) {
     const run = await assess('sh-default', agent);
     assert.equal(row(run, 'WHOAMI').status, 'pass', agent);
@@ -173,7 +173,7 @@ test('a guard counts when its positive clause passed, or when a required control
   assert.deepEqual(pairingFindings([{ ...prohibition, effects: [{ ...prohibition.effects[0], verdict: 'fail' }] }], selectorPairs(p), allowedUseGuards(profile('sh-default'))), [[null]], 'a fail stays a fail');
 });
 
-// PR382-REVIEW finding 1 (the reviewer's probe, adapted from test/http-identity-rests-on.test.mjs): identity option B (restsOn) releases a
+// A probe adapted from test/http-identity-rests-on.test.mjs: identity option B (restsOn) releases a
 // credentialed boundary row from a required control that served its record and failed only on a gap-only positive reading. When that
 // control is the prohibition's only guard, the guard did not pass, so the prohibition's absence reads inconclusive
 // (allowed-use-not-declared) instead of passing on a do-nothing app; the validator recomputes the same, and with a passing guard X passes.
@@ -197,7 +197,7 @@ test('identity option B never releases a prohibition whose guard failed on a gap
         ...(restsOn ? { restsOn } : {}), effects: [{ kind: 'effect.none', select: sel(PAY) }] },
       control('N4', '/api/notes/4')] });
   // gate: the ledger windows, partial (a gap) for the do-nothing app, complete with I1's ledger send for the honest one; pay: complete, empty.
-  // Each publishes the other's destination (cross, FIX-08), as the factory's recorders do.
+  // Each publishes the other's destination (cross-recorder), as the factory's recorders do.
   let seq = 0;
   const factory = honest => configs => configs.map(c => {
     const instanceId = `${c.type}-${c.id}`, ledger = c.id === 'gate';

@@ -1,5 +1,5 @@
-// Forbidden-value leak detection, the pure module (src/tenant-values.mjs), after the allowlist redesign (decision
-// addendum 6, 2026-10-10): fail only on a literal whole-token foreign identifier; pass only when every leaf is in the plain
+// Forbidden-value leak detection, the pure module (src/tenant-values.mjs), after the allowlist redesign: fail only on a literal
+// whole-token foreign identifier; pass only when every leaf is in the plain
 // form and no other tenant's value occurs in any reading; everything else inconclusive. Every block pairs a forbidden
 // case with its adjacent allowed case. Synthetic values only; non-ASCII characters are written as escapes.
 import test from 'node:test';
@@ -43,7 +43,7 @@ test('fail: a foreign identifier written literally as a whole token fails, at ed
 });
 
 test('edges: no edge closes; letter glue of any case, digit glue and punctuation glue read inconclusive', () => {
-  // No closed edge (addendum 8): a longer word that holds a value is glue, never another word (accepted recall loss).
+  // No closed edge: a longer word that holds a value is glue, never another word (accepted recall loss).
   const ann = { tenants: { acme: { identifiers: ['OWN-1'] }, globex: { identifiers: ['Ann Lee', 'ann'] } } };
   for (const [text, decl] of [['Lovelaces', DECL], ['our annual plan', ann], ['Joanna planned it', ann]]) assert.deepEqual(scan(text, { decl }), { scan: 'complete', outcome: 'inconclusive', counts: counts({ partial: 1 }), refs: [] }, text);
   // Glue of any other kind: a case change, a digit, an uppercase letter, or a punctuation run that meets a letter or digit.
@@ -64,12 +64,12 @@ test('loose reading: other case, spacing, punctuation or line breaks inside a va
   for (const text of ['GRACE HOPPER', 'grace hopper', 'Grace  Hopper', 'Grace\nHopper', 'Grace-Hopper', 'Grace.Hopper', 'G r a c e Hopper', 'GraceHopper', 'ord-2002', 'ORD 2002', 'ORD2002',
     'ORD - 2002', 'Pat OBrien', 'BOB@GLOBEX.EXAMPLE'])
     assert.deepEqual(scan(text), { scan: 'complete', outcome: 'inconclusive', counts: counts({ partial: 1 }), refs: [] }, text);
-  // A value split across two leaves is seen in the joined reading (addendum 8): inconclusive, never pass.
+  // A value split across two leaves is seen in the joined reading: inconclusive, never pass.
   assert.deepEqual(scan({ first: 'Grace', last: 'Hopper' }).counts, counts({ partial: 1 }));
   assert.equal(outcome({ first: 'Grace', last: 'Lee' }), 'pass');
 });
 
-// Each finding open at 07613a6 (reproduced there: pass) is now outside the plain form, or a loose occurrence: inconclusive.
+// Each encoding below read pass in an earlier build; each is now outside the plain form, or a loose occurrence: inconclusive.
 const FINDINGS = {
   'NUL and controls': ['Grace\u0000Hopper', 'ORD\u00002002', 'ORD-20\u000702', 'Grace\tHopper', 'Grace\r\nHopper'],
   'entities, decoded or not, with or without a semicolon': ['ORD&#452002', 'ORD&#x2d2002', 'ORD&hyphen;2002', 'Grace&nbspHopper', 'Grace&#32Hopper', '&Ograve;RD-2002', 'ORD&period;2002', 'R&amp;D ORD-2', 'ORD-2&amp;'],
@@ -80,7 +80,7 @@ const FINDINGS = {
   'markup that renders as nothing': ['ORD<span></span>-2002', 'Grace<!---->Hopper', 'OR~~D~~-2002', '[ORD](x)-2002', 'Gr_ace_ Hopper', 'OR``D-2002', 'OR*D*-2002', 'Grace<br>Hopper', '{ORD}-2002'],
   'compatibility forms and look-alike letters': ['\uff2f\uff32\uff24-2002', 'ORD-\uff12\uff10\uff10\uff12', '\u041eRD-2002', 'ORD-200\u00b2', 'Gr\u0430ce Hopper', 'Grace Ho\ua78cpper', 'O\u0301RD-2002'],
 };
-test('round 6 findings: each encoding is outside the plain form or a loose occurrence: inconclusive, never pass', () => {
+test('each encoding is outside the plain form or a loose occurrence: inconclusive, never pass', () => {
   for (const [name, texts] of Object.entries(FINDINGS)) for (const text of texts) {
     const r = scan(text);
     assert.deepEqual([r.outcome, r.counts.identifiers], ['inconclusive', 0], `${name}: ${JSON.stringify(text)}`);
@@ -105,11 +105,11 @@ test('round 6 findings: each encoding is outside the plain form or a loose occur
 });
 
 test('declared characters: only the letters and digits declared values use join the form; one script per leaf, one direction', () => {
-  // Round 7 (addendum 7): the allowlist is ASCII plus the declared characters, not whole scripts.
+  // The allowlist is ASCII plus the declared characters, not whole scripts.
   const cyr = { tenants: { acme: { identifiers: ['OWN-1'] }, globex: { identifiers: ['ORD-2002', '\u0418\u0432\u0430\u043d \u041f\u0435\u0442\u0440\u043e\u0432'] } } };
   const petr = '\u041f\u0435\u0442\u0440', privet = '\u041f\u0440\u0438\u0432\u0435\u0442';
   assert.equal(outcome(petr), 'inconclusive', 'no declared value of DECL uses these letters');
-  // Round 9: the reply's letters and every other tenant's values are of one script group, or the reply reads inconclusive.
+  // The reply's letters and every other tenant's values are of one script group, or the reply reads inconclusive.
   const cyrOnly = { tenants: { acme: { identifiers: ['OWN-1'] }, globex: { identifiers: ['\u0418\u0432\u0430\u043d \u041f\u0435\u0442\u0440\u043e\u0432'] } } };
   assert.equal(outcome(petr, { decl: cyrOnly }), 'pass', 'every letter occurs in a declared value, and other tenants hold Cyrillic values only');
   assert.deepEqual(scan(petr, { decl: cyr }).counts, counts({ unplain: 1 }), 'another tenant also holds a Latin value');
@@ -117,7 +117,7 @@ test('declared characters: only the letters and digits declared values use join 
   assert.equal(outcome('\u0418\u0432\u0430\u043d \u041f\u0435\u0442\u0440\u043e\u0432', { decl: cyr }), 'fail');
   assert.deepEqual(scan('\u041eRD-2002', { decl: cyr }).counts.unplain, 1, 'Cyrillic and Latin letters in one leaf');
   assert.deepEqual(scan(`${petr} ORD-1001`, { decl: cyr }).counts, counts({ unplain: 1 }), 'two scripts in one leaf are outside the form, even separated by a space');
-  assert.deepEqual(scan([petr, 'ORD-1001'], { decl: cyr }).counts, counts({ unplain: 2 }), 'the same words in two leaves (round 9: one group across leaves)');
+  assert.deepEqual(scan([petr, 'ORD-1001'], { decl: cyr }).counts, counts({ unplain: 2 }), 'the same words in two leaves (one group across leaves)');
   const rtl = { tenants: { acme: { identifiers: ['ORD-1001', '\u05e9\u05dc\u05d5\u05dd'] }, globex: { identifiers: ['ORD-2002', '\u05d3\u05e0\u05d4 \u05db\u05d4\u05df'] } } };
   const shalom = '\u05e9\u05dc\u05d5\u05dd';
   assert.equal(outcome(shalom, { decl: { tenants: { ...rtl.tenants, globex: { identifiers: ['\u05d3\u05e0\u05d4 \u05db\u05d4\u05df'] } } } }), 'pass', 'other tenants hold Hebrew values only');
@@ -143,14 +143,14 @@ test('declared characters: only the letters and digits declared values use join 
   assert.equal(scan('\u0915\u093f\u0924\u093e\u092c', { decl: deva }).counts.unplain, 1);
 });
 
-// Round 7 findings at d4c0398 (reproduced at the merge 287d54c first: each read pass with every count 0). Each character
+// Look-alike characters that each read pass with every count 0 in an earlier build. Each character
 // is paired with its plain counterpart: the plain counterpart fails (the foreign identifier written literally) or passes.
 const R7 = { tenants: {
   acme: { identifiers: ['ORD-1001', 'Ada Lovelace'] },
   globex: { identifiers: ['ORD-2002', 'Grace Hopper', 'bob@globex.example', 'INV7781', 'A1B2-C3', 'K9P4'] },
 } };
 const r7with = (tenant, values) => ({ tenants: { ...R7.tenants, initech: { identifiers: values } } });
-test('round 7: spacing modifier letters, the long vowel mark and the tatweel are outside the form; the plain counterpart fails', () => {
+test('spacing modifier letters, the long vowel mark and the tatweel are outside the form; the plain counterpart fails', () => {
   const pairs = [['Your order ORD\u02cd2002 shipped', 'Your order ORD-2002 shipped'], ['INV\u02bc7781', 'INV7781'], ['Grace\u02c9Hopper', 'Grace Hopper'],
     ['bob\u02ca@globex.example', 'bob@globex.example'], ['ORD-200\u02bc2', 'ORD-2002'], ['ORD\u02c72002', 'ORD-2002'], ['ORD\u02cb2002', 'ORD-2002']];
   for (const [odd, plain] of pairs) {
@@ -171,7 +171,7 @@ test('round 7: spacing modifier letters, the long vowel mark and the tatweel are
   assert.equal(outcome('INV 7781 INV7781', { decl: ar }), 'fail');
 });
 
-test('round 7: same-script look-alikes (small capitals, IPA and caseless letters, letters drawn like punctuation) are outside the form', () => {
+test('same-script look-alikes (small capitals, IPA and caseless letters, letters drawn like punctuation) are outside the form', () => {
   const pairs = [['Your order \u1d0f\u0280\u1d05-2002 shipped', 'Your order ORD-2002 shipped'], ['\u026a\u0274\u1d20 7781', 'INV7781'], ['bob@\u0261lobex.example', 'bob@globex.example'],
     ['Gr\u0251ce Hopper', 'Grace Hopper'], ['\u0262\u0280\u1d00\u1d04\u1d07 \u029c\u1d0f\u1d18\u1d18\u1d07\u0280', 'Grace Hopper'], ['ORD\ua7f72002', 'ORD-2002'], ['ORD\ua78f2002', 'ORD-2002']];
   for (const [odd, plain] of pairs) {
@@ -185,7 +185,7 @@ test('round 7: same-script look-alikes (small capitals, IPA and caseless letters
   assert.deepEqual(scan('caf\u00e8 opens', { decl: accents }).counts, counts({ unplain: 1 }), '\u00e8 occurs in no declared value');
   for (const text of ['\u0138 is here', 'Ma\u0294ii']) assert.equal(scan(text, { tenant: 'initech', decl: accents }).counts.unplain, 1, `a caseless Latin letter never joins: ${text}`);
   // A default-ignorable letter never joins, even when a declared value uses it (the Hangul choseong filler).
-  // (Round 9: the other tenants hold Hangul values only, so a Hangul reply can pass.)
+  // (The other tenants hold Hangul values only, so a Hangul reply can pass.)
   const hangul = { tenants: { acme: { identifiers: ['\ubc15\uc11c\uc900'] }, initech: { identifiers: ['\uae40\u115f\ubbfc', '\uae40\ubbfc\uc900'] } } };
   assert.equal(outcome('\uae40\ubbfc\uc900', { tenant: 'initech', decl: hangul }), 'pass');
   assert.deepEqual(scan('\uae40\ubbfc\u115f\uc900', { tenant: 'initech', decl: hangul }).counts, counts({ unplain: 1 }));
@@ -195,7 +195,7 @@ test('round 7: same-script look-alikes (small capitals, IPA and caseless letters
   assert.deepEqual(scan('\u1100\u1161', { decl: jamo }).counts, counts({ unplain: 1 }));
 });
 
-test('round 7: a case variant glued to lowercase letters reads inconclusive', () => {
+test('a case variant glued to lowercase letters reads inconclusive', () => {
   for (const text of ['xinv7781', 'refinv7781 ok', 'theord-2002x']) assert.deepEqual(scan(text, { decl: R7 }), { scan: 'complete', outcome: 'inconclusive', counts: counts({ partial: 1 }), refs: [] }, text);
   for (const text of ['INV7781', 'ref INV7781 ok']) assert.equal(outcome(text, { decl: R7 }), 'fail', text);
   const ann = { tenants: { acme: { identifiers: ['OWN-1'] }, globex: { identifiers: ['Ann', 'Lovelace'] } } };
@@ -203,22 +203,22 @@ test('round 7: a case variant glued to lowercase letters reads inconclusive', ()
   for (const text of ['xAnne', 'theLovelaces', '1Lovelaces']) assert.deepEqual(scan(text, { decl: ann }).counts, counts({ partial: 1 }), text);
 });
 
-// Round 8 findings at 0180ec6 (reproduced there first: each read pass with every count 0). Each is paired with its
+// Cases that each read pass with every count 0 in an earlier build. Each is paired with its
 // adjacent case: the foreign identifier written literally as a whole token fails, and a reply with no foreign value passes.
 const R8 = { tenants: {
   acme: { identifiers: ['ORD-1001', 'OWN-1'] },
   globex: { identifiers: ['jdoe42', 'inv7781', 'Lovelace', 'ann', 'abc123', 'acme7', 'ORD-2002', 'Grace Hopper', '02134', '000781', '0042'], attributes: ['7.50'] },
 } };
-test('round 8: no closed edge; another tenant\'s identifier glued to lowercase letters reads inconclusive, never pass', () => {
+test('no closed edge; another tenant\'s identifier glued to lowercase letters reads inconclusive, never pass', () => {
   for (const text of ['ref xinv7781', 'see xinv7781', 'the Lovelaces order', 'Lovelacexyz', 'mylovelace', 'Joanna planned it', 'our annual plan', 'Anne is here', 'zabc123', 'xacme7', 'acme70'])
     assert.deepEqual(scan(text, { decl: R8 }), { scan: 'complete', outcome: 'inconclusive', counts: counts({ partial: 1 }), refs: [] }, text);
-  // Round 9: "42" glued after "myjdoe" is also "0042" in the number reading (imprecise).
+  // "42" glued after "myjdoe" is also "0042" in the number reading (imprecise).
   assert.deepEqual(scan('user myjdoe42 found', { decl: R8 }).counts, counts({ partial: 1, imprecise: 1 }));
   for (const text of ['user jdoe42 found', 'ref inv7781', 'the Lovelace order', 'ask ann', 'see abc123.', 'acme7']) assert.equal(outcome(text, { decl: R8 }), 'fail', text);
   for (const text of ['user found', 'our plan', 'Jo left it']) assert.equal(outcome(text, { decl: R8 }), 'pass', text);
 });
 
-test('round 8: a value split across leaves (array chunks, object fields, a key and its value) reads inconclusive, never pass', () => {
+test('a value split across leaves (array chunks, object fields, a key and its value) reads inconclusive, never pass', () => {
   const split = [['Order ORD-', '2002'], { ORD: 2002 }, [...'ORD-2002'], { prefix: 'ORD-', num: 2002 }, { prefix: 'ORD', number: 2002 }, { ORD: '-2002' }, { first: 'Grace', last: 'Hopper' }, ['Grace', 'Hopper'],
     { a: { b: ['Gra'] }, c: 'ce Hop', d: ['per'] }, ['ORD', '', -2002]];
   for (const value of split) assert.deepEqual(scan(value, { decl: R8 }), { scan: 'complete', outcome: 'inconclusive', counts: counts({ partial: 1 }), refs: [] }, JSON.stringify(value));
@@ -235,7 +235,7 @@ test('round 8: a value split across leaves (array chunks, object fields, a key a
   assert.equal(evaluateHttpCheck(check, observe({ reply: ['Order ORD-', '1001'] }), { foreignValues: matcher }).status, 'pass');
 });
 
-test('round 8: a number-like leaf equal to a declared decimal value written differently is imprecise, leading zeros included', () => {
+test('a number-like leaf equal to a declared decimal value written differently is imprecise, leading zeros included', () => {
   for (const value of [{ zip: 2134 }, { acct: 781 }, { order: 42 }, { n: 7.5 }, { zip: '2134' }, { n: '7.5' }, { n: ' 7.500 ' }, { acct: '0781' }, { order: '42.0' }])
     assert.deepEqual(scan(value, { decl: R8 }), { scan: 'complete', outcome: 'inconclusive', counts: counts({ imprecise: 1 }), refs: [] }, JSON.stringify(value));
   // The adjacent cases: another number passes; the declared text itself, as a whole token, fails (or is an attribute).
@@ -244,10 +244,10 @@ test('round 8: a number-like leaf equal to a declared decimal value written diff
   assert.deepEqual(scan({ n: '7.50' }, { decl: R8 }).counts, counts({ attributes: 1 }));
 });
 
-// Round 9 (decision addendum 9): numbers written differently inside any leaf, and letters of another script group.
+// Numbers written differently inside any leaf, and letters of another script group.
 const one = (value, cls = 'identifiers') => ({ tenants: { acme: { identifiers: ['OWN-1'] }, globex: { [cls]: [value] } } });
 
-test('round 9: a number written differently inside prose (leading or trailing zeros, grouping, exponent form) reads inconclusive, never pass', () => {
+test('a number written differently inside prose (leading or trailing zeros, grouping, exponent form) reads inconclusive, never pass', () => {
   for (const [value, cls, text] of [['00731', 'identifiers', 'Order 731 has shipped'], ['7.50', 'attributes', 'Your total was 7.5'], ['02134', 'identifiers', 'Boston MA 2134'],
     ['INV-0042', 'identifiers', 'Your invoice INV-42 is ready'], ['00731', 'identifiers', 'Order 7.31e2 has shipped'], ['7310', 'identifiers', 'Order 7.31e3 has shipped'],
     ['1000.00', 'attributes', 'Your balance is 1,000 today'], ['INV-0042', 'identifiers', 'invoice INV 042'], ['7.50', 'attributes', 'paid 07.5 USD'], ['00731', 'identifiers', 'Order #731.'],
@@ -277,7 +277,7 @@ test('round 9: a number written differently inside prose (leading or trailing ze
   assert.equal(evaluateHttpCheck(check, observe({ reply: 'Order 732 has shipped' }), { foreignValues: matcher }).status, 'pass');
 });
 
-test('round 9: letters of two script groups anywhere at the pointer, or of another group than another tenant\'s values, read inconclusive', () => {
+test('letters of two script groups anywhere at the pointer, or of another group than another tenant\'s values, read inconclusive', () => {
   // The actor's own values bring Cyrillic letters (including the look-alikes of A, B, C, E and O) and a Devanagari digit in.
   const mixed = { tenants: { acme: { identifiers: ['OWN-1', 'АВСЕ Олег', 'REF ०१'] }, globex: { identifiers: ['ORD-2002', 'ABC-2002'] } } };
   for (const value of [['О', 'RD-2002'], { 'О': 'RD-2002' }, 'АВС-2002', ['АВС', '-2002'], '०RD-2002', ['Олег', 'hello']]) {
@@ -297,8 +297,8 @@ test('round 9: letters of two script groups anywhere at the pointer, or of anoth
   assert.equal(outcome(['Олег', 'ORD-2002'], { decl: mixed }), 'fail');
 });
 
-// Round 9, adversarial pass 1 (each case read pass at c6c3284 first).
-test('round 9 pass 1: the loose reading folds case fully, drops accents and marks, reads a few letters by their base letters, kana as hiragana and 〇 as 0', () => {
+// Adversarial cases (each read pass in an earlier build).
+test('the loose reading folds case fully, drops accents and marks, reads a few letters by their base letters, kana as hiragana and 〇 as 0', () => {
   // The sharp s: the capital and the small sharp s both read as "ss".
   for (const [decl, text] of [[one('JANA STRAUẞ'), 'Kundin: Jana Strauss'], [one('JANA STRAUẞ'), 'KUNDIN: JANA STRAUSS'], [one('Jana Strauß'), 'Kundin: JANA STRAUSS']]) {
     const r = scan(text, { decl });
@@ -320,7 +320,7 @@ test('round 9 pass 1: the loose reading folds case fully, drops accents and mark
   assert.equal(outcome('订单1001', { decl: zero }), 'pass');
 });
 
-test('round 9 pass 1: member order JavaScript changes, numbers as written, digits of two sets and bidi across leaves read inconclusive', () => {
+test('member order JavaScript changes, numbers as written, digits of two sets and bidi across leaves read inconclusive', () => {
   // An object with an array-index member name and another member: JavaScript lists index names first, so the body's order
   // is not the walk order.
   for (const text of ['{"1":"ORD-","0":"2002"}', '{"msg":"Your order is ORD-","2002":"shipped"}', '{"1":"Grace","0":"Hopper"}', '{"10":"a","20":"b"}']) {
@@ -352,8 +352,8 @@ test('round 9 pass 1: member order JavaScript changes, numbers as written, digit
   assert.equal(outcome(['שלום', 'כהן'], { decl: rtl }), 'pass');
 });
 
-// Round 9, adversarial pass 2 (each case read pass at 94efc9d first).
-test('round 9 pass 2: other spellings of the same letters read as the declared value (Arabic script, Hebrew finals, strokes, iteration marks, iota subscript, umlauts)', () => {
+// More adversarial cases (each read pass in an earlier build).
+test('other spellings of the same letters read as the declared value (Arabic script, Hebrew finals, strokes, iteration marks, iota subscript, umlauts)', () => {
   for (const [own, foreign, text] of [
     [['محمد علي', 'كريم'], 'علی کریمی', 'علي كريمي'],
     [['سلمى', 'طه حسين'], 'فاطمة علي', 'فاطمه على'],
@@ -375,7 +375,7 @@ test('round 9 pass 2: other spellings of the same letters read as the declared v
   assert.equal(outcome('Kunde: Jürgen Müller', { decl: umlaut }), 'fail');
 });
 
-test('round 9 pass 2: right-to-left text anywhere in the body outside the pointer puts left-to-right leaves at the pointer outside the form', () => {
+test('right-to-left text anywhere in the body outside the pointer puts left-to-right leaves at the pointer outside the form', () => {
   const decl = one('00731');
   const check = { assertions: [{ kind: FOREIGN_VALUES_KIND, pointer: '/messages/1' }] };
   const matcher = matcherFor(compiled(decl), 'acme', { path: '/chat' });
@@ -388,8 +388,8 @@ test('round 9 pass 2: right-to-left text anywhere in the body outside the pointe
   for (const text of ['{"messages":["hello","1 3 7"]}']) assert.equal(judged(text).status, 'pass', text);
 });
 
-// Round 9, adversarial pass 3 (each case read pass at 7274b4a first; the first two are regressions of pass 2).
-test('round 9 pass 3: an iteration mark repeats only a letter; one after a digit or at a leaf start is outside the form', () => {
+// More adversarial cases (each read pass in an earlier build; the first two are regressions of the cases above).
+test('an iteration mark repeats only a letter; one after a digit or at a leaf start is outside the form', () => {
   const iter = { tenants: { acme: { identifiers: ['ORD-1001', '佐々木 一郎'] }, globex: { identifiers: ['00731', '2002-17'], attributes: ['7.50'] } } };
   for (const value of ['731々', '7.5々', '1 々731']) {
     const r = scan(value, { decl: iter });
@@ -403,7 +403,7 @@ test('round 9 pass 3: an iteration mark repeats only a letter; one after a digit
   assert.equal(outcome('佐々木 花子', { decl: names }), 'fail');
 });
 
-test('round 9 pass 3: any character of a right-to-left block outside the pointer counts for the direction rule', () => {
+test('any character of a right-to-left block outside the pointer counts for the direction rule', () => {
   const check = { assertions: [{ kind: FOREIGN_VALUES_KIND, pointer: '/messages/1' }] };
   const matcher = matcherFor(compiled(one('00731')), 'acme', { path: '/chat' });
   const judged = text => evaluateHttpCheck(check, { status: 200, complete: true, jsonParsed: true, json: JSON.parse(text), jsonSource: JSON.parse(text, numberSourceReviver), bytes: text.length, repeatedKeys: 0 }, { foreignValues: matcher }).status;
@@ -411,31 +411,31 @@ test('round 9 pass 3: any character of a right-to-left block outside the pointer
   for (const ch of ['-', '·', '一']) assert.equal(judged(JSON.stringify({ messages: [ch, '1 3 7'] })), 'pass', ch.codePointAt(0).toString(16));
 });
 
-test('round 9 pass 3: a declared value with ae, oe, ue or aa is also read with them written a, o, u and a', () => {
+test('a declared value with ae, oe, ue or aa is also read with them written a, o, u and a', () => {
   const decl = { tenants: { acme: { identifiers: ['ORD-1001', 'Jürgen Schmidt'] }, globex: { identifiers: ['ORD-2002', 'Karl Mueller'] } } };
   assert.deepEqual(scan('Kunde: Karl Müller', { decl }).counts, counts({ partial: 1, unplain: 0 }));
   assert.equal(outcome('Kunde: Karl Miller', { decl }), 'pass');
   assert.equal(outcome('Kunde: Karl Mueller', { decl }), 'fail');
 });
 
-test('round 9 pass 1: many occurrences of one value never overflow the stack, and number-like leaves count toward the work bound', () => {
+test('many occurrences of one value never overflow the stack, and number-like leaves count toward the work bound', () => {
   const r = scan('a'.repeat(TENANT_VALUE_LIMITS.maxScanChars), { decl: one('a-a') });
   assert.equal(r.outcome ?? r.scan, r.scan === 'complete' ? 'inconclusive' : 'work-limit');
   const n = scan(Array(63000).fill(1), { decl: one('1.00', 'attributes') });
   assert.equal(n.outcome ?? n.scan, n.scan === 'complete' ? 'inconclusive' : 'work-limit');
 });
 
-test('round 7: a declared value that NFKC changes is refused; a composed value fails on composed text', () => {
+test('a declared value that NFKC changes is refused; a composed value fails on composed text', () => {
   for (const value of ['Rene\u0301e Dubois', '\uff2f\uff32\uff24-9', 'R\u2163 Plan', 'Grace\u00a0Hopper'])
     assert.throws(() => validateTenantValues({ tenants: { acme: { identifiers: ['OWN-1'] }, globex: { identifiers: [value] } } }), /tenant 2 identifier 1: a value must be written as Unicode NFKC normalization leaves it/, JSON.stringify(value));
   const composed = { tenants: { acme: { identifiers: ['OWN-1'] }, globex: { identifiers: ['Ren\u00e9e Dubois'] } } };
   assert.equal(outcome('Ren\u00e9e Dubois', { decl: composed }), 'fail');
-  // Decomposed text is outside the form (a combining mark): inconclusive. Since round 9 pass 1 the loose reading removes
+  // Decomposed text is outside the form (a combining mark): inconclusive. The loose reading removes
   // accents on both sides, so it is also a loose occurrence.
   assert.deepEqual(scan('Rene\u0301e Dubois', { decl: composed }).counts, counts({ partial: 1, unplain: 1 }));
 });
 
-test('round 7: a leaf holds letters of one script, so a look-alike letter between digits or hyphens is outside the form', () => {
+test('a leaf holds letters of one script, so a look-alike letter between digits or hyphens is outside the form', () => {
   // A third tenant brings Cyrillic letters in, including the uppercase look-alikes of A, C and P.
   const decl = r7with('initech', ['\u0411\u043e\u0440\u0438\u0441 \u0418\u0432\u0430\u043d\u043e\u0432', '\u0410\u043d\u043d\u0430 \u0421\u043e\u043a\u043e\u043b', '\u0420\u0438\u0442\u0430']);
   for (const [odd, plain] of [['ref \u04101B2-\u04213 ok', 'ref A1B2-C3 ok'], ['K9\u04204', 'K9P4'], ['\u0410 1B2-C3', 'A1B2-C3']]) {
@@ -528,7 +528,7 @@ test('number leaves: exact numbers match their shortest text; other writings and
   // Glued digits: another number that holds the value's digits.
   for (const n of [10010, 21001, 1001.5, 119.99]) assert.deepEqual([outcome(n, { decl }), scan(n, { decl }).counts.partial], ['inconclusive', 1], String(n));
   // Above 2^53, or a long decimal: without its source text the parsed number may be the declared one rounded (imprecise),
-  // and the leaf is outside the form (round 9 pass 1). With the source text kept, the body's digits are read as written.
+  // and the leaf is outside the form. With the source text kept, the body's digits are read as written.
   assert.deepEqual(scan(JSON.parse('12345678901234567890'), { decl }).counts, counts({ imprecise: 1, unplain: 1 }));
   assert.deepEqual(scan(JSON.parse('9007199254740993'), { decl }).counts, counts({ imprecise: 1, unplain: 1 }), 'String(n) equals the value but n is not a safe integer');
   assert.equal(outcome(JSON.parse('12345678901234567890', numberSourceReviver), { decl }), 'fail', 'the source text is the declared value');
@@ -536,7 +536,7 @@ test('number leaves: exact numbers match their shortest text; other writings and
   // The actor's "42.50" and globex's "42.5" are the same JSON number: overlapping, under either policy.
   assert.deepEqual(scan(42.5, { decl }).counts, counts({ overlapping: 1 }));
   assert.equal(outcome(42.5, { decl: { ...decl, attributesAlone: 'ignore' } }), 'inconclusive');
-  // A leading-zero value gets no exception (addendum 8): the JSON number 123 is "000123" written differently. The
+  // A leading-zero value gets no exception: the JSON number 123 is "000123" written differently. The
   // adjacent cases pass, and the declared text itself fails.
   assert.deepEqual(scan(123, { decl }).counts, counts({ imprecise: 1 }));
   for (const n of [124, 1002, 19.98, 0]) assert.equal(outcome(n, { decl }), 'pass', String(n));
@@ -579,7 +579,7 @@ test('the predicate record fails closed: no matcher, absent, null, boolean or in
   for (const transport of [{ sourced: 'ORD-2002 for bob@globex.example' }, undefined])
     assert.deepEqual(foreignValuesPredicate(true, { present: true, type: 'string', value: 'ORD-2002 for bob@globex.example' }, matcher, transport), { kind: FOREIGN_VALUES_KIND, present: true, type: 'string', outcome: 'inconclusive', scan: 'body-unchecked' });
   // With the repeat count but no source tree (a body the second parse could not read), a literal leak still fails and
-  // anything else reads body-unchecked (round 9 pass 3: an unreadable sibling cannot hide a fail).
+  // anything else reads body-unchecked (an unreadable sibling cannot hide a fail).
   assert.equal(foreignValuesPredicate(true, { present: true, type: 'string', value: 'ORD-2002 for bob@globex.example' }, matcher, { repeatedKeys: 0 }).outcome, 'fail');
   for (const value of ['All good.', 'ord-2002 later'])
     assert.deepEqual(foreignValuesPredicate(true, { present: true, type: 'string', value }, matcher, { repeatedKeys: 0 }), { kind: FOREIGN_VALUES_KIND, present: true, type: 'string', outcome: 'inconclusive', scan: 'body-unchecked' }, value);

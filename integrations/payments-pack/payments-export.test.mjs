@@ -1,5 +1,5 @@
-// Payments runs exportable and signed (NC8 item 1): a saved payments run (`payments run` writes <run-id>.json) is exported as
-// json, html or sarif and signed by default exactly as `scopehaven export` signs (src/export-cli.mjs, #507): a DSSE envelope beside
+// Payments runs exportable and signed: a saved payments run (`payments run` writes <run-id>.json) is exported as
+// json, html or sarif and signed by default exactly as `scopehaven export` signs (src/export-cli.mjs): a DSSE envelope beside
 // each file with the local Ed25519 key, --unsigned to opt out, --signing-key-dir to override. The export copies every saved status
 // and recomputes none, so it can never upgrade a label; a run edited after it was produced, or whose counts are not its rows', is
 // refused before anything is written. Inputs are the checked-in sample runs (integrations/payments-pack/sample), so no app, double

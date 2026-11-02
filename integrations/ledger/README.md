@@ -52,7 +52,7 @@ Leaf hash = SHA-256(0x00 ‖ entry line), node hash = SHA-256(0x01 ‖ left ‖ 
 
 ## What the verifiers check
 
-Both verifiers apply the rules below. The tests give both the same tamper cases and edge inputs and require the same outcome and reason code from each. They include every probe from three review rounds: `ledger-probes.test.mjs` (K01 to K25), `ledger-parity.test.mjs` (R00 to R10, Q01 to Q21) and `ledger-parity3.test.mjs` (E00 to E28, P01 to P14, and a two-run envelope with its run files). `ledger-payments.test.mjs` adds payments runs: alone and beside a run export, refused ones, and a ledger recorded at main 0de64259 (`fixtures/ledger-main-0de64259`), which still verifies. On all of them both verifiers give the same verdict, reason and exit code; agreement on inputs nobody has tried yet is a claim the tests can only sample.
+Both verifiers apply the rules below. The tests give both the same tamper cases and edge inputs and require the same outcome and reason code from each. They include three sets of edge probes: `ledger-probes.test.mjs` (K01 to K25), `ledger-parity.test.mjs` (R00 to R10, Q01 to Q21) and `ledger-parity3.test.mjs` (E00 to E28, P01 to P14, and a two-run envelope with its run files). `ledger-payments.test.mjs` adds payments runs: alone and beside a run export, refused ones, and a ledger recorded by an earlier build (`fixtures/ledger-main-0de64259`), which still verifies. On all of them both verifiers give the same verdict, reason and exit code; agreement on inputs nobody has tried yet is a claim the tests can only sample.
 
 | Check | Reason when it fails |
 |---|---|
@@ -193,7 +193,7 @@ What recovery cannot do: if someone deletes `pending.json`, the stopped write's 
 
 ## Limits
 
-- No external witness runs yet, and no trusted timestamp. Witnessing works locally (see Witnessing), but no party other than the operator runs a witness, and the OpenTimestamps anchoring Yusef approved is a separate step. Checkpoint times are the operator's clock, checked only for order.
+- No external witness runs yet, and no trusted timestamp. Witnessing works locally (see Witnessing), but no party other than the operator runs a witness, and OpenTimestamps anchoring is a separate step. Checkpoint times are the operator's clock, checked only for order.
 - No key rotation. Changing either key part way through makes the ledger unverifiable under any single key, so a ledger lives as long as its keys.
 - Single writer per folder, with a local lock file.
 - **Size and cost:**

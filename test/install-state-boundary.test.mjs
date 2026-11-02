@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// D19: an assessment must keep its state inside the configured data directory.
+// An assessment must keep its state inside the configured data directory.
 // Each check runs the real CLI from a private copy of the workbench, so the
 // whole copy (including directory mtimes, which change on any transient create
 // or delete) can be compared before and after. Only owned synthetic fixtures
@@ -49,13 +49,13 @@ async function privateWorkbench(t) {
   // although these SupportDesk assessments do not instantiate them.
   for (const name of ['payments-double.mjs', 'factory.mjs', 'sink-ledger.mjs', 'audit-file.mjs', 'audit-http.mjs', 'egress-recorder.mjs', 'egress-forward.mjs', 'mcp.mjs',
     'mysql-snapshot.mjs', 'mysql-wire.mjs', 'otel.mjs', 'pg-snapshot.mjs', 'pg-wire.mjs', 'smtp-sink.mjs', 'provider-feed.mjs', 'request-feed.mjs', 'read-back.mjs', 'app-log.mjs', 'sqlite.mjs', 'fixtures/free-port.mjs',
-    // The database observers' background-writer rules (N12): the ignore-list reader and its lists, the end barrier, the run lease.
+    // The database observers' background-writer rules: the ignore-list reader and its lists, the end barrier, the run lease.
     'end-barrier.mjs', 'run-lease.mjs', 'ignore-lists/ignore-list.mjs', 'ignore-lists/supabase.json', 'ignore-lists/litestream.json',
-    // The catalog fingerprint (N13) the database observers read at each mark.
+    // The catalog fingerprint the database observers read at each mark.
     'catalog.mjs',
     // Read (never imported) by src/collector-identity.mjs at import, for the pg-wal/1 and dns-stub/1 collector records.
     'pg-wal.mjs', 'dns-stub.mjs', 'dns-wire.mjs',
-    // The actor capture (NC2 item 2) both Postgres observers import, and the Supabase rules pg-snapshot and the factory import (NC9 item 3).
+    // The actor capture both Postgres observers import, and the Supabase rules pg-snapshot and the factory import.
     'pg-actor.mjs', 'supabase-rules.mjs',
     // pg_net on the wire, which the factory imports for a pg-wal observer's pgNetWire.
     'pg-net-wire.mjs']) {

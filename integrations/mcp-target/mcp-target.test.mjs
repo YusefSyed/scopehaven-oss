@@ -29,7 +29,7 @@ const HELD = ['inconclusive', 'subject-writable', 'subject-writable-custody'];
 test('a clean server (grants bound to the tool descriptor): the forbidden calls never run, and the paired controls pass', async t => {
   const run = await runOn(t, 'bound');
   assert.equal(run.aborted, null);
-  // Custody (SURPASS-CUSTODY-01): only the server's own audit table can decide these absences (the traffic is presence-only), so MCP-01 and MCP-02 read inconclusive.
+  // Custody: only the server's own audit table can decide these absences (the traffic is presence-only), so MCP-01 and MCP-02 read inconclusive.
   assert.deepEqual(statuses(run), { 'MCP-01': 'inconclusive', 'MCP-02': 'inconclusive', 'MCP-C1': 'pass', 'MCP-C2': 'pass', 'MCP-C3': 'pass', 'MCP-C4': 'pass' });
   for (const id of ['MCP-01', 'MCP-02']) assert.deepEqual(custodyOf(run, id), HELD, id);
   // The records still show the forbidden calls never ran: neither record has a committed viewer refund before the change or a committed viewer export after it.
@@ -38,7 +38,7 @@ test('a clean server (grants bound to the tool descriptor): the forbidden calls 
 
 test('a descriptor change mid-session: grants by tool name let the old grant run the new capability, judged from the records', async t => {
   const run = await runOn(t, 'by-name');
-  // Custody (SURPASS-CUSTODY-01): MCP-01's absence is decided only by the server's audit table, so it reads inconclusive; MCP-02's fail stays a fail.
+  // Custody: MCP-01's absence is decided only by the server's audit table, so it reads inconclusive; MCP-02's fail stays a fail.
   assert.deepEqual(statuses(run), { 'MCP-01': 'inconclusive', 'MCP-02': 'fail', 'MCP-C1': 'pass', 'MCP-C2': 'pass', 'MCP-C3': 'pass', 'MCP-C4': 'pass' });
   assert.deepEqual(custodyOf(run, 'MCP-01'), HELD);
   assert.equal(custodyOf(run, 'MCP-02')[2], undefined);
@@ -85,7 +85,7 @@ test('MCP-02 is judged from every record: when only the traffic shows the old gr
 test('a grant is bound to the whole descriptor: changing only the description or only the input schema voids an old grant', async t => {
   for (const [only, resource] of [['description', 'tickets/*'], ['inputSchema', 'tickets/mcp-viewer']]) {
     const boundRun = await runOn(t, 'bound', { upgrade: { only } }), bound = statuses(boundRun);
-    // Custody (SURPASS-CUSTODY-01): the bound server's MCP-02 absence is decided only by its own audit table, so it reads inconclusive; the control keeps its pass.
+    // Custody: the bound server's MCP-02 absence is decided only by its own audit table, so it reads inconclusive; the control keeps its pass.
     assert.deepEqual([bound['MCP-02'], bound['MCP-C4']], ['inconclusive', 'pass'], only);
     assert.deepEqual(custodyOf(boundRun, 'MCP-02'), HELD, only);
     const byName = await runOn(t, 'by-name', { upgrade: { only } });

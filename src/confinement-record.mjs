@@ -1,4 +1,4 @@
-// The confinement record of a confined launch (FIX-01 option 2) and the routing tier it gives a run's absence passes.
+// The confinement record of a confined launch and the routing tier it gives a run's absence passes.
 // Pure and presentation-side: it never feeds a verdict, status, count, comparison, gate outcome, note or any suite, policy,
 // fixture, evaluator or profile hash, and it is outside the HTTP evaluator hash, so the validator never reads it.
 // src/confine.mjs writes the record when it starts the application (./scopehaven assess --confine); src/absence-scope.mjs
@@ -60,7 +60,7 @@ export const profileDigest = profile => createHash('sha256').update(profile, 'ut
 
 // The sandbox profile: every outbound connection is refused (tagged, so the kernel log names this run) except TCP over IPv4
 // loopback to the listed ports. sandbox-exec takes only "localhost" or "*" as a host, and "localhost" alone ("remote ip") also
-// means [::1], where a squatter could listen at a sink's port (FIX-02); "tcp4" keeps the allowance to the address family the
+// means [::1], where a squatter could listen at a sink's port; "tcp4" keeps the allowance to the address family the
 // sinks listen on. Unix-domain sockets and the system resolver are outbound connections too, so they are refused as well.
 export function confinementProfile(tag, ports) {
   if (!confinementTagValid(tag)) throw new Error('a confinement tag is "scopehaven-confine-" and 12 lowercase hex digits');

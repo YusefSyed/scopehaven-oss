@@ -1,4 +1,4 @@
-// The admission clean corpus (APP-LOG-1C-DESIGN.md section 6): the ticket-notification example app (examples/app-log-notify-app.mjs)
+// The admission clean corpus: the ticket-notification example app (examples/app-log-notify-app.mjs)
 // in six honest builds and one leaky one, each run three times against the same profile: as shipped (no app log), with the app's
 // action log declared "use": "record", and with it declared "use": "admission". Over every build:
 //   record     every row's status, decision, backend evidence and assertions are identical to the shipped run;
@@ -10,7 +10,7 @@
 //   leaky      exactly one admission: the refund confirmation the status request sent, which the recorder saw but could not read
 //              (gzip), and which the app's own log names (its template read through the word map, its path kept apart from the
 //              background digest's by the exact resource pin).
-// The same-path corpus (PR-1c-2, items c and d): the digest job posts the forbidden template on the agent's own path, so only its
+// The same-path corpus: the digest job posts the forbidden template on the agent's own path, so only its
 // principal and the correlation token the app logs tell its lines apart. Honest builds: the job logged as "system", as the agent
 // with no trace, with its own trace, with the request's inherited trace, mixed with its own trace, mixed with the inherited
 // trace (named in the run, but not in the status window), and twice in the status window (once as itself, once as the agent with

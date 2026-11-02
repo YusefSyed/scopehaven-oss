@@ -1,4 +1,4 @@
-// H1 step 4: header API keys. An actor's credential can be sent in a named header (x-api-key, apikey) instead of
+// Header API keys. An actor's credential can be sent in a named header (x-api-key, apikey) instead of
 // Authorization: Bearer or a cookie. Its value comes only from a SCOPEHAVEN_TARGET_ variable, the evidence keeps a
 // digest of it only, it goes only to the target's origin, and the names the connector, HTTP framing or a proxy owns
 // are refused. A loopback app in this process records the headers every request carried. No model or provider.
@@ -66,11 +66,11 @@ test('the header name is a token the connector, framing or a proxy does not own;
   assert.throws(() => observeHttp('http://127.0.0.1:1', { method: 'GET', path: '/' }, { credential: KEY, credentialHeader: 'x-api-key', credentialCookie: 'session' }), /Credential header/);
 });
 
-test('PR456-REVIEW m1: no observer credential may name a header actor\'s variable, so the key never reaches an observer as its own bearer token', () => {
+test('no observer credential may name a header actor\'s variable, so the key never reaches an observer as its own bearer token', () => {
   const audit = credentialEnv => ({ id: 'audit', type: 'http-audit', origin: 'http://127.0.0.1:2', path: '/audit', credentialEnv, itemsPointer: '/items', pageLimit: 100,
     fields: { id: '/id', actor: '/actor', action: '/action' }, actions: { 'note.create': 'insert' }, principals: ['member-1'] });
   const withObserver = (observer, actor) => ({ ...keyProfile('http://127.0.0.1:1', actor), observers: [observer] });
-  // The review's probe H5: an http-audit observer naming the X-Api-Key actor's variable was accepted and sent the key as Authorization: Bearer.
+  // An http-audit observer naming the X-Api-Key actor's variable was accepted and sent the key as Authorization: Bearer.
   assert.throws(() => valid(withObserver(audit('SCOPEHAVEN_TARGET_API_KEY'))), /an observer credential names a header actor's "credentialEnv"/);
   // Its own variable is accepted, and so is a bearer actor's variable reused by an observer (unchanged).
   assert.equal(valid(withObserver(audit('SCOPEHAVEN_TARGET_AUDIT'))).observers[0].credentialEnv, 'SCOPEHAVEN_TARGET_AUDIT');
@@ -82,10 +82,10 @@ test('PR456-REVIEW m1: no observer credential may name a header actor\'s variabl
   assert.throws(() => valid(withObserver(pg('SCOPEHAVEN_TARGET_API_KEY'))), /an observer credential names a header actor's "credentialEnv"/);
 });
 
-test('PR456 round 2 N4: no other actor may name a header actor\'s variable, so the key is never sent as another actor\'s bearer token, cookie or header', async t => {
+test('no other actor may name a header actor\'s variable, so the key is never sent as another actor\'s bearer token, cookie or header', async t => {
   const app = await keyApp(t), base = keyProfile(app.origin);
   const withOther = other => ({ ...base, actors: { ...base.actors, other: { principalId: 'other-1', ...other } } });
-  // The review's probe W: a bearer actor, and a cookie actor, on the X-Api-Key actor's variable were accepted, and the key went out as Authorization: Bearer.
+  // A bearer actor, and a cookie actor, on the X-Api-Key actor's variable were accepted, and the key went out as Authorization: Bearer.
   for (const [name, other] of [['bearer', { credentialEnv: 'SCOPEHAVEN_TARGET_API_KEY' }], ['cookie', { credentialEnv: 'SCOPEHAVEN_TARGET_API_KEY', credentialCookie: 'session' }],
     ['another header', { credentialEnv: 'SCOPEHAVEN_TARGET_API_KEY', credentialHeader: 'x-other-key' }], ['the same header', { credentialEnv: 'SCOPEHAVEN_TARGET_API_KEY', credentialHeader: 'x-api-key' }]]) {
     assert.throws(() => valid(withOther(other)), /"credentialEnv" names another actor's header key variable/, name);
@@ -182,7 +182,7 @@ test('cross probes with mixed credential modes send each credential the way its 
   assert.deepEqual(run.identityEvidence.actors.map(a => [a.actorId, a.reason]).sort(), [['admin', 'established'], ['member', 'established']]);
 });
 
-test('H1 step 4 on the reviewed #451: a header-key target goes through the same record and window checks: refused before any request, no request after validUntil, nothing saved', async t => {
+test('a header-key target goes through the same record and window checks: refused before any request, no request after validUntil, nothing saved', async t => {
   // The key app, slow: it holds each response until hold(at) says and records when each connection arrived (real clock);
   // onConnect, when set, runs once at the next connection.
   let holdUntil = 0, onConnect = null;

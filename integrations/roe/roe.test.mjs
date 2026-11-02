@@ -1,4 +1,4 @@
-// CMP-ROE-01: the authorization record. A loopback notes app (counting every request it
+// The authorization record. A loopback notes app (counting every request it
 // receives) and the owned synthetic fixture; no network beyond 127.0.0.1, no model, provider or
 // customer system. The record is checked before any request and never changes a verdict.
 import test from 'node:test';
@@ -70,7 +70,7 @@ test('every field is checked, each for its own reason, and a refusal never echoe
     ['another schema', r => { r.schema = 'scopehaven-authorization/2'; }, /"schema" must be/],
     ['an id with spaces', r => { r.id = 'acme notes'; }, /"id" must be/],
     ['no target application', r => { delete r.target.applicationId; }, /"target" is missing "applicationId"/],
-    // A host name is an endpoint only as a remote target's https origin (H1 step 3), written as its origin.
+    // A host name is an endpoint only as a remote target's https origin, written as its origin.
     ['a plain http hostname origin', r => { r.origins = ['http://staging.acme.example']; }, /lists 1-16 distinct endpoints/],
     ['an https origin with a path', r => { r.origins = ['https://staging.acme.example/app']; }, /lists 1-16 distinct endpoints/],
     ['an https origin not written as its origin', r => { r.origins = ['https://Staging.acme.example:443']; }, /lists 1-16 distinct endpoints/],
@@ -171,7 +171,7 @@ test('the record never changes a verdict: the same run with and without it diffe
     validateHttpRunEvidence(authorized, { expectedSuite });
     assert.deepEqual(authorized.authorization, { schema: AUTHORIZATION_SCHEMA, id: 'acme-notes-staging-2026-10', sha256: covering(app.origin).sha256 });
     assert.equal(Object.hasOwn(plain, 'authorization'), false);
-    // Round 2 (L8): every field a verdict, its scope or its identity rests on, not only a few.
+    // Every field a verdict, its scope or its identity rests on, not only a few.
     for (const key of ['profileHash', 'suiteHash', 'evaluatorHash', 'targetConfigHash', 'counts', 'checksTotal', 'limitations', 'scopeLabel', 'evidenceOrigin', 'targetId', 'buildLabel', 'applicationId'])
       assert.deepEqual(authorized[key], plain[key], `${mode} ${key}`);
     assert.deepEqual(Object.keys(authorized).filter(k => k !== 'authorization').sort(), Object.keys(plain).sort(), 'no other field added or dropped');
@@ -189,8 +189,7 @@ test('built-in fixture targets need no record and run unchanged; every configure
   assert.equal(repaired.counts.fail, 0);
 });
 
-// Round 2 (review ROE-REVIEW-2026-10-07).
-test('round 2 F3: every endpoint the run contacts is in the record, observers included; an unknown observer type is refused', async t => {
+test('every endpoint the run contacts is in the record, observers included; an unknown observer type is refused', async t => {
   const { profile, origin } = await notesApp(t);
   const withObservers = observers => ({ ...profile, observers });
   const audit = { id: 'audit', type: 'http-audit', origin: 'http://127.0.0.1:4555', path: '/audit' };
@@ -202,28 +201,28 @@ test('round 2 F3: every endpoint the run contacts is in the record, observers in
   // Observers that contact nothing (a local file, a loopback sink the app reaches) need no entry.
   checkAuthorization(covering(origin), withObservers([{ id: 'log', type: 'sqlite-audit', path: '/tmp/x.db' }, { id: 'out', type: 'egress-recorder', port: 18089 }]), { now: NOW });
   refused(() => checkAuthorization(covering(origin), withObservers([{ id: 'x', type: 'vendor-api' }]), { now: NOW }), 'authorization-origin', /does not know/);
-  // A trailing slash on the target origin is the same origin (L6), and no message echoes an endpoint.
+  // A trailing slash on the target origin is the same origin, and no message echoes an endpoint.
   checkAuthorization(covering(origin), { ...profile, origin: `${origin}/` }, { now: NOW });
   assert.throws(() => checkAuthorization(covering(origin), withObservers([audit]), { now: NOW }), error => !error.message.includes('4555'));
 });
 
-test('round 2 F4: every credentialed actor is covered by its principal, whatever its credential or use; origins match exactly (M01-M04, M11)', async t => {
+test('every credentialed actor is covered by its principal, whatever its credential or use; origins match exactly', async t => {
   const { profile, origin } = await notesApp(t);
   const ok = covering(origin);
   const actors = extra => ({ ...profile, actors: { ...profile.actors, ...extra } });
   for (const [name, extra] of [
-    ['M01 a second bearer actor', { admin: { principalId: 'admin-1', credentialEnv: 'SCOPEHAVEN_TARGET_ADMIN', identityValue: 'admin-1' } }],
-    ['M02 a cookie actor', { owner: { principalId: 'owner-1', credentialEnv: 'SCOPEHAVEN_TARGET_OWNER', credentialCookie: 'session', identityValue: 'owner-1' } }],
-    ['M11 an actor no check uses', { spare: { principalId: 'spare-1', credentialEnv: 'SCOPEHAVEN_TARGET_SPARE' } }],
+    ['a second bearer actor', { admin: { principalId: 'admin-1', credentialEnv: 'SCOPEHAVEN_TARGET_ADMIN', identityValue: 'admin-1' } }],
+    ['a cookie actor', { owner: { principalId: 'owner-1', credentialEnv: 'SCOPEHAVEN_TARGET_OWNER', credentialCookie: 'session', identityValue: 'owner-1' } }],
+    ['an actor no check uses', { spare: { principalId: 'spare-1', credentialEnv: 'SCOPEHAVEN_TARGET_SPARE' } }],
   ]) assert.throws(() => checkAuthorization(ok, actors(extra), { now: NOW }), error => error.code === 'authorization-identity' && /1 test account is not covered/.test(error.message), name);
-  // M03: coverage is by principalId, never by the value the login proof expects.
+  // Coverage is by principalId, never by the value the login proof expects.
   const shifted = { ...profile, actors: { ...profile.actors, member: { ...profile.actors.member, principalId: 'member-1-alt', identityValue: 'member-1' } } };
   refused(() => checkAuthorization(ok, shifted, { now: NOW }), 'authorization-identity');
-  // M04: an origin matches exactly, never by prefix (:580 does not cover :5800).
+  // An origin matches exactly, never by prefix (:580 does not cover :5800).
   refused(() => checkAuthorization(record(r => { r.origins = [origin.slice(0, -1)]; }), profile, { now: NOW }), 'authorization-origin');
 });
 
-test('round 2 L2, L3: an unknown or missing kind needs a record; dates are real calendar instants in a bounded window', () => {
+test('an unknown or missing kind needs a record; dates are real calendar instants in a bounded window', () => {
   for (const entry of [undefined, null, {}, { kind: 'vendor-adapter' }, { kind: 'http-contract' }]) assert.equal(needsAuthorization(entry), true, JSON.stringify(entry));
   for (const kind of BUILT_IN_KINDS) assert.equal(needsAuthorization({ kind }), false, kind);
   for (const [name, edit, pattern] of [
@@ -238,7 +237,7 @@ test('round 2 L2, L3: an unknown or missing kind needs a record; dates are real 
   validateAuthorization(record(r => { r.validFrom = '2026-10-07T00:00Z'; r.validUntil = '2026-10-14T00:00:00.500Z'; }));
 });
 
-test('round 2 advisory: the record file is a regular file, never a symlink, at most 256 KiB, and JSON', async t => {
+test('the record file is a regular file, never a symlink, at most 256 KiB, and JSON', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven roe ')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const good = join(dir, 'record.json'); writeFileSync(good, JSON.stringify(EXAMPLE));
   assert.deepEqual(await readAuthorizationFile(good), EXAMPLE);
@@ -255,8 +254,7 @@ test('round 2 advisory: the record file is a regular file, never a symlink, at m
   for (const path of [link, big, overLimit, huge, text, join(dir, 'missing.json'), dir]) await assert.rejects(readAuthorizationFile(path), error => error.code === 'authorization-invalid' && !error.message.includes(dir), path);
 });
 
-// Round 3 (review ROE-R2-REVIEW-2026-10-07).
-test('round 3 F6: a MySQL snapshot\'s endpoint must be in the record, as a Postgres one must', async t => {
+test('a MySQL snapshot\'s endpoint must be in the record, as a Postgres one must', async t => {
   const { profile, origin } = await notesApp(t);
   const mysql = { id: 'db', type: 'mysql-snapshot', host: '127.0.0.1', port: 3306, database: 'app', credentialEnv: 'SCOPEHAVEN_TARGET_MYSQL', tables: [{ table: 'notes', key: 'id' }] };
   const withMysql = { ...profile, observers: [mysql] };
@@ -266,7 +264,7 @@ test('round 3 F6: a MySQL snapshot\'s endpoint must be in the record, as a Postg
   checkAuthorization(record(r => { r.origins = [origin, 'tcp://127.0.0.1:3306']; }), withMysql, { now: NOW });
 });
 
-test('round 3 L9: a FIFO at the record path is refused at once, never waited on', async t => {
+test('a FIFO at the record path is refused at once, never waited on', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven roe fifo ')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const fifo = join(dir, 'record.json'); execFileSync('mkfifo', [fifo]);
   const outcome = await Promise.race([readAuthorizationFile(fifo).then(() => 'read', error => error.code), new Promise(resolve => setTimeout(() => resolve('blocked'), 2000))]);
@@ -275,7 +273,7 @@ test('round 3 L9: a FIFO at the record path is refused at once, never waited on'
   assert.equal(outcome, 'authorization-invalid');
 });
 
-test('round 3 L1: the check and the run see one copy of the profile, read once', async t => {
+test('the check and the run see one copy of the profile, read once', async t => {
   const { profile, origin } = await notesApp(t);
   let reads = 0;
   const shifting = { ...profile };
@@ -286,21 +284,21 @@ test('round 3 L1: the check and the run see one copy of the profile, read once',
   assert.equal(reads, 1, 'the accessor is read once');
   assert.equal(seen, origin, 'the run gets the origin the check covered');
   assert.equal(result.authorization.id, covering(origin).id);
-  // A nested accessor too: an observer's port read once, and the run gets the port the check covered (pre-push review F1).
+  // A nested accessor too: an observer's port read once, and the run gets the port the check covered.
   let portReads = 0;
   const observer = { id: 'db', type: 'pg-snapshot', host: '127.0.0.1', database: 'app', credentialEnv: 'SCOPEHAVEN_TARGET_PG', tables: [{ table: 'notes', key: 'id' }] };
   Object.defineProperty(observer, 'port', { enumerable: true, get: () => (portReads++ ? 6543 : 5432) });
   let seenPort = null;
   await runAuthorized({ ...profile, observers: [observer] }, { record: record(r => { r.origins = [origin, 'tcp://127.0.0.1:5432']; }), env: {}, now: NOW, run: async given => { seenPort = given.observers[0].port; return { counts: {} }; } });
   assert.deepEqual([portReads, seenPort], [1, 5432]);
-  // A profile that is not plain data is refused under its own code, and nothing runs (pre-push review F2).
+  // A profile that is not plain data is refused under its own code, and nothing runs.
   let ran = false;
   await assert.rejects(runAuthorized({ ...profile, hook: () => 1 }, { record: covering(origin), env: {}, now: NOW, run: async () => { ran = true; return {}; } }),
     error => error instanceof AuthorizationError && error.code === 'authorization-profile');
   assert.equal(ran, false);
 });
 
-test('round 3 L11: the boundaries hold exactly (366 days, signedAt before the end, tcp and http only, a slashed audit origin)', async t => {
+test('the boundaries hold exactly (366 days, signedAt before the end, tcp and http only, a slashed audit origin)', async t => {
   validateAuthorization(record(r => { r.validFrom = '2026-10-07T00:00:00Z'; r.validUntil = '2027-10-08T00:00:00Z'; }));
   assert.throws(() => validateAuthorization(record(r => { r.validFrom = '2026-10-07T00:00:00Z'; r.validUntil = '2027-10-08T00:00:01Z'; })), /at most 366 days/);
   assert.throws(() => validateAuthorization(record(r => { r.signedAt = r.validUntil; })), /"signedAt" must be before "validUntil"/);

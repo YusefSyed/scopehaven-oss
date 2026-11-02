@@ -1,4 +1,4 @@
-// Egress recorder correlation (fast-loop fix W2; src/egress-rules.mjs, integrations/observers/egress-recorder.mjs):
+// Egress recorder correlation (src/egress-rules.mjs, integrations/observers/egress-recorder.mjs):
 // a destination that declares the run's correlation header records the token one well-formed value carries in
 // event.correlation.settlementToken, and nothing else. Every request goes to 127.0.0.1; destination hosts are names only.
 import test from 'node:test';
@@ -37,7 +37,7 @@ async function window(o, sends) {
   return collectWindow(o, from, await o.mark());
 }
 
-test('W2 header rules: the connector value, the parsed token and the accepted names', () => {
+test('header rules: the connector value, the parsed token and the accepted names', () => {
   assert.equal(correlationToken(ID), TOKEN);
   assert.equal(correlationToken(ID.toUpperCase()), TOKEN);
   assert.equal(correlationToken('00000000-0000-0000-0000-000000000000'), null);
@@ -49,7 +49,7 @@ test('W2 header rules: the connector value, the parsed token and the accepted na
   for (const values of [[], [`00-${TOKEN}-a1b2c3d4e5f60718-01`, `00-${TOKEN}-a1b2c3d4e5f60718-01`], [`00-${TOKEN.toUpperCase()}-a1b2c3d4e5f60718-01`], [`01-${TOKEN}-a1b2c3d4e5f60718-01`],
     [`00-${'0'.repeat(32)}-a1b2c3d4e5f60718-01`], [`00-${TOKEN}-0000000000000000-01`], [`00-${TOKEN}-a1b2c3d4e5f60718`], ['garbage']]) assert.equal(correlationTokenOf('traceparent', values), null, JSON.stringify(values));
   assert.equal(correlationTokenOf('x-request-id', [ID]), TOKEN, 'the exact value the connector sent');
-  // Lead direction of 2026-10-10: normalization never creates a match, so a re-cased custom value carries no token.
+  // Normalization never creates a match, so a re-cased custom value carries no token.
   for (const values of [['not-a-uuid'], [TOKEN], [ID, ID], [ID.toUpperCase()], [`${ID.slice(0, 8).toUpperCase()}${ID.slice(8)}`], [` ${ID}`]]) assert.equal(correlationTokenOf('x-request-id', values), null, JSON.stringify(values));
   assert.ok(['traceparent', 'x-request-id', 'x-correlation-id'].every(correlationHeaderValid));
   assert.ok(!['tracestate', 'authorization', 'x-scopehaven', 'X-Request-Id', 'x-'].some(correlationHeaderValid));
@@ -61,7 +61,7 @@ test('W2 header rules: the connector value, the parsed token and the accepted na
   assert.deepEqual(correlationRecorded([{ id: 'sink', type: 'egress-recorder', ...config('traceparent') }, { id: 'mail', type: 'smtp-sink' }]), [{ observer: 'sink', names: [PAY] }]);
 });
 
-test('W2 recorder: one well-formed header gives the token; a duplicate, malformed, all-zero or uppercase value, an undeclared destination and the witness give none', async t => {
+test('recorder: one well-formed header gives the token; a duplicate, malformed, all-zero or uppercase value, an undeclared destination and the witness give none', async t => {
   const o = await recorder(t, 'traceparent');
   const w = await window(o, [
     [`http://${PAY}/v1/charges`, { traceparent: `00-${TOKEN}-a1b2c3d4e5f60718-01` }],
@@ -77,7 +77,7 @@ test('W2 recorder: one well-formed header gives the token; a duplicate, malforme
   assert.ok(w.events.every(e => e.name !== WITNESS), 'the witness is never an effect, so never tagged');
 });
 
-test('W2 recorder: a custom header carries the exact lowercase UUID; any letter case of the name is read once, a re-cased value is not', async t => {
+test('recorder: a custom header carries the exact lowercase UUID; any letter case of the name is read once, a re-cased value is not', async t => {
   const o = await recorder(t, 'x-request-id');
   const w = await window(o, [
     [`http://${PAY}/v1/charges`, { 'X-Request-ID': ID }],
@@ -88,11 +88,11 @@ test('W2 recorder: a custom header carries the exact lowercase UUID; any letter 
   assert.deepEqual(w.events.map(e => e.correlation.settlementToken ?? null), [TOKEN, null, null, null]);
 });
 
-// Review round 4 (lead direction of 2026-10-10: never pass or fail on the application's own self-written token alone).
+// Never pass or fail on the application's own self-written token alone.
 // APP is a well-formed trace id the application chose (never a connector token), derived from ID so no key-like literal sits here.
 const APP = [...TOKEN].reverse().join('');
 const scoped = w => ({ source: 'http-egress', instanceId: 'egress-recorder-sink', scope: { operations: ['send'], names: [PAY, HOOK], actorAttribution: 'none', evidence: 'authoritative' }, ...w });
-test('W2 round 4 forbidden: an app-chosen value is recorded only as settlementToken; a traceId selector never reads it, so it neither passes nor fails a clause', async t => {
+test('forbidden: an app-chosen value is recorded only as settlementToken; a traceId selector never reads it, so it neither passes nor fails a clause', async t => {
   // The format check cannot tell the connector's token from the app's own value: both are recorded (stated in the docs).
   assert.equal(correlationTokenOf('traceparent', [`00-${APP}-1111111111111111-01`]), APP);
   const o = await recorder(t, 'traceparent');
@@ -109,7 +109,7 @@ test('W2 round 4 forbidden: an app-chosen value is recorded only as settlementTo
   // Allowed, adjacent: the unpinned selector still matches the committed send in both windows.
   for (const w of [forged, bare]) assert.equal(evaluateEffectAssertion({ kind: 'effect.exists', select: { source: 'http-egress', operation: 'send', name: PAY } }, [w]).verdict, 'pass');
 });
-test('W2 round 4: settlementToken lives only on http-egress events, and an http-egress event never carries a traceId', () => {
+test('settlementToken lives only on http-egress events, and an http-egress event never carries a traceId', () => {
   const observer = { kind: 'http-egress-recorder', instanceId: 'egress-recorder-sink' };
   const egress = correlation => makeEffect({ source: 'http-egress', observer, seq: 1, operation: 'send', name: PAY, outcome: 'committed', correlation });
   const otel = correlation => makeEffect({ source: 'otel-genai', observer: { kind: 'otel', instanceId: 'otel-1' }, seq: 1, operation: 'send', name: PAY, outcome: 'committed', correlation });

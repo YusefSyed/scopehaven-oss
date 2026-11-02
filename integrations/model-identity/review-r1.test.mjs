@@ -1,5 +1,5 @@
-// Regression tests for the W6 adversarial review, round 1 (review record, not in this repository).
-// Each test names the finding it pins. They were written to fail on the reviewed code first.
+// Regression tests from an earlier adversarial review. Each test pins one finding, and each was written to fail on
+// the reviewed code first.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, request } from 'node:http';
@@ -60,7 +60,7 @@ const ident = (served, extra = {}) => ({ state: 'observed', tapSession: extra.ta
   models: [{ served, requested: [served], fingerprints: extra.fingerprints ?? [], weightsDigest: extra.weightsDigest ?? null, strength: extra.weightsDigest ? 'weights-digest' : extra.fingerprints?.length ? 'vendor-fingerprint' : 'vendor-model-string' }] });
 const cmp = rows => ({ compatible: true, controlsPass: true, reasons: [], baselineId: 'b', candidateId: 'c', restorationLabel: 'Core label', rows: rows.map(([id, before, after, transition]) => ({ id, title: id, before, after, transition })) });
 
-test('F15: two windows of one tap session are never compared as two runs', async t => {
+test('two windows of one tap session are never compared as two runs', async t => {
   const origin = await upstream(t, ollama());
   const { tap, path } = await startTap(t, origin);
   const m0 = await tap.mark(); await send(tap.url, '/api/chat', chat('q')); const m1 = await tap.mark(); await send(tap.url, '/api/chat', chat('q')); const m2 = await tap.mark();
@@ -95,7 +95,7 @@ test('F15: two windows of one tap session are never compared as two runs', async
   assert.equal(JSON.parse(out.text).controlsPass, false);
 });
 
-test('F1: a different upstream is a model change unless the weights match', () => {
+test('a different upstream is a model change unless the weights match', () => {
   const a = ident('q', { upstream: 'http://127.0.0.1:1' }), b = ident('q', { upstream: 'http://127.0.0.1:2' });
   const r = compareModelIdentities(a, b);
   assert.equal(r.relation, 'different'); assert.deepEqual(r.changes[0], { kind: 'upstream', before: 'http://127.0.0.1:1', after: 'http://127.0.0.1:2' });
@@ -103,7 +103,7 @@ test('F1: a different upstream is a model change unless the weights match', () =
   assert.equal(same.relation, 'same'); assert.equal(same.strength, 'weights-digest');
 });
 
-test('F2: a model list that was asked for and failed makes the window partial', async t => {
+test('a model list that was asked for and failed makes the window partial', async t => {
   const origin = await upstream(t, (req, res, body) => req.url === '/api/tags' ? json(res, 500, { error: 'boom' }) : ollama()(req, res, body));
   const { tap, path } = await startTap(t, origin);
   await send(tap.url, '/api/chat', chat('q')); await tap.stop();
@@ -117,18 +117,18 @@ test('F2: a model list that was asked for and failed makes the window partial', 
   assert.equal(declared.state, 'observed'); assert.equal(declared.strength, 'vendor-model-string');
 });
 
-test('F2: same name and vendor reading only: the app is credited, with the weakness stated', () => {
+test('same name and vendor reading only: the app is credited, with the weakness stated', () => {
   const r = attributeComparison(cmp([['x', 'fail', 'pass', 'contract-restored']]), { baselineIdentity: ident('q'), candidateIdentity: ident('q'), app: { changed: true, basis: 't', evidence: 'build-hash' } });
   assert.equal(r.flipCause, 'app'); assert.ok(r.caveats.some(c => /weights not verified/.test(c)));
 });
 
-test('F17: mixed whole-window identities are never compared as sets', () => {
+test('mixed whole-window identities are never compared as sets', () => {
   const mixed = (a, b) => ({ state: 'mixed', tapSession: `s-${a}${b}`, upstream: 'u', window: { from: 0, to: null }, models: [{ served: 'q', calls: a, requested: ['q'], fingerprints: [], weightsDigest: DIGEST.q, strength: 'weights-digest' }, { served: 'g', calls: b, requested: ['g'], fingerprints: [], weightsDigest: DIGEST.g, strength: 'weights-digest' }] });
   const r = compareModelIdentities(mixed(9, 1), mixed(1, 9));
   assert.equal(r.relation, 'unverifiable'); assert.ok(r.reasons.includes('mixed-models'));
 });
 
-test('F14: Ollama aliases with one weights digest are one model', () => {
+test('Ollama aliases with one weights digest are one model', () => {
   const r = compareModelIdentities(ident('x', { weightsDigest: DIGEST.q }), ident('x:latest', { weightsDigest: DIGEST.q }));
   assert.equal(r.relation, 'same'); assert.equal(r.strength, 'weights-digest');
   assert.equal(compareModelIdentities(ident('x', { weightsDigest: DIGEST.q }), ident('x:latest', { weightsDigest: DIGEST.g })).relation, 'silent-change');
@@ -139,7 +139,7 @@ test('fingerprints are compared as whole sets', () => {
   assert.equal(r.relation, 'silent-change');
 });
 
-test('F8: an explicit window that runs past the end of the log is partial', async t => {
+test('an explicit window that runs past the end of the log is partial', async t => {
   const origin = await upstream(t, ollama());
   const { tap, path, dir } = await startTap(t, origin);
   const m0 = await tap.mark(); await send(tap.url, '/api/chat', chat('q')); const m1 = await tap.mark(); await send(tap.url, '/api/chat', chat('g')); const m2 = await tap.mark();
@@ -151,7 +151,7 @@ test('F8: an explicit window that runs past the end of the log is partial', asyn
   assert.ok(modelIdentity(readTapLog(path), { from: 9999, to: 10000 }).reasons.includes('window-start-missing'));
 });
 
-test('F9: a call that started before the window and answered inside it is visible', async t => {
+test('a call that started before the window and answered inside it is visible', async t => {
   const origin = await upstream(t, (req, res, body) => {
     if (req.url === '/api/tags') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(tags([['a:latest', DIGEST.q], ['b:latest', DIGEST.g]])); }
     const j = JSON.parse(body.toString());
@@ -168,7 +168,7 @@ test('F9: a call that started before the window and answered inside it is visibl
   assert.equal(id.state, 'partial'); assert.ok(id.reasons.includes('call-started-before-window'), String(id.reasons));
 });
 
-test('F3: a window in which no model was identified is never observed', async t => {
+test('a window in which no model was identified is never observed', async t => {
   const origin = await upstream(t, (req, res) => {
     if (req.url === '/api/tags') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(tags([])); }
     if (req.headers['x-case'] === 'sse-typed-json') { res.writeHead(200, { 'content-type': 'text/event-stream' }); return res.end(JSON.stringify({ model: 'real', choices: [] })); }
@@ -191,7 +191,7 @@ test('F3: a window in which no model was identified is never observed', async t 
   }
 });
 
-test('F5: blocked-by-controls is a flip, never a repair credited to the app', () => {
+test('blocked-by-controls is a flip, never a repair credited to the app', () => {
   const r = attributeComparison({ ...cmp([['x', 'fail', 'pass', 'blocked-by-controls']]), controlsPass: false }, { baselineIdentity: ident('q', { weightsDigest: DIGEST.q }), candidateIdentity: ident('q', { weightsDigest: DIGEST.q, tapSession: 'other' }), app: { changed: true, basis: 't', evidence: 'build-hash' } });
   assert.equal(r.repairCreditedToApp, false); assert.equal(r.rows[0].attribution, 'app');
   const app = { changed: true, basis: 't', evidence: 'build-hash' };
@@ -203,7 +203,7 @@ test('F5: blocked-by-controls is a flip, never a repair credited to the app', ()
   assert.equal(local.rows[0].attribution, 'model'); assert.equal(local.repairCreditedToApp, false); assert.match(local.restorationLabel, /^Not attributable/);
 });
 
-test('F6: an unverified row that moved is attributed, and any flip not credited to the app replaces the label', () => {
+test('an unverified row that moved is attributed, and any flip not credited to the app replaces the label', () => {
   const r = attributeComparison(cmp([['x', 'pass', 'fail', 'unverified'], ['y', 'pass', 'fail', 'regression']]), { baselineIdentity: ident('q'), candidateIdentity: ident('g'), app: { changed: false, basis: 't', evidence: 'build-hash' } });
   assert.equal(r.rows[0].attribution, 'model'); assert.equal(r.rows[1].attribution, 'model');
   assert.match(r.restorationLabel, /^Not attributable to the application/);
@@ -211,7 +211,7 @@ test('F6: an unverified row that moved is attributed, and any flip not credited 
   assert.equal(still.rows[0].attribution, 'no-change'); assert.equal(still.restorationLabel, 'Core label');
 });
 
-test('F7: null build fields are unknown, and a label alone never lets the model take the blame', () => {
+test('null build fields are unknown, and a label alone never lets the model take the blame', () => {
   assert.equal(appChangedBetween({ targetBuildHash: null }, { targetBuildHash: null }).changed, true);
   assert.equal(appChangedBetween({ targetBuildHash: null, targetConfigHash: null, build: null }, { targetBuildHash: null, targetConfigHash: null, build: null }).evidence, 'unknown');
   const label = appChangedBetween({ targetBuildHash: null, targetConfigHash: 'h', build: 'lab-v1' }, { targetBuildHash: null, targetConfigHash: 'h', build: 'lab-v1' });
@@ -224,7 +224,7 @@ test('F7: null build fields are unknown, and a label alone never lets the model 
   assert.equal(attributeComparison(rows, { baselineIdentity: ident('q'), candidateIdentity: ident('g'), app: { changed: false, basis: 'x' } }).flipCause, 'confounded');
 });
 
-test('F11: a log that can no longer be written never takes the tap down', async t => {
+test('a log that can no longer be written never takes the tap down', async t => {
   const origin = await upstream(t, ollama());
   const { tap, path } = await startTap(t, origin);
   await send(tap.url, '/api/chat', chat('q'));
@@ -240,7 +240,7 @@ test('F11: a log that can no longer be written never takes the tap down', async 
   assert.ok(modelIdentity(tap.log.frames).reasons.includes('log-write-failed'));
 });
 
-test('F11: the CLI tap exits 2 when its log could not be written', async t => {
+test('the CLI tap exits 2 when its log could not be written', async t => {
   const origin = await upstream(t, ollama('gemma4', [['gemma4:latest', DIGEST.g]]));
   const dir = await mkdtemp(join(tmpdir(), 'w6 r1 efbig ')); t.after(() => rm(dir, { recursive: true, force: true }));
   const log = join(dir, 'tap.jsonl'), cli = new URL('./cli.mjs', import.meta.url);
@@ -255,7 +255,7 @@ test('F11: the CLI tap exits 2 when its log could not be written', async t => {
   assert.equal(await exited, 2); assert.match(stderr, /could not be written/);
 });
 
-test('F4: a stream the request asked for is never held, whatever its content type', async t => {
+test('a stream the request asked for is never held, whatever its content type', async t => {
   const origin = await upstream(t, (req, res) => {
     if (req.url === '/api/tags') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(tags([])); }
     res.writeHead(200, { 'content-type': 'application/json' });
@@ -268,7 +268,7 @@ test('F4: a stream the request asked for is never held, whatever its content typ
   assert.ok(held.firstByteMs >= 350, `non-stream first byte after ${held.firstByteMs} ms`);
 });
 
-test('F12: duplicate headers and trailers pass through', async t => {
+test('duplicate headers and trailers pass through', async t => {
   const origin = await upstream(t, (req, res) => {
     if (req.url === '/api/tags') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(tags([])); }
     res.writeHead(200, [['content-type', 'application/json'], ['x-dup', 'one'], ['x-dup', 'two'], ['trailer', 'x-done']].flat());
@@ -280,7 +280,7 @@ test('F12: duplicate headers and trailers pass through', async t => {
   assert.deepEqual(dups, ['one', 'two']); assert.equal(r.trailers['x-done'], 'yes');
 });
 
-test('F13: multibyte names split across chunks and a leading BOM are read correctly', () => {
+test('multibyte names split across chunks and a leading BOM are read correctly', () => {
   const r = createResponseReader('openai-chat', 'text/event-stream');
   const bytes = Buffer.from(`data: ${JSON.stringify({ model: 'modèle-1' })}\n\n`);
   const cut = bytes.indexOf(Buffer.from('è')) + 1;
@@ -291,7 +291,7 @@ test('F13: multibyte names split across chunks and a leading BOM are read correc
   const out = bom.end(); assert.deepEqual(out.served, ['b']); assert.equal(out.unparsable, 0);
 });
 
-test('F16: a model list that trickles is cut off at the deadline', async t => {
+test('a model list that trickles is cut off at the deadline', async t => {
   const origin = await upstream(t, (req, res) => {
     if (req.url === '/api/tags') { res.writeHead(200, { 'content-type': 'application/json' }); const timer = setInterval(() => { if (!res.destroyed) res.write(' '); }, 100); res.on('close', () => clearInterval(timer)); return; }
     json(res, 200, { model: 'x' });
@@ -304,7 +304,7 @@ test('F16: a model list that trickles is cut off at the deadline', async t => {
   assert.equal(readTapLog(join(dir, 'tap.jsonl')).find(f => f.kind === 'models').reason, 'tags-timeout');
 });
 
-test('F18: a redirect from the model server is a gap', async t => {
+test('a redirect from the model server is a gap', async t => {
   const origin = await upstream(t, (req, res) => {
     if (req.url === '/api/tags') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(tags([])); }
     json(res, 307, { model: 'x' }, { location: 'http://127.0.0.1:9/v1/chat/completions' });

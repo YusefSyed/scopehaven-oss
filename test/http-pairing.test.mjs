@@ -80,7 +80,7 @@ test('pairing (pure): a pin is shown by a twin on the same selector but the acto
   assert.deepEqual(unpairedSelectors(profile({ select: sel({ actor: 'member-l', resource: 'POST /notes/n1/edit' }) })).map(u => [u.checkId, u.effect, u.pin]), [['MEMBER-EDIT', 1, 'actor']]);
   assert.deepEqual(unpairedSelectors(profile({ select: sel({ actor: 'member-1', resource: 'POST /notes/n9/edit' }) })).map(u => [u.checkId, u.effect, u.pin]), [['MEMBER-EDIT', 1, 'resource']]);
   assert.deepEqual(unpairedSelectors(profile({ select: sel({}) })), [], 'a selector the observer\'s vocabulary covers needs no twin');
-  // allowed-use-not-declared is the allowed-use guard's reason (FIX-07, test/allowed-use-guard.test.mjs).
+  // allowed-use-not-declared is the allowed-use guard's reason (test/allowed-use-guard.test.mjs).
   assert.deepEqual(PAIRING_REASONS, ['selector-unpaired', 'selector-not-shown-to-match', 'allowed-use-not-declared']);
   for (const reason of PAIRING_REASONS) assert.match(PAIRING_BASIS[reason], new RegExp(reason));
   // applyPairing withholds a boundary pass only; a fail, an inconclusive and a control's clause are left as decided.
@@ -195,10 +195,10 @@ test('a resource the deciding observer declares for the selector\'s name needs n
   validateTargetFile({ schemaVersion: 1, targets: [p] });
 });
 
-// Decision 2 (DECISIONS-2026-10-09) and review finding B-M2: the vocabulary vouches a resource only for the exact name that lists
+// Vocabulary vouching: the vocabulary vouches a resource only for the exact name that lists
 // it, and only while the deciding window is closed for the selector: every committed effect in it with the selector's source,
 // operation and name carries a resource from that name's vocabulary. Otherwise the pin needs a twin as usual.
-test('Decision 2 (B-M2): a class vouches only for the name whose vocabulary lists it, and only in a window whose effects of that name all carry a listed class', async () => {
+test('vocabulary vouching: a class vouches only for the name whose vocabulary lists it, and only in a window whose effects of that name all carry a listed class', async () => {
   const names = [HOST, OTHER];
   // A selector naming another declared name with a class that only HOST's vocabulary lists can never match: it needs a twin.
   const offName = profile({ select: sel({ name: OTHER, resource: 'refund new-destination' }), controls: ['OWNER-EDIT'] });
@@ -217,7 +217,7 @@ test('Decision 2 (B-M2): a class vouches only for the name whose vocabulary list
   for (const [why, events] of [['a listed class', [{ resource: 'refund original-method' }]], ['another name', [{ name: OTHER, resource: 'GET *' }]], ['not committed', [{ resource: 'GET *', outcome: 'denied' }]]]) {
     assert.equal(clause(await assess(p, [[OWNER_EDIT], events], { names, resources: { [HOST]: VOCAB } }), 'MEMBER-EDIT').verdict, 'pass', why);
   }
-  // Pure, as the review states it: one window reporting two names, with the vocabulary declared for one of them.
+  // Pure: one window reporting two names, with the vocabulary declared for one of them.
   const PAY = 'api.payments.test', HOOK = 'hooks.chat.test';
   const w = { source: 'http-egress', instanceId: GATE, scope: { operations: ['send'], names: [PAY, HOOK], actorAttribution: 'none', evidence: 'authoritative', resources: { [PAY]: VOCAB } }, coverage: 'complete', reason: null, events: [] };
   const absence = name => ({ kind: 'effect.none', select: { source: 'http-egress', operation: 'send', name, resource: 'refund new-destination' }, verdict: 'pass', basis: 'b' });
@@ -226,10 +226,10 @@ test('Decision 2 (B-M2): a class vouches only for the name whose vocabulary list
   assert.deepEqual([finding(PAY), finding(HOOK), finding(PAY, unclassified)], [null, 'selector-unpaired', 'selector-unpaired']);
 });
 
-// Round-1 verification of Decision 2: the closure also binds a selector that leaves out its operation or its source. Every committed
+// Vocabulary vouching: the closure also binds a selector that leaves out its operation or its source. Every committed
 // effect of the name (and of the selector's source and operation, when it gives them) must carry a listed class; a selector that gives
-// neither is closed over every committed effect of the name. The narrowing the decision specifies is pinned too.
-test('Decision 2 (closure): a selector without an operation or a source is vouched for only while every committed effect of its name carries a listed class', async () => {
+// neither is closed over every committed effect of the name. The narrowing is pinned too.
+test('vocabulary vouching (closure): a selector without an operation or a source is vouched for only while every committed effect of its name carries a listed class', async () => {
   for (const [why, select] of [['no operation', { source: 'http-egress', name: HOST, resource: 'refund new-destination' }], ['no source', { operation: 'send', name: HOST, resource: 'refund new-destination' }], ['neither', { name: HOST, resource: 'refund new-destination' }]]) {
     const p = profile({ select, controls: ['OWNER-EDIT'] });
     validateTargetFile({ schemaVersion: 1, targets: [p] });
@@ -244,7 +244,7 @@ test('Decision 2 (closure): a selector without an operation or a source is vouch
   }
   // The narrowing: an off-vocabulary effect of the name under another operation does not fit a selector that gives its operation,
   // so the window stays closed for it, and open for a selector that gives none. The observer reports both operations, so the
-  // insert is in its declared scope, and the evidence validator accepts both runs with the suite (round-2 verification).
+  // insert is in its declared scope, and the evidence validator accepts both runs with the suite.
   const offOperation = [[OWNER_EDIT], [{ operation: 'insert', resource: 'GET *' }]], both = { resources: { [HOST]: VOCAB }, operations: ['send', 'insert'] };
   const narrowed = profile({ select: sel({ resource: 'refund new-destination' }), controls: ['OWNER-EDIT'] }), narrowedRun = await assess(narrowed, offOperation, both);
   assert.deepEqual([row(narrowedRun, 'MEMBER-EDIT').status, clause(narrowedRun, 'MEMBER-EDIT').verdict, Object.hasOwn(clause(narrowedRun, 'MEMBER-EDIT'), 'pairing')], ['pass', 'pass', false]);
@@ -255,10 +255,10 @@ test('Decision 2 (closure): a selector without an operation or a source is vouch
   validateHttpRunEvidence(unnarrowedRun, { expectedSuite: suiteOf(unnarrowed) });
 });
 
-// Round-2 verification, V1: a resource the vocabulary vouches for excuses only the resource pin. An actor pin or a trace id pin on
+// A resource the vocabulary vouches for excuses only the resource pin. An actor pin or a trace id pin on
 // the same selector still needs its own twin; the only twin here is the owner's allowed edit, which shows neither (another principal,
 // and no trace id). Each reads selector-unpaired, and the validator, which shares pairingFindings, accepts the run with the suite.
-test('V1: a vouched resource never excuses an actor pin or a trace id pin that has no twin', async () => {
+test('a vouched resource never excuses an actor pin or a trace id pin that has no twin', async () => {
   for (const [why, extra, pin] of [['an own actor pin', { actor: 'member-1' }, 'actor'], ['a trace id pin', { traceId: 't-404' }, 'traceId'], ['both', { actor: 'member-1', traceId: 't-404' }, 'actor']]) {
     const p = profile({ select: sel({ resource: 'refund new-destination', ...extra }), controls: ['OWNER-EDIT'] });
     validateTargetFile({ schemaVersion: 1, targets: [p] });
@@ -272,9 +272,9 @@ test('V1: a vouched resource never excuses an actor pin or a trace id pin that h
   assert.equal(clause(await assess(alone, [[OWNER_EDIT], []], { resources: { [HOST]: VOCAB } }), 'MEMBER-EDIT').verdict, 'pass');
 });
 
-// Round-2 verification, V2: a committed effect of the name that carries no resource field is unclassified, so it breaks the closure
+// A committed effect of the name that carries no resource field is unclassified, so it breaks the closure
 // as an off-vocabulary class does, for every selector shape. The pin then needs a twin: selector-unpaired, accepted by the validator.
-test('V2: a committed effect of the name with no resource breaks vouching', async () => {
+test('a committed effect of the name with no resource breaks vouching', async () => {
   for (const [why, select] of [['source, operation and name', sel({ resource: 'refund new-destination' })], ['no operation', { source: 'http-egress', name: HOST, resource: 'refund new-destination' }], ['neither', { name: HOST, resource: 'refund new-destination' }]]) {
     const p = profile({ select, controls: ['OWNER-EDIT'] });
     const run = await assess(p, [[OWNER_EDIT], [{}]], { resources: { [HOST]: VOCAB } });
@@ -294,9 +294,9 @@ test('V2: a committed effect of the name with no resource breaks vouching', asyn
   assert.deepEqual([finding([]), finding([bare]), finding([keyless]), finding([{ ...bare, resource: 'payout' }])], [null, 'selector-unpaired', 'selector-unpaired', null]);
 });
 
-// Decision 1 (DECISIONS-2026-10-09): an actor-pin twin is the same principal and carries every key of the absence except its
+// An actor-pin twin is the same principal and carries every key of the absence except its
 // resource and trace id (source, operation, name) with the same value: attribution of this principal for this kind of effect.
-test('Decision 1: an actor pin is shown only by a twin of the same principal with the same source, operation and name; the shipped example profiles still pair', async () => {
+test('actor-pin twins: an actor pin is shown only by a twin of the same principal with the same source, operation and name; the shipped example profiles still pair', async () => {
   const principals = { member: 'member-1', owner: 'owner-1' }, absence = sel({ actor: 'member-1', resource: 'POST /notes/n1/edit' });
   assert.equal(showsPin('actor', absence, 'member', sel(MEMBER_OWN), 'member', principals), true, 'the same kind of effect, another resource');
   assert.equal(showsPin('actor', absence, 'member', { ...sel(MEMBER_OWN), name: OTHER }, 'member', principals), false, 'another name');
@@ -321,10 +321,10 @@ test('Decision 1: an actor pin is shown only by a twin of the same principal wit
   assert.ok(actorPins >= 4, `${actorPins} actor pins in the examples`);
 });
 
-// Round-1 verification of Decision 1: resource and trace id pins stay as built. Their twin is the same selector but the actor, so it
+// Resource and trace id pins stay as built. Their twin is the same selector but the actor, so it
 // carries the absence's source, operation and name with the same value. Before this test only the evaluator-hash pin caught a twin
 // on another destination name.
-test('Decision 1 (resource and trace id pins): a twin on another name, operation or source shows nothing, and the run reads selector-unpaired', async () => {
+test('resource and trace id pins: a twin on another name, operation or source shows nothing, and the run reads selector-unpaired', async () => {
   const principals = { member: 'member-1', owner: 'owner-1' }, absence = sel({ actor: 'member-1', resource: 'POST /notes/n1/edit' });
   const without = (select, key) => Object.fromEntries(Object.entries(select).filter(([k]) => k !== key));
   assert.equal(showsPin('resource', absence, 'member', sel(OWNER_EDIT), 'owner', principals), true, 'resource: the same selector but the actor');
@@ -345,10 +345,10 @@ test('Decision 1 (resource and trace id pins): a twin on another name, operation
   validateHttpRunEvidence(run, { expectedSuite: suiteOf(p) });
 });
 
-// Review finding B-M1: a twin control that was not sent (a capture it uses was unavailable) has no effect window. The connector
+// A twin control that was not sent (a capture it uses was unavailable) has no effect window. The connector
 // paired from the profile and read selector-not-shown-to-match while the validator, pairing from the run's rows, read
 // selector-unpaired, so an authentic run was refused as invalid evidence. Both now read selector-unpaired.
-test('B-M1: a twin that was not sent shows nothing, and the connector and the validator agree it reads selector-unpaired', async () => {
+test('a twin that was not sent shows nothing, and the connector and the validator agree it reads selector-unpaired', async () => {
   // CREATE answers without an id, so OWNER-EDIT (the resource twin, which edits the created note) is not sent.
   const p = profile(), owner = p.checks.find(c => c.id === 'OWNER-EDIT');
   const create = { ...check('CREATE', 'control', 'owner', '/notes', []), capture: { note: { pointer: '/id', type: 'id' } } }; delete create.effects;

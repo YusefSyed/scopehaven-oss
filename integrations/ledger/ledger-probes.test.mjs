@@ -1,6 +1,5 @@
-// A an earlier review probes (a review record outside this repository
-// probe.mjs, K01-K25), kept as tests: each input has one expected outcome, and the Node and Python
-// verifiers must both give it. Added after the review: the H2 parity inputs (integral floats in proofs,
+// Edge probes (K01-K25), kept as tests: each input has one expected outcome, and the Node and Python
+// verifiers must both give it. Also: parity inputs (integral floats in proofs,
 // deep nesting), signed ledger metadata, canonical checkpoint lines and verdicts checked against run files.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -105,14 +104,14 @@ const LOG_CASES = [
     const forged = Buffer.from(JSON.stringify({ ...env, signatures: [{ keyid: env.signatures[0].keyid, sig: rawSign(null, pae(env.payloadType, payload), createPrivateKey(OTHER.privatePem)).toString('base64') }] }));
     const v = resealed((e, i) => i ? e : { ...e, envelope: { ...e.envelope, sha256: sha(forged) } }); v.envelopes.set(sha(forged), forged); return v;
   }, 'envelope-invalid'],
-  ['M1 one entry recording the same run twice (resealed)', () => resealed((e, i) => i ? e : { ...e, runs: [e.runs[0], e.runs[0]] }), 'entry-shape'],
-  ['M2 a second checkpoint at one size: same root, different head (re-signed)', () => base({ checkpoints: text([...SP, rawCheckpoint({ ...body(SP[3]), headHash: 'e'.repeat(64), signedAt: at(9).toISOString() })]) }), 'fork'],
+  ['one entry recording the same run twice (resealed)', () => resealed((e, i) => i ? e : { ...e, runs: [e.runs[0], e.runs[0]] }), 'entry-shape'],
+  ['a second checkpoint at one size: same root, different head (re-signed)', () => base({ checkpoints: text([...SP, rawCheckpoint({ ...body(SP[3]), headHash: 'e'.repeat(64), signedAt: at(9).toISOString() })]) }), 'fork'],
   ['a run with its id removed (resealed)', () => resealed((e, i) => i ? e : withRun0(e, ({ id, ...r }) => r)), 'entry-shape'],
   ['K21 entries file without its final newline', () => base({ entries: SB.entries.subarray(0, SB.entries.length - 1) }), 'entry-shape'],
-  ['L3 ledger.json creation time moved back', () => base({ metadata: Buffer.from(`${JSON.stringify({ ...JSON.parse(SB.metadata), createdAt: '2001-01-01T00:00:00.000Z' })}\n`) }), 'ledger-mismatch'],
-  ['L5 checkpoint line with spacing', () => base({ checkpoints: text([...SP.slice(0, 3), JSON.stringify(JSON.parse(SP[3]), null, 1).replace(/\n/g, '')]) }), 'checkpoint-shape'],
-  ['H2c checkpoint line nested 100,000 deep', () => base({ checkpoints: text([...SP, nested(100000)]) }), 'checkpoint-shape'],
-  ['H1 a replayed run, chain rebuilt and re-signed', () => {
+  ['ledger.json creation time moved back', () => base({ metadata: Buffer.from(`${JSON.stringify({ ...JSON.parse(SB.metadata), createdAt: '2001-01-01T00:00:00.000Z' })}\n`) }), 'ledger-mismatch'],
+  ['checkpoint line with spacing', () => base({ checkpoints: text([...SP.slice(0, 3), JSON.stringify(JSON.parse(SP[3]), null, 1).replace(/\n/g, '')]) }), 'checkpoint-shape'],
+  ['checkpoint line nested 100,000 deep', () => base({ checkpoints: text([...SP, nested(100000)]) }), 'checkpoint-shape'],
+  ['a replayed run, chain rebuilt and re-signed', () => {
     const again = signRun(1, 3.6);
     const entry = L.buildEntry({ previousLine: null, index: 0, recordedAt: at(3.7).toISOString(), envelope: again, check: verifyEnvelope({ envelope: again, publicKey: KEY.publicPem, files: files[1] }), files: files[1] });
     const ls = rechain([...SE, entry]);
@@ -120,11 +119,11 @@ const LOG_CASES = [
   }, 'run-replayed'],
 ];
 
-test('every review probe gets its expected outcome from both verifiers', async () => {
+test('every K probe gets its expected outcome from both verifiers', async () => {
   for (const [label, make, expected] of LOG_CASES) expectBoth(await viaBoth(make()), expected, label);
 });
 
-test('H2: the depth limit counts brackets outside strings only, the same way in both verifiers', async () => {
+test('the depth limit counts brackets outside strings only, the same way in both verifiers', async () => {
   const cases = [['"' + '['.repeat(300) + '"', false], ['"\\"' + '['.repeat(300) + '"', false], ['["\\\\"' + ',['.repeat(300), true], ['['.repeat(256), false], ['['.repeat(257), true], ['{"a":'.repeat(257), true]];
   for (const [input, deep] of cases) assert.equal(V.tooDeep(input), deep, `Node: ${input.slice(0, 12)}`);
   if (!PYTHON) return;
@@ -142,18 +141,18 @@ test('K20: an unsigned tail is reported, not hidden, and stays out of history', 
   assert.equal(r.node.unsignedTail, 1); if (r.python) assert.equal(r.python.unsignedTail, 1);
 });
 
-test('proof probes and the H2 number and nesting cases agree in both verifiers', async () => {
+test('proof probes and the number and nesting cases agree in both verifiers', async () => {
   const PROOFS = [
     ['K10 inclusion proof labelled with another log', 'inclusion', { entry: Sl[1], proof: JSON.stringify({ ...inc, log: '00000000-0000-4000-8000-000000000000' }), checkpoint: SP[3] }, 'inclusion-proof-invalid'],
     ['K11 consistency from log S to log B, identical prefix', 'consistency', { older: SP[0], newer: BP[1], proof: JSON.stringify(L.consistencyProof({ log: SLOG, lines: Sl, from: 1, to: 2 })) }, 'checkpoint-shape'],
     ['K15 inclusion path with one extra element', 'inclusion', { entry: Sl[1], proof: JSON.stringify({ ...inc, path: [...inc.path, 'e'.repeat(64)] }), checkpoint: SP[3] }, 'inclusion-proof-invalid'],
     ['K16 inclusion path one element short', 'inclusion', { entry: Sl[1], proof: JSON.stringify({ ...inc, path: inc.path.slice(0, -1) }), checkpoint: SP[3] }, 'inclusion-proof-invalid'],
     ['K25 inclusion of an entry line with index -1', 'inclusion', { entry: JSON.stringify({ ...SE[1], index: -1 }), proof: JSON.stringify({ ...inc, index: -1 }), checkpoint: SP[3] }, 'entry-shape'],
-    ['H2b inclusion with index 1.0 and treeSize 4e0', 'inclusion', { entry: Sl[1], proof: JSON.stringify(inc).replace('"index":1', '"index":1.0').replace('"treeSize":4', '"treeSize":4e0'), checkpoint: SP[3] }, 'verified'],
-    ['H2b consistency with from 2.0', 'consistency', { older: SP[1], newer: SP[3], proof: JSON.stringify(L.consistencyProof({ log: SLOG, lines: Sl, from: 2, to: 4 })).replace('"from":2', '"from":2.0') }, 'verified'],
+    ['inclusion with index 1.0 and treeSize 4e0', 'inclusion', { entry: Sl[1], proof: JSON.stringify(inc).replace('"index":1', '"index":1.0').replace('"treeSize":4', '"treeSize":4e0'), checkpoint: SP[3] }, 'verified'],
+    ['consistency with from 2.0', 'consistency', { older: SP[1], newer: SP[3], proof: JSON.stringify(L.consistencyProof({ log: SLOG, lines: Sl, from: 2, to: 4 })).replace('"from":2', '"from":2.0') }, 'verified'],
     ['a valid proof padded past 64 KB with whitespace', 'inclusion', { entry: Sl[1], proof: `${JSON.stringify(inc)}${' '.repeat(70000)}`, checkpoint: SP[3] }, 'verified'],
-    ['H2c proof file nested 100,000 deep', 'inclusion', { entry: Sl[1], proof: nested(100000), checkpoint: SP[3] }, 'inclusion-proof-invalid'],
-    ['H2c checkpoint file nested 100,000 deep', 'inclusion', { entry: Sl[1], proof: JSON.stringify(inc), checkpoint: nested(100000) }, 'checkpoint-shape'],
+    ['proof file nested 100,000 deep', 'inclusion', { entry: Sl[1], proof: nested(100000), checkpoint: SP[3] }, 'inclusion-proof-invalid'],
+    ['checkpoint file nested 100,000 deep', 'inclusion', { entry: Sl[1], proof: JSON.stringify(inc), checkpoint: nested(100000) }, 'checkpoint-shape'],
   ];
   for (const [label, kind, inputs, expected] of PROOFS) expectBoth(await proofBoth(kind, inputs), expected, label);
   // K17: the auditor holds an earlier head; the operator rewrote entry 1, re-signed, and offers a proof from the rewritten log.
@@ -171,7 +170,7 @@ test('K23: the exported consistency path check refuses equal sizes with differen
   assert.equal(p.stdout.trim(), 'False');
 });
 
-test('K24 and M3: a run id is recorded once, so its anchor can be neither superseded nor replayed', async () => {
+test('K24: a run id is recorded once, so its anchor can be neither superseded nor replayed', async () => {
   const A = await newLedger('A');
   await L.appendEnvelope(A, { envelope: envelopes[0], files: files[0], evidenceKey: KEY.publicPem, privateKey: KEY.privatePem, now: at(1), anchors: new Map([['run-0.json', [{ source: 'sql-audit-table', count: 3, head: '3'.repeat(64) }]]]) });
   await assert.rejects(L.appendEnvelope(A, { envelope: signRun(0, 2), files: files[0], evidenceKey: KEY.publicPem, privateKey: KEY.privatePem, now: at(3), anchors: new Map([['run-0.json', [{ source: 'sql-audit-table', count: 2, head: '2'.repeat(64) }]]]) }), /already in the ledger/);
@@ -183,7 +182,7 @@ test('K24 and M3: a run id is recorded once, so its anchor can be neither supers
   assert.throws(() => anchorFor(two, { runId: runs[0].id, source: 'sql-audit-table' }), /refusing to choose/);
 });
 
-test('M2: with the signed run files, recorded verdicts are checked against them in both verifiers', async () => {
+test('with the signed run files, recorded verdicts are checked against them in both verifiers', async () => {
   // The ledger-key holder rewrites a verdict, rebuilds the chain and re-signs every checkpoint.
   const forged = resealed((e, i) => i !== 1 ? e : withRun0(e, r => { const verdicts = r.verdicts.map(([id, s]) => [id, id === 'TENANT-01' ? 'fail' : s]); return { ...r, verdicts, verdictDigest: sha(JSON.stringify(verdicts)) }; }));
   expectBoth(await viaBoth(forged), 'verified', 'without the run files, the ledger key alone vouches for verdicts');
@@ -197,7 +196,7 @@ test('M2: with the signed run files, recorded verdicts are checked against them 
   if (some.python) assert.equal(some.python.verdictsCheckedAgainstRunFiles, 2, 'Python: files not supplied are counted as unchecked, never as checked');
 });
 
-test('L2: the writer refuses an envelopes folder that is a symlink or not private', async () => {
+test('the writer refuses an envelopes folder that is a symlink or not private', async () => {
   const { symlink, rm, chmod } = await import('node:fs/promises');
   const W = await newLedger('W'); const outside = await mkdtemp(join(work, 'outside-'));
   await rm(join(W, 'envelopes'), { recursive: true }); await symlink(outside, join(W, 'envelopes'));

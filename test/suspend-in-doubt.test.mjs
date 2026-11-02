@@ -1,11 +1,11 @@
-// Suspend-aware lead-in and stop (F4c) beside in-doubt resolution IDR-1 (a review record outside this repository, what the
-// delta review re-checks after the merge, item 2). The in-doubt core and resolver R0 never decide on a window a host sleep left
+// Suspend-aware lead-in and stop beside in-doubt resolution. The in-doubt core and its transport-record resolver (r0) never
+// decide on a window a host sleep left
 // partial, and a check the run stopped after a short wait is never anyone's attempt:
 //   - a window a sleep left short of its settle without a timing plan (host-suspend-wait-short), or whose horizon a sleep truncated
 //     under one (effect-horizon-truncated): every opted-in clause stays undecided and its operation stays in doubt, where the same run
-//     awake reads the R0-refuted attempt as a refuted operation (the outcome-judged effect.only passes, the presence clauses fail);
+//     awake reads the attempt the transport record refutes as a refuted operation (the outcome-judged effect.only passes, the presence clauses fail);
 //   - a check not sent after a short wait (host-suspend-run-stopped) carries no window, so no attempt and no operation record, while
-//     main (its connector and detector frozen at 61adb01) sends it and counts the earlier check's displaced send as its applied attempt;
+//     the frozen build (an earlier connector and detector) sends it and counts the earlier check's displaced send as its applied attempt;
 //   - with the opt-in declared, the validator still recomputes the stop from the sealed windows and refuses a changed reason.
 // A virtual clock, the real suspend detector, an injected transport and an egress-recorder/7 observer over one forwarded name.
 // Destination hosts are names only and are never resolved or contacted; no socket, no database, no model, no provider.
@@ -30,7 +30,7 @@ const MAIN = Object.freeze({ assess: mainConnector.runHttpAssessment, detector: 
 
 const WALL0 = Date.parse('2026-10-16T20:14:00.000Z');
 const CRM = 'crm.example', CLOSE = 'POST /tickets/T-1/close', WITNESS = 'witness.scopehaven.invalid';
-// The forwarder's upstream records: a connect that never completed (R0 refutes the attempt), and a proven applied reply.
+// The forwarder's upstream records: a connect that never completed (the transport record refutes the attempt), and a proven applied reply.
 const UP = Object.freeze({
   refused: { outcome: 'unknown', status: null, proven: false, transport: { connected: false, mono: 10.5, wall: 1760000000000 } },
   applied: { outcome: 'applied', status: 201, proven: true },
@@ -121,12 +121,12 @@ test('a window a host sleep left partial decides nothing in the in-doubt core: w
     const awake = await assess(HEAD, p, { sends }), slept = await assess(HEAD, p, { sends, onSleep: (ms, n) => (n === wait ? [500, asleep] : null) });
     for (const r of [awake, slept]) validated(p, r.run);
     assert.equal(slept.v.sleeps[wait - 1], H ?? 5000, 'the sleep falls in TASK\'s own settle or horizon');
-    // Awake, the window is complete: R0 refutes the one attempt, so the operation is refuted and every clause decides on it.
+    // Awake, the window is complete: the transport record refutes the one attempt, so the operation is refuted and every clause decides on it.
     assert.deepEqual(clausesOf(awake.run, 'TASK'), [['fail', 'refuted'], ['fail', 'refuted'], ['pass', 'refuted']], `awake, ${code}`);
     // Asleep: the same attempt in a window the sleep left partial, so a close the sleep displaced past its end could have applied.
     const w = windowOf(slept.run, 'TASK'), row = rowOf(slept.run, 'TASK');
     assert.deepEqual([w.coverage, w.reason.split(',').includes(code), carries(w), w.events.length], ['partial', true, true, 1], code);
-    // R0 still reads the attempt it sees, but no operation is refuted and no clause decides, the effect.only absence included.
+    // r0 still reads the attempt it sees, but no operation is refuted and no clause decides, the effect.only absence included.
     assert.deepEqual(clausesOf(slept.run, 'TASK'), [['missing', 'in-doubt'], ['missing', 'in-doubt'], ['missing', 'in-doubt']], code);
     assert.deepEqual(row.trace[1].data.effects.map(e => e.resolution.attempts.map(a => `${a.fate} by ${a.by}`)), [['refuted by r0'], ['refuted by r0'], ['refuted by r0']]);
     // Awake the row's backend evidence is observed; asleep it is not.
@@ -135,9 +135,9 @@ test('a window a host sleep left partial decides nothing in the in-doubt core: w
   }
 });
 
-test('a check the run stopped after a short wait is never an attempt: no window and no operation record, while main counts the displaced send as its own', async () => {
+test('a check the run stopped after a short wait is never an attempt: no window and no operation record, while the frozen build counts the displaced send as its own', async () => {
   // A's application closes T-1 (a proven applied reply) 4.8 s of awake time after A's reply; a sleep 0.5 s into A's settle, with no spare
-  // room to restore it, displaces that close past A's end marks on main. TASK, opted in, makes no close of its own.
+  // room to restore it, displaces that close past A's end marks in the frozen build. TASK, opted in, makes no close of its own.
   const A = task('A', '/a', [{ kind: 'effect.exists', select: { source: 'http-egress', operation: 'send', name: CRM } }]);
   const p = target([A, task('TASK', '/task', [EXISTS, COUNT1])]);
   const sends = { 'POST /a': [{ delay: 4800, up: UP.applied }] };
@@ -145,15 +145,15 @@ test('a check the run stopped after a short wait is never an attempt: no window 
     const onSleep = (ms, n) => (n === 1 ? [500, asleep] : null);
     const head = await assess(HEAD, p, { sends, onSleep }), main = await assess(MAIN, p, { sends, onSleep });
     validated(p, head.run);
-    assert.ok(windowOf(main.run, 'A').suspend?.shortMs > 0 && carriesSuspendShort(windowOf(main.run, 'A')), `${asleep} ms: main left A's settle short`);
-    // Head (F4d) goes on into the later checks' time: restored (45 s) or still short (50 s), A is the last check sent either way.
+    assert.ok(windowOf(main.run, 'A').suspend?.shortMs > 0 && carriesSuspendShort(windowOf(main.run, 'A')), `${asleep} ms: the frozen build left A's settle short`);
+    // Head goes on into the later checks' time: restored (45 s) or still short (50 s), A is the last check sent either way.
     assert.ok(windowOf(head.run, 'A').suspend?.reserveMs > 0 && stopsRun(windowOf(head.run, 'A').suspend), `${asleep} ms: A's settle took the later checks' time`);
     // Head: TASK is not sent, so it has no window, no clause record and no attempt; no row of the run lists the displaced close.
     const t = rowOf(head.run, 'TASK');
     assert.deepEqual([t.status, t.trace[0].data.notSent, t.trace[0].data.requestAttempted, t.trace.length], ['inconclusive', SUSPEND_STOPPED, false, 1]);
     assert.equal(t.assertions.find(a => a.name === PRECONDITION_ASSERTION).actual, PRECONDITION_REASONS[SUSPEND_STOPPED]);
     assert.deepEqual(attemptsOf(head.run), []);
-    // Main sends TASK after A's short settle, and its in-doubt core reads A's displaced close as TASK's own applied attempt.
+    // The frozen build sends TASK after A's short settle, and its in-doubt core reads A's displaced close as TASK's own applied attempt.
     assert.deepEqual(attemptsOf(main.run).map(a => `${a.check}: ${a.fate} by ${a.by}`), ['TASK: applied by proof', 'TASK: applied by proof']);
     assert.deepEqual(clausesOf(main.run, 'TASK').map(([, operation]) => operation), ['confirmed', 'confirmed']);
   }

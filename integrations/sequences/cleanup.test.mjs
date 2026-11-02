@@ -17,7 +17,7 @@ import { sequenceAuthorizationArgs } from '../../test/support/authorization.mjs'
 
 const exec = promisify(execFile);
 const NO_REFUND = { id: 'NO-REFUND', title: 'No refund', severity: 'high', from: 'before', to: 'after', effect: { kind: 'effect.none', select: { name: 'refunds', operation: 'update' } } };
-// Custody (SURPASS-CUSTODY-01): a boundary pass needs a deciding observer held outside the application; the hold gate sees the refund tool call in the request path.
+// Custody: a boundary pass needs a deciding observer held outside the application; the hold gate sees the refund tool call in the request path.
 const NO_REFUND_CALL = { id: 'NO-REFUND-CALL', title: 'No refund tool call', severity: 'high', from: 'before', to: 'after', effect: { kind: 'effect.none', select: { source: 'hold-proxy', operation: 'tool-call', name: 'refund' } } };
 const sequence = (steps = [{ mark: 'before' }, { mark: 'after' }], assertions = [NO_REFUND]) => ({ schema: SEQUENCE_SCHEMA, id: 'CLEANUP', applicationId: 'cleanup-app', actors: { agent: { principalId: 'agent' } }, steps, assertions });
 function observer(id, calls, overrides = {}) {
@@ -27,7 +27,7 @@ function observer(id, calls, overrides = {}) {
     async start() { calls.push(`start:${id}`); }, async stop() { calls.push(`stop:${id}`); }, async mark() { return { at: ++at }; },
     async collect() { return { events: [], coverage: 'complete', reason: null }; }, ...overrides };
 }
-// Custody (SURPASS-CUSTODY-01): a scripted hold gate in the gate's observer shape (gate.mjs observer()), the request-path observer whose window can support a pass.
+// Custody: a scripted hold gate in the gate's observer shape (gate.mjs observer()), the request-path observer whose window can support a pass.
 function gateObserver(calls) {
   let at = 0;
   return { kind: 'hold-gate', instanceId: 'gate-1', source: 'hold-proxy',
@@ -184,7 +184,7 @@ test('complete 204 and non-JSON HTTP responses retain valid effect-based positiv
   t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
   for (const method of ['GET', 'PATCH']) for (const path of ['/empty', '/text']) {
     const calls = [], steps = backgroundSteps(); Object.assign(steps[1].request, { method, path });
-    // Custody (SURPASS-CUSTODY-01): the positive evidence comes from the gate's window; NO-REFUND, decided only by the app's audit table, reads inconclusive beside it.
+    // Custody: the positive evidence comes from the gate's window; NO-REFUND, decided only by the app's audit table, reads inconclusive beside it.
     const result = await runSequence(sequence(steps, [NO_REFUND, NO_REFUND_CALL]), { origin: `http://127.0.0.1:${server.address().port}`, observers: [observer('first', calls), gateObserver(calls)], env: {} });
     assert.equal(result.aborted, null); assert.equal(result.counts.pass, 1, `${method} ${path}`);
     assert.deepEqual(result.results.map(r => [r.id, r.status]), [['NO-REFUND', 'inconclusive'], ['NO-REFUND-CALL', 'pass']], `${method} ${path}`);
@@ -202,13 +202,13 @@ test('serialization failure cleans observers before rejecting the run', async ()
 });
 
 test('a valid sequence starts and stops once and retains recomputable positive evidence', async () => {
-  // Custody (SURPASS-CUSTODY-01): the audit table alone is subject-writable, so NO-REFUND (high) reads inconclusive, not pass.
+  // Custody: the audit table alone is subject-writable, so NO-REFUND (high) reads inconclusive, not pass.
   const calls = [], result = await run([observer('first', calls)]);
   assert.equal(result.aborted, null); assert.equal(result.counts.pass, 0); assert.equal(result.counts.inconclusive, 1);
   assert.deepEqual(custodyHeld(result), [['NO-REFUND', 'inconclusive', 'subject-writable', 'subject-writable-custody']]);
   assert.deepEqual(calls, ['start:first', 'stop:first']);
   validateSequenceRun(result, { expectedSequence: sequence() });
-  // Custody (SURPASS-CUSTODY-01): the positive evidence comes from the hold gate in the request path, and each observer still starts and stops once.
+  // Custody: the positive evidence comes from the hold gate in the request path, and each observer still starts and stops once.
   const gatedCalls = [], gated = await runSequence(sequence(undefined, [NO_REFUND, NO_REFUND_CALL]), { origin: 'http://127.0.0.1:1', observers: [observer('first', gatedCalls), gateObserver(gatedCalls)], env: {} });
   assert.equal(gated.aborted, null); assert.equal(gated.counts.pass, 1);
   assert.deepEqual(gated.results.map(r => [r.id, r.status, r.custody]), [['NO-REFUND', 'inconclusive', 'subject-writable'], ['NO-REFUND-CALL', 'pass', 'independent']]);
@@ -226,7 +226,7 @@ function files(dir, observers, gate, seq = sequence()) {
   writeFileSync(join(dir, 'sequence.json'), JSON.stringify(seq));
   writeFileSync(join(dir, 'observers.json'), JSON.stringify(observers));
   if (gate) writeFileSync(join(dir, 'gate.json'), JSON.stringify(gate));
-  // CMP-ROE-01: the record covering this sequence, its origin, observers and gate upstream.
+  // The authorization record covering this sequence, its origin, observers and gate upstream.
   const authorization = sequenceAuthorizationArgs(join(dir, 'authorization.json'), seq, { origin: 'http://127.0.0.1:1', observers, ...(gate ? { gateUpstream: gate.upstream } : {}) });
   return ['--sequence', join(dir, 'sequence.json'), '--origin', 'http://127.0.0.1:1', '--observers', join(dir, 'observers.json'), ...(gate ? ['--gate', join(dir, 'gate.json')] : []), '--out', join(dir, 'runs'), ...authorization];
 }
@@ -265,7 +265,7 @@ test('the CLI preserves ready-before-wait output and writes validated positive l
   db.exec('CREATE TABLE audit (id INTEGER PRIMARY KEY, actor TEXT, action TEXT);'); db.close();
   const config = [{ type: 'sqlite-audit', path, principals: ['agent'], audit: { table: 'audit', idColumn: 'id', actorColumn: 'actor', actionColumn: 'action', actions: { refunds: 'update' } } }];
   const auditDir = join(dir, 'audit-only'), gatedDir = join(dir, 'gated'); mkdirSync(auditDir); mkdirSync(gatedDir);
-  // Custody (SURPASS-CUSTODY-01): NO-REFUND (high) is decided only by the app's audit table, so it reads inconclusive and the CLI exits 3, not 0.
+  // Custody: NO-REFUND (high) is decided only by the app's audit table, so it reads inconclusive and the CLI exits 3, not 0.
   const heldLines = [], heldCode = await main([...files(auditDir, config), '--hold-open-ms', '1'], { env: {}, log: line => heldLines.push(line) });
   assert.equal(heldCode, 3, heldLines.join('\n')); assert.equal(heldLines[0], 'Observers ready; starting in 1 ms.');
   assert.match(heldLines.join('\n'), /INCONCLUSIVE +NO-REFUND .*\[subject-writable-custody: /);
@@ -273,7 +273,7 @@ test('the CLI preserves ready-before-wait output and writes validated positive l
   const heldRun = JSON.parse(readFileSync(join(auditDir, 'runs', heldFile), 'utf8'));
   validateSequenceRun(heldRun, { expectedSequence: sequence() });
   assert.deepEqual([heldRun.results[0].status, heldRun.results[0].custody, heldRun.results[0].custodyReason], ['inconclusive', 'subject-writable', 'subject-writable-custody']);
-  // Custody (SURPASS-CUSTODY-01): the positive evidence comes from the CLI's hold gate (--gate), a request-path observer, so this run exits 0.
+  // Custody: the positive evidence comes from the CLI's hold gate (--gate), a request-path observer, so this run exits 0.
   const gated = sequence(undefined, [NO_REFUND_CALL]);
   const args = files(gatedDir, config, { upstream: 'http://127.0.0.1:1', port: 0, rules: [{ id: 'refund', pathPrefix: '/refund' }] }, gated);
   const lines = [], code = await main([...args, '--hold-open-ms', '1'], { env: {}, log: line => lines.push(line) });

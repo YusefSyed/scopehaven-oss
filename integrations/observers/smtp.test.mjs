@@ -205,14 +205,14 @@ test('smtp: a sink restarted between the marks fails the window (its earlier rec
   });
 });
 
-test('W3 review M4/L6: an SMTPUTF8 recipient is compared by its A-label, a source route is dropped, and bytes that are not UTF-8 are malformed', async t => {
+test('an SMTPUTF8 recipient is compared by its A-label, a source route is dropped, and bytes that are not UTF-8 are malformed', async t => {
   const IDN = 'xn--bcher-kva.example';
   const o = await sink(t, { domains: [{ domain: IDN, addresses: [`vip@${IDN}`] }, { domain: EXT, addresses: [`vip@${EXT}`] }] });
-  // S6: the U-label form of a declared domain.
+  // The U-label form of a declared domain.
   const idn = await window(o, () => mail(o, { to: 'vip@bücher.example' }));
   assert.deepEqual([idn.coverage, idn.events.map(e => `${e.name} ${e.resource}`)], ['complete', [`${IDN} vip@${IDN}`]]);
   assert.equal(evaluateEffectAssertion(none({ name: IDN }), [idn]).verdict, 'fail');
-  // S10: a source-routed recipient is the mailbox after the route.
+  // A source-routed recipient is the mailbox after the route.
   const routed = await window(o, () => mail(o, { to: `@relay.example,@other.example:vip@${EXT}` }));
   assert.deepEqual(routed.events.map(e => `${e.name} ${e.resource}`), [`${EXT} vip@${EXT}`]);
   assert.equal(evaluateEffectAssertion(none({ name: EXT, resource: `vip@${EXT}` }), [routed]).verdict, 'fail');
@@ -224,7 +224,7 @@ test('W3 review M4/L6: an SMTPUTF8 recipient is compared by its A-label, a sourc
   assert.equal(bad.coverage, 'partial'); assert.match(bad.reason, /smtp-malformed-message/);
 });
 
-test('W3 round-2 S-L2: a recipient at an address literal (IPv4 or IPv6) leaves the window partial; a named recipient does not', async t => {
+test('a recipient at an address literal (IPv4 or IPv6) leaves the window partial; a named recipient does not', async t => {
   const o = await sink(t);
   for (const literal of ['[198.51.100.9]', '[IPv6:2001:db8::1]']) {
     const w = await window(o, () => mail(o, { to: `vip@${literal}` }));
@@ -235,7 +235,7 @@ test('W3 round-2 S-L2: a recipient at an address literal (IPv4 or IPv6) leaves t
   assert.deepEqual([named.coverage, named.reason], ['complete', null]);
 });
 
-test('W3 review L1 and survivors: QUIT inside an open transaction sends nothing; a nonce in a mail to another domain is still a send; the body digest is of the unstuffed message', async t => {
+test('QUIT inside an open transaction sends nothing; a nonce in a mail to another domain is still a send; the body digest is of the unstuffed message', async t => {
   const o = await sink(t);
   const quit = await window(o, async () => { const s = session(o.port); await s.greeting; await s.send('EHLO a'); await s.send('MAIL FROM:<app@acme.example>'); await s.send(`RCPT TO:<vip@${EXT}>`); await s.send('QUIT'); await s.closed; });
   assert.deepEqual([quit.coverage, quit.reason, quit.events.map(e => e.outcome)], ['partial', 'smtp-message-incomplete', ['unknown']]);
@@ -307,13 +307,13 @@ const inUse = () => Object.assign(new Error('listen EADDRINUSE'), { code: 'EADDR
 const collectFails = (configs, options) => buildObservers(configs, options).map(o => Object.assign(o, { collect: async () => { throw new Error('synthetic collect failure'); } }));
 const firstStartLoses = () => { let first = true; return (configs, options) => buildObservers(configs, options).map(o => { const start = o.start.bind(o); o.start = async () => { if (first) { first = false; throw inUse(); } return start(); }; return o; }); };
 
-test('round-2 lows: an SMTP sink witness actor with no check of its own needs its credential too', () => {
+test('an SMTP sink witness actor with no check of its own needs its credential too', () => {
   const p = profile('http://127.0.0.1:4000', 47000);
   const asBob = { ...p, actors: { ...p.actors, bob: { principalId: 'bob', credentialEnv: 'SCOPEHAVEN_TARGET_BOB', identityValue: 'bob' } }, checks: p.checks.map(c => ({ ...c, actorId: 'bob' })) };
   assert.deepEqual(credentialReadiness(asBob, { SCOPEHAVEN_TARGET_BOB: 'synthetic-bob-token' }), { ready: false, missingCredentialRefs: ['SCOPEHAVEN_TARGET_OPS'] });
 });
 
-test('round-2 lows: a profile run is retried only when a sink lost its port; a window that fails for another reason stands', async t => {
+test('a profile run is retried only when a sink lost its port; a window that fails for another reason stands', async t => {
   const once = [];
   const { run } = await profileRun(t, false, { build: collectFails, attempts: once });
   assert.deepEqual([run.results.find(x => x.id === 'NO-EXTERNAL-MAIL').trace[1].data.windows[0].coverage, once.length], ['failed', 1]);
@@ -329,7 +329,7 @@ test('smtp in a profile: a mail to a customer fails the check; a clean app passe
     assert.deepEqual([r.status, r.backendEvidence, w.coverage, w.lineage.observer, w.lineage.independence], [status, 'observed', 'complete', 'smtp-sink-recorder', 'request-path'], JSON.stringify({ reason: w.reason, a: r.assertions }));
     validateHttpRunEvidence(run, { expectedSuite: createRegistry({ profiles: [p], env }).exportSuite(p.id) });
     assert.ok(run.limitations.some(l => l.startsWith('SMTP sinks (mail: smtp-host routing')));
-    // S-L3: the addressing limit, pinned.
+    // The addressing limit, pinned.
     assert.ok(run.limitations.find(l => l.startsWith('SMTP sinks (mail:')).includes('A recipient at an address literal leaves the window partial'));
   }
 });

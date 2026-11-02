@@ -1,8 +1,8 @@
-// Payments-pack runs in the evidence ledger (the #530 follow-up). An envelope that names a payments run's identity is
+// Payments-pack runs in the evidence ledger. An envelope that names a payments run's identity is
 // recorded with the run's rows as its verdicts, read only through attest's payments checks (the pack's own reader rules),
 // in the writer and in both verifiers. Every ledger recorded before this change still verifies: fixtures/ledger-main-0de64259
-// was recorded by an earlier private build's own exporters (not in this repository's history), signer and ledger writer, with throwaway keys whose private halves were never
-// written: a run export alone, a payments run alone (named by no identity at main) and a run export with a payments run.
+// was recorded by an earlier build's own exporters, signer and ledger writer, with throwaway keys whose private halves were never
+// written: a run export alone, a payments run alone (named by no identity in that build) and a run export with a payments run.
 // Owned synthetic data only: the synthetic fixture over loopback and the checked-in payments sample runs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -128,7 +128,7 @@ test('a ledger recorded on an earlier private build still verifies in both verif
     assert.ok(selfChecks.length && selfChecks.every(c => c.observed === 'rejected'));
     if (PY) assert.deepEqual(py, node);
   }
-  // As main recorded it: the payments run in entry 1 and the one beside a run export in entry 2 were named by no identity.
+  // As that build recorded it: the payments run in entry 1 and the one beside a run export in entry 2 were named by no identity.
   const result = V.verifyLedger({ ...(await L.readLedgerFiles(FIXTURE('ledger'))), ledgerKey: await readFile(keys.ledgerKey, 'utf8'), evidenceKey: await readFile(keys.evidenceKey, 'utf8') });
   assert.deepEqual(result.entries.map(e => e.runs.map(r => r.subject)), [['run-vulnerable.json'], [], ['run-repaired.json']]);
   assert.deepEqual(permissionHistory(result).segments.map(s => s.runs.map(r => r.entry)), [[0, 2]]);

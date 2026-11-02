@@ -1,5 +1,5 @@
 // Writing a payments run: <run-id>.json and <run-id>.html, created exclusively (an existing file is never replaced).
-// Exporting a saved one (NC8): json, html or sarif, signed by default exactly as `scopehaven export` signs (src/export-cli.mjs).
+// Exporting a saved one: json, html or sarif, signed by default exactly as `scopehaven export` signs (src/export-cli.mjs).
 import { open, mkdir, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { basename, dirname, isAbsolute, join } from 'node:path';
@@ -77,7 +77,7 @@ export function savedPaymentsRun(value, what = 'the run') {
   const { comparison: _, ...run } = value, { sha256, ...body } = run;
   if (typeof run.id !== 'string' || !RUN_ID.test(run.id)) throw refused(`${what} has no payments run id`);
   if (typeof sha256 !== 'string' || digest(body) !== sha256) throw refused(`${what} was edited after it was produced (its sha256 no longer matches its body)`);
-  const fields = Object.hasOwn(run, 'producer') ? [...RUN_FIELDS, 'producer'] : RUN_FIELDS; // Runs saved before F9 have no producer.
+  const fields = Object.hasOwn(run, 'producer') ? [...RUN_FIELDS, 'producer'] : RUN_FIELDS; // Older saved runs have no producer.
   if (Object.keys(run).length !== fields.length || !fields.every(k => Object.hasOwn(run, k))) throw refused(`${what} does not have exactly the fields a payments run has`);
   if (run.scope !== PAYMENTS_SCOPE) throw refused(`${what} does not state the payments pack's scope`);
   const checks = run.rows;

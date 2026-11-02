@@ -70,10 +70,10 @@ export function sideBounds(checks) {
 // src/contract-http.mjs: a required control is allowed-control, every other row
 // response-contract. A run whose row set does not match its checksTotal, or that repeats a
 // row id, gets no bounds (the guards gate.mjs and contract-http.mjs apply). Nor does one in which
-// two sent rows share a requestId (review G4-2): no genuine run repeats one, and a row copied
+// two sent rows share a requestId: no genuine run repeats one, and a row copied
 // into another check's slot does. The shared core does not check this yet.
 // expectedSuite: the suite the run's target exports (registry currentSuite or exportSuite), never one
-// rebuilt from a stored run: like the gate, this module trusts the suite it is given (review G4-1). It is checked as the
+// rebuilt from a stored run: like the gate, this module trusts the suite it is given. It is checked as the
 // regression gate checks it (integrations/regression-gate/gate.mjs), for every kind of run: the
 // same row ids, the same required controls, the suite hash and each check's severity, so an edit
 // made consistent everywhere (a row deleted with checksTotal changed to match, required controls

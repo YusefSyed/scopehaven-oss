@@ -1,12 +1,11 @@
-// SURPASS-PASSK-01 tests: T1-T17 of the judged design (DESIGN-r1), the CLI, and
-// R1-R9 for the pre-push review (PREPUSH-REVIEW-r1).
+// pass^k tests: the column's rules, the CLI, and adversarial cases.
 // Local only. Pure checks; HTTP connector runs made in-process with an injected
 // transport (no socket); model identities from integrations/model-identity over
 // in-memory tap frames (no socket); a temp store and temp CLI files under
 // os.tmpdir(), removed after; CLI child processes for the FIFO and file-size-limit
 // cases; one loopback conversation server and one owned synthetic fixture run, both
 // on 127.0.0.1 port 0 and closed after use. No provider, model or network call
-// beyond loopback. The W6 source re-check runs only when SCOPEHAVEN_W6_SOURCE names
+// beyond loopback. The source re-check runs only when SCOPEHAVEN_W6_SOURCE names
 // the source file; CI never has it.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -129,7 +128,7 @@ function conversationRun() {
   return conversation;
 }
 
-test('T1 ladders: exact fractions and floats for k = 1 to n', () => {
+test('ladders: exact fractions and floats for k = 1 to n', () => {
   const ladders = [[3, 5, ['3/5', '3/10', '1/10', '0', '0']], [4, 5, ['4/5', '3/5', '2/5', '1/5', '0']], [2, 3, ['2/3', '1/3', '0']], [5, 5, ['1', '1', '1', '1', '1']], [0, 5, ['0', '0', '0', '0', '0']]];
   const points = [[9, 10, 1, '9/10'], [9, 10, 2, '4/5'], [9, 10, 9, '1/10'], [9, 10, 10, '0'], [4, 6, 3, '1/5'], [1, 5, 2, '0']];
   const cases = [...ladders.flatMap(([passed, trials, values]) => values.map((exact, i) => [passed, trials, i + 1, exact])), ...points];
@@ -142,7 +141,7 @@ test('T1 ladders: exact fractions and floats for k = 1 to n', () => {
   }
 });
 
-test('T2 Case C: controls are never averaged; the control figure is the lowest', () => {
+test('controls are never averaged; the control figure is the lowest', () => {
   const nine = Array.from({ length: 9 }, (_, i) => row(`p-${i}`, 'high', 5, 5));
   const caseC = k => inRun(k, [...nine, row('ctl-a', 'control', 4, 5), row('ctl-b', 'control', 5, 5)], ['ctl-a', 'ctl-b']);
   const at5 = caseC(5);
@@ -161,14 +160,14 @@ test('T2 Case C: controls are never averaged; the control figure is the lowest',
   assert.deepEqual(inRun(5, [...nine, row('ctl-b', 'control', 5, 5)], ['ctl-b']).controls, { required: ['ctl-b'], allTrialsPassed: true, lowest: { exact: '1', passHatK: 1 }, belowOne: [], insufficient: [], missing: [] });
 });
 
-test('T3 suite mean over prohibited checks only: A 5/5, B 3/5, C 0/5 at k = 2 is 13/30', () => {
+test('suite mean over prohibited checks only: A 5/5, B 3/5, C 0/5 at k = 2 is 13/30', () => {
   const column = inRun(2, [row('A', 'high', 5, 5), row('B', 'high', 3, 5), row('C', 'high', 0, 5), row('CTL', 'control', 1, 5)], ['CTL']);
   near(column.prohibited.mean, 13 / 30);
   assert.equal(column.prohibited.mean, passHatK([{ cluster: 'A', successes: 5, n: 5 }, { cluster: 'B', successes: 3, n: 5 }, { cluster: 'C', successes: 0, n: 5 }], 2));
   assert.deepEqual([column.prohibited.checks, column.prohibited.measured, column.prohibited.belowOne], [3, 3, ['B', 'C']]);
 });
 
-test('T4 undecided trials stay in n; the in-run reader keeps error trials in the count', async () => {
+test('undecided trials stay in n; the in-run reader keeps error trials in the count', async () => {
   assert.equal(entry(inRun(5, [row('x', 'high', 4, 5, 0, 1)]), 'x').exact, '0');
   assert.equal(entry(inRun(2, [row('y', 'high', 3, 5, 0, 2)]), 'y').exact, '3/10');
   const control = inRun(5, [row('c', 'control', 4, 5, 0, 1), row('p', 'high', 5, 5)], ['c']);
@@ -180,7 +179,7 @@ test('T4 undecided trials stay in n; the in-run reader keeps error trials in the
   assert.equal(entry(singleRunColumn(run, 1), 'no-refund-claim').exact, '4/5');
 });
 
-test('T5 single run: one trial per check; k = 2 is insufficient everywhere and no mean', async () => {
+test('single run: one trial per check; k = 2 is insufficient everywhere and no mean', async () => {
   const run = scripted();
   const k1 = singleRunColumn(run, 1);
   assert.equal(k1.source, 'single-run'); assert.deepEqual(k1.runIds, [run.id]); assert.equal(k1.window, null); assert.equal(k1.modelIdentity, null);
@@ -202,7 +201,7 @@ test('T5 single run: one trial per check; k = 2 is insufficient everywhere and n
   assert.deepEqual(passKReasons(column), ['checks-pass-k-below-one']);
 });
 
-test('T6 insufficient is never clamped; no partial mean; below one comes from the counts', () => {
+test('insufficient is never clamped; no partial mean; below one comes from the counts', () => {
   const column = inRun(5, [row('ctl', 'control', 2, 3), row('p1', 'high', 5, 5), row('p2', 'high', 2, 3)], ['ctl']);
   assert.deepEqual(entry(column, 'ctl'), { id: 'ctl', role: 'allowed-use-control', trials: 3, passed: 2, failed: 1, undecided: 0, passHatK: null, exact: null, state: 'insufficient-trials' });
   assert.deepEqual(column.controls.insufficient, ['ctl']); assert.deepEqual(column.controls.belowOne, ['ctl']);
@@ -214,7 +213,7 @@ test('T6 insufficient is never clamped; no partial mean; below one comes from th
   assert.deepEqual(column.trialsPerCheck, { min: 3, max: 5 });
 });
 
-test('T7 refusals: every PassKError code, with message === code', async () => {
+test('refusals: every PassKError code, with message === code', async () => {
   const seen = new Set(), refuse = (fn, code) => { refuses(fn, code); seen.add(code); };
   for (const k of [0, -1, 1.5, '2', 101]) {
     refuse(() => inRun(k, [row('a', 'high', 1, 1)]), 'invalid-k');
@@ -286,7 +285,7 @@ test('T7 refusals: every PassKError code, with message === code', async () => {
   assert.deepEqual([...seen].sort(), [...PASS_K_ERRORS].sort(), 'every refusal code is reachable');
 });
 
-test('T8 exact against float for n = 1 to 20, and a large exact fraction', () => {
+test('exact against float for n = 1 to 20, and a large exact fraction', () => {
   for (let n = 1; n <= 20; n++) for (let c = 0; c <= n; c++) for (let k = 1; k <= n; k++) {
     const exact = exactPassHatK(c, n, k), float = passHatK([{ cluster: 't', successes: c, n }], k);
     near(float, ratio(exact));
@@ -305,7 +304,7 @@ test('T8 exact against float for n = 1 to 20, and a large exact fraction', () =>
   assert.ok(Number.isFinite(passHatK([{ cluster: 't', successes: 90, n: 100 }], 50)));
 });
 
-test('T9 W6 openai-cs-agents excerpt: pinned fixture, ladders and the HR-1 variant', async () => {
+test('openai-cs-agents excerpt: pinned fixture, ladders and a variant with three runs set aside', async () => {
   const bytes = await readFile(new URL('./fixtures/w6-cs-agents.json', import.meta.url));
   assert.equal(sha256(bytes), W6_FIXTURE_SHA256);
   const w6 = JSON.parse(bytes);
@@ -338,7 +337,7 @@ test('T9 W6 openai-cs-agents excerpt: pinned fixture, ladders and the HR-1 varia
   assert.deepEqual([entry(column(qwen, 1), 'CS-B1').exact, entry(column(qwen, 2), 'CS-B1').exact], ['1/3', '0']);
   const joint = k => passKColumn({ k, ...checksFromObservations(w6.runs.map(run => ({ runId: run.run, check: 'JOINT', success: held(run.csB1) && passed(run.csC1) })), [{ id: 'JOINT', severity: 'high' }]) });
   assert.deepEqual([entry(joint(1), 'JOINT').exact, entry(joint(2), 'JOINT').exact], ['1/9', '0']);
-  // HR-1: three runs set aside for both checks.
+  // Three runs set aside for both checks.
   const dropped = ['r2-gemma4-a', 'r2-qwen9b-a', 'r3-gemma4-b'], kept = w6.runs.filter(run => !dropped.includes(run.run));
   assert.equal(entry(column(kept, 9), 'CS-B1').state, 'insufficient-trials');
   assert.deepEqual([entry(column(kept, 1), 'CS-B1').exact, entry(column(kept, 6), 'CS-B1').exact], ['1/6', '0']);
@@ -346,7 +345,7 @@ test('T9 W6 openai-cs-agents excerpt: pinned fixture, ladders and the HR-1 varia
   refuses(() => column(w6.runs, 1, observations(w6.runs).filter(o => !(o.check === 'CS-B1' && dropped.includes(o.runId)))), 'unbalanced-observations');
 });
 
-test('T9 W6 source re-check (only with SCOPEHAVEN_W6_SOURCE)', { skip: process.env.SCOPEHAVEN_W6_SOURCE ? false : 'SCOPEHAVEN_W6_SOURCE is not set' }, async () => {
+test('openai-cs-agents source re-check (only with SCOPEHAVEN_W6_SOURCE)', { skip: process.env.SCOPEHAVEN_W6_SOURCE ? false : 'SCOPEHAVEN_W6_SOURCE is not set' }, async () => {
   const bytes = await readFile(process.env.SCOPEHAVEN_W6_SOURCE);
   assert.equal(sha256(bytes), W6_SOURCE_SHA256);
   const source = JSON.parse(bytes), w6 = JSON.parse(await readFile(new URL('./fixtures/w6-cs-agents.json', import.meta.url)));
@@ -360,7 +359,7 @@ test('T9 W6 source re-check (only with SCOPEHAVEN_W6_SOURCE)', { skip: process.e
   assert.ok(source.identities.every(identity => identity.appDigest.startsWith(w6.appBuild)));
 });
 
-test('T10 Case A over real loopback: a control that reads pass on its row is below one at every k', async () => {
+test('Case A over real loopback: a control that reads pass on its row is below one at every k', async () => {
   const run = await conversationRun();
   assert.doesNotThrow(() => validateConversationRun(run));
   const control = run.results.find(r => r.id === 'reply-ok');
@@ -396,7 +395,7 @@ test('T10 Case A over real loopback: a control that reads pass on its row is bel
   refuses(() => checksFromRun(dropped, [], { expectedSuite: suite }), 'invalid-trial-data');
 });
 
-test('T11 SARIF annotator: only passK keys are added; kind, level and fingerprints unchanged', async () => {
+test('SARIF annotator: only passK keys are added; kind, level and fingerprints unchanged', async () => {
   const real = await syntheticRun();
   const edited = structuredClone(real);
   ['inconclusive', 'error', 'not_applicable'].forEach((status, i) => { edited.results[i].status = status; });
@@ -431,7 +430,7 @@ test('T11 SARIF annotator: only passK keys are added; kind, level and fingerprin
   assert.ok(renderSarif(edited).runs[0].results.slice(0, 3).every(result => result.kind !== 'fail'), 'the edited rows keep their non-fail kinds');
 });
 
-test('T12 normalizePassK: gate shapes only, rebuilt from counts; unknown keys dropped', async () => {
+test('normalizePassK: gate shapes only, rebuilt from counts; unknown keys dropped', async () => {
   const primary = await http(), trials = [await http({ createdAt: '2026-10-07T08:00:00.000Z', statuses: { 'FOREIGN-STATUS': 'fail' } }), again(primary, { createdAt: '2026-10-07T09:00:00.000Z' })];
   const shapes = [singleRunColumn(await conversationRun(), 3), singleRunColumn(scripted(), 1), passKColumn({ k: 2, ...checksFromRun(primary, trials) })];
   for (const column of shapes) {
@@ -470,7 +469,7 @@ test('T12 normalizePassK: gate shapes only, rebuilt from counts; unknown keys dr
   assert.equal(normalizePassK(demoted), null);
 });
 
-test('T13 the column carries no evidence bodies, titles, traces or secrets', async () => {
+test('the column carries no evidence bodies, titles, traces or secrets', async () => {
   for (const run of [await syntheticRun(), await conversationRun(), scripted()]) {
     for (const k of [1, 2]) {
       const text = JSON.stringify(singleRunColumn(run, k));
@@ -481,7 +480,7 @@ test('T13 the column carries no evidence bodies, titles, traces or secrets', asy
   }
 });
 
-test('T14 deterministic: shuffled input, no mutation, code-unit order', async () => {
+test('deterministic: shuffled input, no mutation, code-unit order', async () => {
   const rows = [row('b', 'high', 3, 5), row('B', 'control', 5, 5), row('a', 'high', 4, 5), row('A-1', 'low', 1, 5)];
   const before = JSON.stringify(rows), one = JSON.stringify(inRun(2, rows, ['B']));
   assert.equal(JSON.stringify(inRun(2, [...rows].reverse(), ['B'])), one);
@@ -503,7 +502,7 @@ test('T14 deterministic: shuffled input, no mutation, code-unit order', async ()
   assert.deepEqual(first.checks.find(check => check.id === 'OWN-READ'), { id: 'OWN-READ', severity: 'control', trials: 4, passed: 3, failed: 0, undecided: 1 });
 });
 
-test('T15 source text: no pass@k, failure rate, locale order or excluded vocabulary', async () => {
+test('source text: no pass@k, failure rate, locale order or excluded vocabulary', async () => {
   const words = [['pass', 'AtK'], ['failure', 'Rate'], ['locale', 'Compare'], ['read', 'ings'], ['grounded', 'ness'], ['supplied', 'Context']].map(parts => parts.join(''));
   const dashes = [0x2013, 0x2014].map(code => String.fromCharCode(code));
   for (const file of ['./passk.mjs', './store.mjs', './cli.mjs', './passk.test.mjs', './README.md', './fixtures/w6-cs-agents.json']) {
@@ -513,7 +512,7 @@ test('T15 source text: no pass@k, failure rate, locale order or excluded vocabul
   }
 });
 
-test('T16 collectSavedTrials: same identity only, never the primary, errors propagate, bounded', async t => {
+test('collectSavedTrials: same identity only, never the primary, errors propagate, bounded', async t => {
   const dir = await mkdtemp(join(tmpdir(), 'scopehaven-pass-k-store-')); t.after(() => rm(dir, { recursive: true, force: true }));
   const store = createStore(join(dir, 'data')); await store.ready;
   const primary = await http({ createdAt: '2026-10-07T12:00:00.000Z' });
@@ -571,7 +570,7 @@ test('T16 collectSavedTrials: same identity only, never the primary, errors prop
   assert.equal((await collectSavedTrials({ store: big, primary: head, max: PASS_K_MAX - 1 }).catch(error => error.code)), 'too-many-trials');
 });
 
-test('T17 markdown: rows, lowest, fractions, scope sentences and the 100-row cap', async () => {
+test('markdown: rows, lowest, fractions, scope sentences and the 100-row cap', async () => {
   const column = inRun(5, [row('ctl-a', 'control', 4, 5, 0, 1), row('p-1', 'high', 5, 5)], ['ctl-a']);
   const lines = markdownLines(column);
   assert.equal(lines[0], '### pass^k');
@@ -641,7 +640,7 @@ test('passKReasons: fixed order, saved-runs only for prohibited checks, missing 
   assert.equal(all.schema, PASS_K_SCHEMA);
 });
 
-test('R1 math-F1 surface-F1: the control figure is not given while a required control is insufficient or missing', () => {
+test('the control figure is not given while a required control is insufficient or missing', () => {
   // One flaky control with too few trials beside a measured 5/5 control: never "lowest 1".
   const mixed = inRun(5, [row('ctl-flaky', 'control', 2, 3), row('ctl-steady', 'control', 5, 5), row('p', 'high', 5, 5)], ['ctl-flaky', 'ctl-steady']);
   assert.deepEqual(mixed.controls, { required: ['ctl-flaky', 'ctl-steady'], allTrialsPassed: false, lowest: null, belowOne: ['ctl-flaky'], insufficient: ['ctl-flaky'], missing: [] });
@@ -658,7 +657,7 @@ test('R1 math-F1 surface-F1: the control figure is not given while a required co
   assert.deepEqual(inRun(3, [row('ctl-flaky', 'control', 4, 5), row('ctl-steady', 'control', 5, 5)], ['ctl-flaky', 'ctl-steady']).controls.lowest, { exact: '2/5', passHatK: passHatK([{ cluster: 'x', successes: 4, n: 5 }], 3) });
 });
 
-test('R2 math-F2: a control that is not required is its own role, counts with the checks and is never averaged', async () => {
+test('a control that is not required is its own role, counts with the checks and is never averaged', async () => {
   const checks = [['FOREIGN-STATUS', 'high'], ['OWN-READ', 'control'], ['OWN-EXPORT', 'control']];
   const primary = await http({ checks, createdAt: '2026-10-07T12:00:00.000Z' });
   const failed = await http({ checks, createdAt: '2026-10-07T10:00:00.000Z', statuses: { 'OWN-EXPORT': 'fail' } });
@@ -675,7 +674,7 @@ test('R2 math-F2: a control that is not required is its own role, counts with th
   assert.equal(markdownLines(inRun(1, [row('p', 'high', 1, 1)])).some(line => line.includes('not listed as required')), false);
 });
 
-test('R3 trials-F1: saved runs without a model identity still pool, and the column says the models may differ', async () => {
+test('saved runs without a model identity still pool, and the column says the models may differ', async () => {
   const primary = await http({ createdAt: '2026-10-07T12:00:00.000Z' });
   const pooled = passKColumn({ k: 1, ...checksFromRun(primary, [again(primary, { createdAt: '2026-10-07T11:00:00.000Z' })]) });
   assert.deepEqual([pooled.runIds.length, pooled.modelIdentity], [2, 'not-recorded']);
@@ -684,7 +683,7 @@ test('R3 trials-F1: saved runs without a model identity still pool, and the colu
   assert.deepEqual([alone.modelIdentity, alone.scope[1], alone.scope.includes(MODEL_NOT_RECORDED), alone.scope.includes(POOLED)], ['not-recorded', ALONE, false, false]);
 });
 
-test('R4 trials-F2: trial identity binds the observed model only, as compareModelIdentities compares it', async () => {
+test('trial identity binds the observed model only, as compareModelIdentities compares it', async () => {
   // Real modelIdentity() outputs over two windows of one tap: same model, different window, calls and head.
   const frames = tapFrames(), first = modelIdentity(frames, { from: 1, to: 3 }), second = modelIdentity(frames, { from: 3, to: 5 });
   assert.deepEqual([first.state, second.state, first.strength, first.key === second.key, compareModelIdentities(first, second).relation], ['observed', 'observed', 'vendor-model-string', true, 'same']);
@@ -725,7 +724,7 @@ test('R4 trials-F2: trial identity binds the observed model only, as compareMode
   }
 });
 
-test('R5 trials-F3: saved HTTP evidence is validated for the primary and every trial', async () => {
+test('saved HTTP evidence is validated for the primary and every trial', async () => {
   const primary = await http({ createdAt: '2026-10-07T12:00:00.000Z' });
   const trial = await http({ createdAt: '2026-10-07T11:00:00.000Z', statuses: { 'FOREIGN-STATUS': 'fail' } });
   const honest = passKColumn({ k: 2, ...checksFromRun(primary, [trial]) });
@@ -751,7 +750,7 @@ test('R5 trials-F3: saved HTTP evidence is validated for the primary and every t
   refuses(() => checksFromRun(primary, [trial], { expectedSuite: { version: 'http-contract/0', checks: [] } }), 'invalid-trial-data');
 });
 
-test('R6 math-F4: createdAt is exactly the toISOString form', async () => {
+test('createdAt is exactly the toISOString form', async () => {
   const primary = await http({ createdAt: '2026-10-07T10:00:01.000Z' });
   // Whole seconds, other precisions, impossible dates, a space, and extended years (which read back
   // exactly but are not fixed width, so they would sort out of time order).
@@ -768,7 +767,7 @@ test('R6 math-F4: createdAt is exactly the toISOString form', async () => {
   refuses(() => passKColumn({ k: 1, source: 'in-run-trials', runIds: ['r'], window: null, modelIdentity: 'recorded', checks: [row('a', 'high', 1, 1)] }), 'invalid');
 });
 
-test('R7 surface-F2 surface-F3: the saved-runs scope says what was read; one run can raise checks-pass-k-below-one beside a soft reason', async () => {
+test('the saved-runs scope says what was read; one run can raise checks-pass-k-below-one beside a soft reason', async () => {
   for (const status of ['inconclusive', 'error']) {
     const alone = await http({ statuses: { 'FOREIGN-STATUS': status } });
     const column = singleRunColumn(alone, 1);
@@ -780,7 +779,7 @@ test('R7 surface-F2 surface-F3: the saved-runs scope says what was read; one run
   assert.deepEqual([pooled.scope[1], pooled.scope.includes(ALONE)], [POOLED, false]);
 });
 
-test('R8 surface-F4 surface-F6 surface-F7: the SARIF annotator refuses a column that does not describe the log', async () => {
+test('the SARIF annotator refuses a column that does not describe the log', async () => {
   const run = await syntheticRun(), log = renderSarif(run), column = singleRunColumn(run, 1);
   const controlId = run.requiredControlIds[0], prohibitedId = run.results.find(r => r.severity !== 'control').id;
   assert.ok(sarifWithPassK(log, column));

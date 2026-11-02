@@ -1,9 +1,9 @@
-// In-doubt resolution, IDR-0 (gate A; IN-DOUBT-DESIGN-ADDENDUM-R1 1.2 and 1.3, ADDENDUM-R2 section 6, IN-DOUBT-LEAD-RULING-IDR0 R-1 to R-3).
+// In-doubt resolution, gate A: the opt-in.
 // A core clause may declare a check-semantics type; `upstream: "resolved"` is accepted exactly on agent-write and exactly-n clauses and
 // claim rules; effect.only opts in per selector with `outcomeJudged`, only on routes whose object the destination declares (objectPaths,
 // objectFields), each selector binding every identifier and overlapping no absence of the same check. Only a send the recorder marked exact
-// and query-free (egress-recorder/6) is judged by outcome. With no opt-in every verdict is main's: a seeded differential against main's
-// frozen modules (test/fixtures/in-doubt-main-86c8a96). With no resolver, "resolved" reads exactly as "applied".
+// and query-free (egress-recorder/6) is judged by outcome. With no opt-in every verdict is the frozen evaluator's: a seeded differential against its
+// modules (test/fixtures/in-doubt-main-86c8a96). With no resolver, "resolved" reads exactly as "applied".
 //
 // Owned synthetic data only: in-memory windows, an injected transport and observer factory, and one real recorder on 127.0.0.1 whose
 // destination hosts are names only and are never resolved or contacted.
@@ -51,8 +51,8 @@ const send = ({ name = PAY, resource = REFUND, upstream, target = EXACT, charge 
   ...(key ? { idempotency: { status: 'keyed', key: hex(keyChar(name, key)), fold: hex(keyChar(name, key)), head: hex('a'), firstSeq: firstSeq ?? seq } } : {}) }); };
 // A key's digest covers its host (src/idempotency.mjs), so one key letter on two hosts is two keys.
 const keyChar = (name, key) => name === PAY ? key : String(Number(key) + 4);
-// What main's build recorded: no target flags (egress-recorder/5), so main's frozen modules read windows without them.
-// Event digests cover the target flags main never recorded; every other field must be equal.
+// What the frozen evaluator's build recorded: no target flags (egress-recorder/5), so its modules read windows without them.
+// Event digests cover the target flags that build never recorded; every other field must be equal.
 const scrub = value => JSON.parse(JSON.stringify(value, (key, v) => (key === 'digest' ? undefined : v)));
 const mainOf = windows => windows.map(w => ({ ...w, events: w.events.map(e => { if (!e.upstream?.target) return e; const { target: _t, ...u } = e.upstream; return { ...e, upstream: u }; }) }));
 const win = (events, { coverage = 'complete', instanceId = INST, ...scope } = {}) => ({ source: 'http-egress', instanceId, scope: scopeOf(scope), coverage, reason: coverage === 'complete' ? null : 'synthetic', events });
@@ -176,17 +176,17 @@ test('5. object declarations (R-1): a template needs a {} segment, a field route
     assert.match(ok(DESTINATIONS(pay)) ?? '', pattern, JSON.stringify(pay));
 });
 
-test('6. profile load: the review\'s reproductions are refused; every identifier must be bound, and nothing else pinned', () => {
+test('6. profile load: adversarial object routes are refused; every identifier must be bound, and nothing else pinned', () => {
   assert.equal(loads([only({ outcomeJudged: [refundOn('ch_A'), closeT1] })]), true);
   assert.equal(loads([only({ outcomeJudged: [{ ...closeT1, resource: 'POST /tickets/T-1' }] })]), true, 'a template bound on a declared path');
   for (const [effects, pattern] of [
-    // A1: a collection path is no object route.
+    // A collection path is no object route.
     [[only({ outcomeJudged: [{ ...closeT1, resource: TICKETS }] })], /outcome-judged-object-undeclared/],
-    // A2 and A3: a refund pinned by a non-identifying field, or by nothing, never by its declared /charge.
+    // A refund pinned by a non-identifying field, or by nothing, never by its declared /charge.
     [[only({ outcomeJudged: [{ ...refundOn('ch_A'), fields: [{ pointer: '/amount', equals: 500 }] }] })], /outcome-judged-object-fields/],
     [[only({ outcomeJudged: [{ source: 'http-egress', operation: 'send', name: PAY, resource: REFUND }] })], /outcome-judged-object-fields/],
     [[only({ outcomeJudged: [{ ...refundOn('ch_A'), fields: [{ pointer: '/charge', equals: 'ch_A' }, { pointer: '/amount', equals: 500 }] }] })], /outcome-judged-object-fields/],
-    // A4 and A6: a boolean or null "object".
+    // A boolean or null "object".
     [[only({ outcomeJudged: [{ ...refundOn('ch_A'), fields: [{ pointer: '/refund_application_fee', equals: false }] }] })], /outcome-judged-object-fields/],
     [[only({ outcomeJudged: [{ ...refundOn('ch_A'), fields: [{ pointer: '/charge', equals: null }] }] })], /outcome-judged-object-fields/],
     // A template route pins nothing in the body; a bound path the recorder never files under; an undeclared host; no forwarding.
@@ -216,7 +216,7 @@ test('7. outcome judging (LD-3n): exact and query-free sends only; applied as be
   assert.equal(verdict(UP.unknown, { extra: () => [send({ upstream: UP.applied, charge: 'ch_Z' })] }).verdict, 'fail', 'a fail from another effect stays a fail');
   // R-2: a sub-path filed under the route, a query string, or no target record (an earlier recorder) keeps the send an attempt.
   for (const target of [{ exact: false, query: false }, { exact: true, query: true }, null]) for (const u of [UP.rejected, UP.unknown]) assert.equal(verdict(u, { target }).verdict, 'fail', JSON.stringify([target, u]));
-  for (const u of Object.values(UP)) assert.equal(judge(only(), [win([send({ name: CRM, resource: CLOSE_T1, upstream: u })])]).verdict, 'fail', 'main: an attempt');
+  for (const u of Object.values(UP)) assert.equal(judge(only(), [win([send({ name: CRM, resource: CLOSE_T1, upstream: u })])]).verdict, 'fail', 'the frozen evaluator: an attempt');
 });
 
 test('8. a send on another object stays an attempt: body-addressed (refunds by charge) and the sub-path of a pinned ticket', () => {
@@ -224,7 +224,7 @@ test('8. a send on another object stays an attempt: body-addressed (refunds by c
   for (const u of [UP.rejected, UP.unknown, UP.applied]) assert.equal(judge(refundA, [win([send({ upstream: UP.applied }), send({ upstream: u, charge: 'ch_B' })])]).verdict, 'fail', JSON.stringify(u));
   assert.equal(judge(refundA, [win([send({ upstream: UP.applied }), send({ upstream: UP.rejected })])]).verdict, 'pass');
   const unread = { status: 'not-json', values: {} };
-  assert.equal(judge(refundA, [win([send({ upstream: UP.applied }), send({ upstream: UP.rejected, captured: unread })])]).verdict, 'missing', 'unread: undecided, as main');
+  assert.equal(judge(refundA, [win([send({ upstream: UP.applied }), send({ upstream: UP.rejected, captured: unread })])]).verdict, 'missing', 'unread: undecided, as the frozen evaluator');
   const lone = [win([send({ upstream: UP.rejected, captured: unread })])];
   assert.equal(judge(only({ outcomeJudged: [refundOn('ch_A')] }), lone).verdict, 'fail');
   assert.equal(frozen.only.judgeOnly(only(), mainOf(lone), { fields: true, countBy: true }).verdict, 'fail');
@@ -235,14 +235,14 @@ test('8. a send on another object stays an attempt: body-addressed (refunds by c
   assert.equal(judge(only({ outcomeJudged: [closeT1] }), [win([send({ name: CRM, resource: CLOSE_T1 })], { forward: false })]).verdict, 'fail', 'an unforwarded window');
 });
 
-test('9. keyed groups (R-3 item 1): a group stands on its applied member, so [unknown, applied] is judged applied and no fail is lost', () => {
+test('9. keyed groups: a group stands on its applied member, so [unknown, applied] is judged applied and no fail is lost', () => {
   const decl = validateIdempotencyDeclaration({ header: 'idempotency-key' });
   const keyedWin = events => [win(events, { idempotency: { [CRM]: decl } })];
   const clause = (expect = []) => only({ expect, countBy: 'idempotency-key', outcomeJudged: [closeT1] });
   const pair = (a, b) => { const first = send({ name: CRM, resource: CLOSE_T1, upstream: a, key: '1' }); return [first, send({ name: CRM, resource: CLOSE_T1, upstream: b, key: '1', firstSeq: first.seq })]; };
   for (const [a, b] of [[UP.unknown, UP.applied], [UP.applied, UP.unknown], [UP.rejected, UP.applied], [UP.applied, UP.rejected], [UP.applied, UP.applied]]) {
     assert.equal(judge(clause(), keyedWin(pair(a, b))).verdict, 'fail', `LD-3n: the close applied (${a.outcome}, ${b.outcome})`);
-    assert.equal(frozen.only.judgeOnly(only({ countBy: 'idempotency-key' }), mainOf(keyedWin(pair(a, b))), { fields: true, countBy: true }).verdict, 'fail', 'main fails too');
+    assert.equal(frozen.only.judgeOnly(only({ countBy: 'idempotency-key' }), mainOf(keyedWin(pair(a, b))), { fields: true, countBy: true }).verdict, 'fail', 'the frozen evaluator fails too');
     assert.equal(judge(clause([{ select: closeT1, count: 1 }]), keyedWin(pair(a, b))).verdict, 'pass', 'one application, expected once');
   }
   assert.equal(judge(clause(), keyedWin(pair(UP.unknown, UP.unknown))).verdict, 'missing');
@@ -254,7 +254,7 @@ function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 10139
 const pick = (r, list) => list[Math.floor(r() * list.length)];
 const UPS = Object.values(UP), TARGETS = [EXACT, EXACT, EXACT, { exact: false, query: false }, { exact: true, query: true }, null];
 const DECL = validateIdempotencyDeclaration({ header: 'idempotency-key' });
-// Window specs (plain data), built twice: once for the live modules and once for main's frozen ones (each admits scoped entries itself).
+// Window specs (plain data), built twice: once for the live modules and once for the frozen ones (each admits scoped entries itself).
 function randomSpecs(r) {
   const keyed = r() < 0.4, two = r() < 0.3;
   const one = instanceId => {
@@ -293,13 +293,13 @@ const randomOnly = r => only({ expect: Array.from({ length: Math.floor(r() * 3) 
 const randomClaims = r => r() < 0.5 ? [] : [{ trigger: { field: { pointer: '/ok', success: [true], refusal: [false] } }, select: randomSelect(r) }];
 const readingOf = r => pick(r, [{ reading: 'success', valueIndex: 0 }, { reading: 'refusal', valueIndex: 0 }, { reading: 'unreadable' }]);
 
-test('10. differential (R-3 item 2): with no opt-in, core, effect.only, decideEffects and claim results equal main\'s frozen modules', () => {
+test('10. differential: with no opt-in, core, effect.only, decideEffects and claim results equal the frozen evaluator\'s modules', () => {
   const r = rng(20261016);
   let n = 0, keyedCases = 0, scopedCases = 0, twoWindows = 0;
   for (let i = 0; i < 2500; i++) {
     const specs = randomSpecs(r);
-    // One build: main's copy is the same events without the target flags. Its scoped entries are admitted by main's frozen module and by
-    // the live one too, because the frozen http-effects reads custody through the live src/custody.mjs (one module on main).
+    // One build: the frozen copy is the same events without the target flags. Its scoped entries are admitted by the frozen module and by
+    // the live one too, because the frozen http-effects reads custody through the live src/custody.mjs (one module there).
     const live = build(specs, admitScoped), main = mainOf(live).map(w => (w.scoped ? admitScoped(frozen.events.admitScoped(w)) : w));
     const core = randomCore(r), onlyClause = randomOnly(r), claims = randomClaims(r), readings = claims.map(() => readingOf(r));
     assert.deepEqual(scrub(evaluateEffectAssertion(core, live, { countBy: true, scoped: true })), scrub(frozen.events.evaluateEffectAssertion(core, main, { countBy: true, scoped: true })), JSON.stringify(core));
@@ -307,7 +307,7 @@ test('10. differential (R-3 item 2): with no opt-in, core, effect.only, decideEf
     assert.deepEqual(scrub(decideEffects([core, onlyClause], live, { claims, readings })), scrub(frozen.effects.decideEffects([core, onlyClause], main, { claims, readings })));
     assert.deepEqual(validateDeclaredClaims(claims.length ? claims : [{ trigger: { field: { pointer: '/ok', success: [true] } }, select: { name: CRM } }]), frozen.effects.validateDeclaredClaims(claims.length ? claims : [{ trigger: { field: { pointer: '/ok', success: [true] } }, select: { name: CRM } }]));
     assert.deepEqual(declaredEffect(onlyClause), frozen.effects.declaredEffect(onlyClause));
-    assert.deepEqual(onlyDeclared(onlyClause), Object.fromEntries(['kind', 'expect', 'allow', 'operations', 'sources', 'counterparts', 'countBy'].filter(k => Object.hasOwn(onlyClause, k)).map(k => [k, onlyClause[k]])), 'settlement\'s re-judge list, as main\'s');
+    assert.deepEqual(onlyDeclared(onlyClause), Object.fromEntries(['kind', 'expect', 'allow', 'operations', 'sources', 'counterparts', 'countBy'].filter(k => Object.hasOwn(onlyClause, k)).map(k => [k, onlyClause[k]])), 'settlement\'s re-judge list, as the frozen evaluator\'s');
     for (const w of live) for (const e of w.events) assert.equal(upstreamState(e, 'applied'), frozen.outcome.upstreamState(e, 'applied'));
     n += 3; if (specs.some(s => s.keyed)) keyedCases++; if (specs.some(s => s.scoped)) scopedCases++; if (specs.length > 1) twoWindows++;
   }
@@ -315,7 +315,7 @@ test('10. differential (R-3 item 2): with no opt-in, core, effect.only, decideEf
   assert.ok(keyedCases > 500 && scopedCases > 50 && twoWindows > 400, `exercised: ${keyedCases} keyed, ${scopedCases} scoped, ${twoWindows} two-window cases`);
 });
 
-test('11. property: a gate-A clause reads as its "applied" twin; an outcome-judged pass is main\'s pass without the set-aside sends, and never passes over an applied unexpected send', () => {
+test('11. property: a gate-A clause reads as its "applied" twin; an outcome-judged pass is the frozen evaluator\'s pass without the set-aside sends, and never passes over an applied unexpected send', () => {
   const r = rng(77);
   let passes = 0, setAsidePasses = 0, keyedPasses = 0;
   for (let i = 0; i < 6000; i++) {

@@ -6,7 +6,7 @@ This is distinct from the earlier parked packs work and from `integrations/payme
 
 ## The four shipped packs
 
-Each pack is built from the owned fixture's checks, and the manifest's `derivedFrom` cites them. Packs are named by the behaviour they check, never by a regulation, and every manifest has `"regulation": null` until the claims register approves a mapping.
+Each pack is built from the owned fixture's checks, and the manifest's `derivedFrom` cites them. Packs are named by the behaviour they check, never by a regulation, and every manifest has `"regulation": null` until a mapping is approved.
 
 | Pack | Checks (in order) | Built from |
 | --- | --- | --- |

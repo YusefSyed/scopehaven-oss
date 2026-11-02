@@ -1,4 +1,4 @@
-// Readiness edge E1 end to end over real loopback HTTP: a destination that declares `forward` has each recorded send
+// Forwarding end to end over real loopback HTTP: a destination that declares `forward` has each recorded send
 // forwarded, as recorded, to a declared loopback upstream, and its event records the upstream outcome. Only a proven,
 // listed 2xx reads applied, only a proven, listed 4xx reads rejected, and everything else reads unknown, which never
 // passes a clause that requires the outcome. Every connection goes to 127.0.0.1; destination hosts are names only.
@@ -78,7 +78,7 @@ async function windowOf(o, between) {
   return { w: await collectWindow(o, from, await o.mark()), out };
 }
 const sel = (name, extra = {}) => ({ source: 'http-egress', operation: 'send', name, ...extra });
-// egress-recorder/6 adds each settled forward's target flags (exact path, query; IN-DOUBT-LEAD-RULING-IDR0 R-2), and /7 its transport record
+// egress-recorder/6 adds each settled forward's target flags (exact path, query), and /7 its transport record
 // (src/in-doubt.mjs: whether the TCP connect completed, and clock values that vary): the outcome fields are compared apart from them, and
 // the flags read on their own.
 const bare = u => { if (!u?.target && !u?.transport) return u; const { target: _t, transport: _p, ...rest } = u; return rest; };
@@ -161,7 +161,7 @@ test('no reply in full within the bounds reads unknown, and the app gets a gatew
   const refused = await windowOf(o2, () => send(o2.port, `http://${PAY}/v1/refunds/ok`, '{}'));
   assert.equal(refused.out.status, 502);
   assert.deepEqual(bare(refused.w.events[0].upstream), { outcome: 'unknown', status: null, proven: false });
-  assert.equal(refused.w.events[0].upstream.transport.connected, false, 'R0: the connect never completed');
+  assert.equal(refused.w.events[0].upstream.transport.connected, false, 'the transport record: the connect never completed');
   assert.equal(verdict(applied('effect.none'), refused.w), 'missing');
   // HTTPS through the proxy to a forwarded host: the tunnel is refused, never forwarded, and reads unknown.
   const tunnel = await windowOf(o, () => new Promise(resolve => { const req = request({ host: '127.0.0.1', port: o.port, method: 'CONNECT', path: `${PAY}:443` }); req.on('connect', (res, socket) => { socket.destroy(); resolve(res.statusCode); }); req.on('response', res => { res.resume(); resolve(res.statusCode); }); req.on('error', () => resolve(null)); req.end(); }));
@@ -250,7 +250,7 @@ test('forwarding leaves the idempotency key record as without it, except that a 
     await send(port, `http://${HOOKS}/hooks/ok`, '{"id":"evt_1"}');
     await send(port, `http://${HOOKS}/hooks/ok`, '{"id":"evt_1"}');
     // A same-key send that arrives while the first is still being forwarded: the upstream is still applying the first, so both
-    // overlap (E2b moved the key's settle to the forward's settle point). Without forwarding the sink answers at once: sequential.
+    // overlap (the key settles at the forward's settle point). Without forwarding the sink answers at once: sequential.
     const first = send(port, `http://${PAY}/v1/refunds/slow`, '{"amount":8}', k('k3'));
     await new Promise(r => setTimeout(r, 150));
     await send(port, `http://${PAY}/v1/refunds/ok`, '{"amount":8}', k('k3'));
@@ -316,7 +316,7 @@ test('validation: the upstream is literal loopback, never the recorder, and a fo
   assert.throws(() => buildSequenceObservers([{ id: 'sink', type: 'egress-recorder', port: 47001, destinations: [{ host: PAY, forward: { upstream: 'http://127.0.0.1:47002' } }] }]), /cannot use an egress recorder destination with "forward"/);
 });
 
-test('differential compat against d349c7c: a recorder without forward records and answers exactly as before', async t => {
+test('differential compat against the frozen recorder copy: a recorder without forward records and answers exactly as before', async t => {
   const config = port => ({ port, routing: 'proxy', witness: { actorId: 'ops', method: 'GET', path: '/ping', host: WITNESS }, witnessWaitMs: 1500, quietMs: 150, maxBodyBytes: 2048,
     destinations: [{ host: PAY, paths: ['/v1/refunds'], capture: { pointers: ['/amount'], encodings: ['json', 'form'] }, correlation: { header: 'x-request-id' } }, { host: HOOKS }],
     replies: [{ host: PAY, method: 'POST', path: '/v1/refunds', status: 200, json: { id: 're_static' } }] });
@@ -392,7 +392,7 @@ test('connector run: the app claims failure; the upstream outcome decides, the r
   assert.equal(alone.results.find(x => x.id === 'DECLINED').status, 'inconclusive');
   assert.match(JSON.stringify(alone.results.find(x => x.id === 'DECLINED').assertions), /selector-unpaired/);
   const declared = { [PAY]: { upstreamPort: up.port, applied: [200, 201, 204], rejected: [402], proof: true } };
-  assert.deepEqual(r.observers.map(o => o.collector), [COLLECTOR_RECORDS['egress-recorder']], 'the collector that built the windows (coverage v2, Part E)');
+  assert.deepEqual(r.observers.map(o => o.collector), [COLLECTOR_RECORDS['egress-recorder']], 'the collector that built the windows');
   assert.deepEqual(r.observers.map(({ collector, ...o }) => o), [{ id: 'sink', type: 'egress-recorder', settleMs: 250, forward: declared }]);
   assert.ok(r.limitations.includes(FORWARD_LIMITATION));
   const suite = createRegistry({ profiles: [p], env }).exportSuite(p.id);

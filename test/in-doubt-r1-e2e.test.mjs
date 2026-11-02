@@ -1,8 +1,8 @@
-// In-doubt resolution R1 end to end on loopback (IDR-4): a real egress recorder (egress-recorder/8, /9 since IDR-3) that declares a request feed, a forward
+// In-doubt resolution by the request feed end to end on loopback: a real egress recorder (egress-recorder/8 or later) that declares a request feed, a forward
 // upstream double that applies a request (or not) and then resets the connection, so every send is in doubt, a provider stub that signs its
 // request entries with a key made in this process, and a small app that sends each task's close through the recorder with its own
 // idempotency key. runHttpAssessment and the shared validator, with the exported suite. Checked: reset after apply is confirmed, reset before
-// apply is refuted under the watermark, a key the feed held before the run stays in doubt, and the same run without the feed is main's; the
+// apply is refuted under the watermark, a key the feed held before the run stays in doubt, and the same run without the feed reads as before; the
 // sealed run holds no key, object id or tenant; the recorder writes arrivals only for feed hosts. Loopback only: 127.0.0.1, owned synthetic
 // names and dummy secrets in an env object (never the process environment). No real provider, no hosted write, no spend.
 import test from 'node:test';
@@ -59,7 +59,7 @@ async function appOf(t, sinkPort, task) {
 const verdictsOf = row => row.trace[1].data.effects.map(e => e.verdict);
 const byOf = row => row.trace[1].data.effects[0].resolution?.attempts?.[0]?.by ?? null;
 
-// One run with one task (a later task sending the same close would hold this one's counts at settlement, main's rule).
+// One run with one task (a later task sending the same close would hold this one's counts at settlement, the run-level settlement rule).
 const EFFECTS = { 1: [C.EXISTS, C.count(1), C.KEYED_COUNT(1)], 2: [C.EXISTS, C.KEYED_ONLY([])], 3: [C.EXISTS] };
 async function scenario(t, { withFeed, task }) {
   const stub = await createRequestFeedStub({ feedId: 'crm-requests' }).listen();
@@ -90,10 +90,10 @@ test('1. reset after apply is confirmed, reset before apply refuted under the wa
     runs[task] = { run, row };
   }
   const [t1, t2, t3] = [1, 2, 3].map(k => runs[k].row);
-  assert.deepEqual([verdictsOf(t1), t1.status, t1.backendEvidence, byOf(t1)], [['pass', 'pass', 'pass'], 'pass', 'observed', 'r1'], 'RA: confirmed (exists, exactly one, one keyed application)');
-  assert.deepEqual([verdictsOf(t2), t2.status, byOf(t2)], [['fail', 'pass'], 'fail', 'r1'], 'RB: refuted (the agent-write exists fails; nothing outside the set applied)');
+  assert.deepEqual([verdictsOf(t1), t1.status, t1.backendEvidence, byOf(t1)], [['pass', 'pass', 'pass'], 'pass', 'observed', 'r1'], 'reset after apply: confirmed (exists, exactly one, one keyed application)');
+  assert.deepEqual([verdictsOf(t2), t2.status, byOf(t2)], [['fail', 'pass'], 'fail', 'r1'], 'reset before apply: refuted (the agent-write exists fails; nothing outside the set applied)');
   assert.deepEqual([verdictsOf(t3), t3.trace[1].data.effects[0].resolution.attempts[0].reason], [['missing'], 'key-history'], 'a key used before the run: in doubt');
-  // Sealed: the recorder's transport carries the arrival on the feed host; every R1 record is a read; nothing names a key, object or tenant.
+  // Sealed: the recorder's transport carries the arrival on the feed host; every request-feed record is a read; nothing names a key, object or tenant.
   const e1 = t1.trace[1].data.windows[0].events[0];
   assert.deepEqual(Object.keys(e1.upstream.transport).sort(), ['arrivedMono', 'arrivedWall', 'connected', 'mono', 'wall']);
   assert.ok(e1.upstream.transport.arrivedMono <= e1.upstream.transport.mono && e1.upstream.transport.connected);
@@ -105,10 +105,10 @@ test('1. reset after apply is confirmed, reset before apply refuted under the wa
   }
   const { run } = runs[1];
   assert.deepEqual([run.observers[0].collector.label, run.observers[0].requestFeed.collector.label, run.observers[0].requestFeed.feedId], ['egress-recorder/13', 'request-feed/1', 'crm-requests']);
-  assert.ok(run.limitations.some(l => /request feed/i.test(l)), 'the run says what R1 rests on');
+  assert.ok(run.limitations.some(l => /request feed/i.test(l)), 'the run says what the request feed rests on');
 });
 
-test('2. the same app and upstream with no request feed: the attempt stays in doubt, as on main, and no arrival is recorded', async t => {
+test('2. the same app and upstream with no request feed: the attempt stays in doubt, as before, and no arrival is recorded', async t => {
   const { p, run } = await scenario(t, { withFeed: false, task: 1 });
   const row = run.results.find(r => r.id === 'TASK1');
   assert.deepEqual(verdictsOf(row), ['missing', 'missing', 'missing']);

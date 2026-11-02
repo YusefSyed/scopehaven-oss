@@ -1,4 +1,4 @@
-// The shipped Python shim (adapters/shim.py): channel and ledger under threads (RT1 product gap 7),
+// The shipped Python shim (adapters/shim.py): channel and ledger under threads,
 // the fault hook's three kinds (fault.mjs), and the state helpers object-path adapters answer snapshots with. fixtures/shim_checks.py runs each
 // property's allowed and forbidden case once; each test reads its own result. No network, no model.
 import test from 'node:test';

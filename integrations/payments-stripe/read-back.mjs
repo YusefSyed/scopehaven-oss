@@ -1,4 +1,4 @@
-// The Stripe read-back observer (N14): ScopeHaven's own read of the provider's ledger through the provider's API, never through the
+// The Stripe read-back observer: ScopeHaven's own read of the provider's ledger through the provider's API, never through the
 // app or its tables. At each mark the operator calls read(label); the observer lists, with a read-only restricted test key the app
 // never holds:
 //   GET /v1/account                              the account the key reads (compared with the declared one)
@@ -26,7 +26,7 @@
 // Custody: a read returned by read() is deeply frozen and branded in memory (isAuthenticRead). Its sha256 is an unkeyed checksum of
 // its canonical JSON: a saved read can be checked for edits (verifySealedRead) but is not a signature, so a file is not a portable proof.
 // Two modes. 'loopback-stand-in' (stage 1, the default): the provider is the loopback stand-in (stand-in.mjs) at
-// http://127.0.0.1:<port>. 'stripe-test-mode' (stage 2, STAGE-2.md): the provider is Stripe itself, base exactly
+// http://127.0.0.1:<port>. 'stripe-test-mode' (stage 2): the provider is Stripe itself, base exactly
 // https://api.stripe.com, over TLS with the certificate checked for api.stripe.com, a pinned Stripe-Version, and a declared sandbox
 // account that every read must match (GET /v1/account needs the read key's connected_account_read permission; a 403 there leaves
 // the read partial, never a pass). The host is fixed in this file and never comes from configuration or a request. The request
@@ -39,7 +39,7 @@ import { createHash, randomUUID } from 'node:crypto';
 export const LEDGER_SCHEMA = 'scopehaven-stripe-ledger/1';
 export const READ_BACK_MODES = Object.freeze(['loopback-stand-in', 'stripe-test-mode']);
 export const STRIPE_TEST_BASE = 'https://api.stripe.com';
-// Chosen at the stage-2 PR (docs.stripe.com/changelog/endive, read 2026-10-25) and recorded in every stage-2 read.
+// Chosen for stage 2 (docs.stripe.com/changelog/endive, read 2026-10-25) and recorded in every stage-2 read.
 export const STRIPE_VERSION = '2026-09-30.endive';
 const STRIPE_HOST = 'api.stripe.com';
 export const READ_BACK_LIMITS = Object.freeze({ pageLimit: 100, maxPages: Object.freeze([1, 100]), timeoutMs: Object.freeze([100, 30000]), settleMs: Object.freeze([0, 120000]),

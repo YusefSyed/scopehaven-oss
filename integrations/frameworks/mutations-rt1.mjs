@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Mutation sweep for the RT1 gap slices (the claim reader, said-did without a planned fault, no-change):
+// Mutation sweep for the claim reader, said-did without a planned fault and no-change:
 // one mutation per property; each must make the adjacent tests fail. A survivor is a test gap.
 //   node integrations/frameworks/mutations-rt1.mjs [--out FILE] [--only ID,ID...]
 // Works on a temporary copy of the modules the tests load (as mutations.mjs does): the checkout

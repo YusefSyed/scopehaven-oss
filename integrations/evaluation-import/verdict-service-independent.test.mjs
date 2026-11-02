@@ -1,4 +1,4 @@
-// Clean on records the application cannot write (SURPASS-REFEREE-03): the hold gate in front of the
+// Clean on records the application cannot write: the hold gate in front of the
 // records desk records each call (hold-proxy, independent), and the desk's outbound HTTP goes through
 // an egress recorder used as its forward proxy (http-egress, independent), whose absence a per-window
 // witness proves. The verdict service sends that witness the way core's connector does.
@@ -110,7 +110,7 @@ test('a service with a witness sink must name the application to ask; the witnes
   assert.equal(journal.includes(TOKEN), false);
 });
 
-// The round-4 review's probes (review record, not in this repository), as acceptance tests.
+// Adversarial probes, as acceptance tests.
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/promptfoo-0.123.1-v3.synthetic.json', import.meta.url), 'utf8'));
 const RECORDS_ASSERT = { type: 'javascript', metric: 'scopehaven-records', weight: 0 }, JUDGE_ASSERT = { type: 'contains', value: 'synthetic response' };
 // A judge pass for one window, as Promptfoo exports it, read against the service's journal.
@@ -137,7 +137,7 @@ function quietLedger({ instanceId = 'review-ledger', failTailMark = false, inclu
 }
 const post = async (service, path, body = {}) => { const res = await fetch(`${service.url}${path}`, { method: 'POST', headers: { authorization: `Bearer ${service.token}`, 'content-type': 'application/json' }, body: JSON.stringify(body) }); return { status: res.status, ...(await res.json()) }; };
 
-test('a request the hold gate still holds when the window ends is no record of the call: the window never reads clean, and a completed request does (review R4-1, probe W1)', async t => {
+test('a request the hold gate still holds when the window ends is no record of the call: the window never reads clean, and a completed request does', async t => {
   for (const held of [false, true]) {
     let upstreamCalls = 0;
     const app = createServer((req, res) => { upstreamCalls++; req.resume(); res.writeHead(200).end('synthetic response'); });
@@ -169,7 +169,7 @@ test('a request the hold gate still holds when the window ends is no record of t
   }
 });
 
-test('a gap the records could not observe is never read as no effect: a failed tail mark names the selector unobserved and stops the clean before it, and a late delete still counts (review R4-2, probe W2)', async t => {
+test('a gap the records could not observe is never read as no effect: a failed tail mark names the selector unobserved and stops the clean before it, and a late delete still counts', async t => {
   for (const failTailMark of [false, true]) {
     const observer = quietLedger({ failTailMark, includeCalls: true });
     const service = await startVerdictService({ observers: [observer], settleMs: 250, calls: { source: 'hold-proxy', name: 'chat.request' }, callPath: '/chat', forbidden: { default: { source: 'hold-proxy', name: 'notes.delete' } } });

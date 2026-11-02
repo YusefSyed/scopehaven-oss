@@ -1,5 +1,5 @@
-// In-doubt resolution R1, the request feed (IDR-4; IN-DOUBT-DESIGN.md section 3, ADDENDUM-R1 section 3 and M7, ADDENDUM-R2 sections 2 and 5,
-// minors m1 and m6): the declaration and its refusals, the run record, the sealed read, every row of the derivation (src/request-feed-rules.mjs
+// In-doubt resolution by the request feed: the declaration and its refusals, the run record, the sealed read, every row of the
+// derivation (src/request-feed-rules.mjs
 // deriveRequestFeed, through the core's binding in src/in-doubt.mjs), and the reader (integrations/observers/request-feed.mjs) against a
 // loopback provider stub that signs with a key made in this process. No real provider, no hosted write, no secret: the only sockets are the
 // stub's on 127.0.0.1 and the reader's requests to it.
@@ -74,7 +74,7 @@ test('2. the profile: the feed endpoint never shares a port with the app, an obs
   assert.throws(() => validateTargetFile(profile([C.declaration({ upstream: 47119 })])), /forward upstream/);
   assert.throws(() => validateTargetFile(profile([C.declaration(), { id: 'sink2', type: 'egress-recorder', port: 47120, destinations: [{ host: 'hooks.example' }] }])), /observer "sink2"/);
   assert.throws(() => validateTargetFile(profile([{ ...C.declaration(), requestFeed: { ...C.requestFeed(), unknown: true } }])), /"requestFeed" is/);
-  // PR363-REVIEW minor 2: a second egress recorder forwarding a feed host is another writer the feed lists and the group never sees: refused.
+  // A second egress recorder forwarding a feed host is another writer the feed lists and the group never sees: refused.
   assert.throws(() => validateTargetFile(profile([C.declaration(), { id: 'sink2', type: 'egress-recorder', port: 47121, destinations: [{ host: CRM }] }])), /egress recorder "sink2" also declares/);
   assert.doesNotThrow(() => validateTargetFile(profile([C.declaration(), { id: 'sink2', type: 'egress-recorder', port: 47121, destinations: [{ host: 'hooks.example' }] }])));
   assert.doesNotThrow(() => validateTargetFile(profile([C.declaration({ feed: null }), { id: 'sink2', type: 'egress-recorder', port: 47121, destinations: [{ host: CRM }] }])), 'no feed: main\'s rules');
@@ -91,7 +91,7 @@ test('3. the sealed read, by shape; the dirty statuses equal the key rules\' own
 });
 
 // --- The derivation, row by row, through the core's binding -----------------------------------------------------------------
-// Bind the recorder's records for these events (as the run-end stage does) and read each event's fate and R1 record.
+// Bind the recorder's records for these events (as the run-end stage does) and read each event's fate and request-feed record (r1).
 function decide(events, records, { feed } = {}) {
   const w = windowOf(events, { feed });
   bindResolutions([w], lateEntriesFor([w], records));
@@ -99,14 +99,14 @@ function decide(events, records, { feed } = {}) {
 }
 const r1Of = (events, records, options) => decide(events, records, options).map(x => (x.r1 ? (x.r1.status === 'failed' ? `failed:${x.r1.reason}` : x.r1.result) : null));
 
-test('4. applicability: R1 applies only to an in-doubt attempt of a request-feed window that connected, is keyed, exact, query-free and on a declared route', () => {
+test('4. applicability: the request feed (r1) applies only to an in-doubt attempt of a request-feed window that connected, is keyed, exact, query-free and on a declared route', () => {
   assert.deepEqual(LATER_RESOLVER_NAMES, ['r1', 'r2']);
   const cases = [[send({ seq: 1 }), ['r0', 'r1']], [send({ seq: 2, outcome: 'refused' }), ['r0']], [send({ seq: 3, outcome: 'missing' }), ['r0']], [send({ seq: 4, outcome: 'applied' }), []],
     [send({ seq: 5, key: null }), ['r0']], [send({ seq: 6, exact: false }), ['r0']], [send({ seq: 7, query: true }), ['r0']], [send({ seq: 8, resource: 'POST /tickets/T-9/close' }), ['r0']],
     [send({ seq: 9, host: ALT }), ['r0']], [send({ seq: 10, outcome: 'server' }), ['r0', 'r1']]];
   windowOf(cases.map(([e]) => e));
   for (const [e, want] of cases) assert.deepEqual(applicableResolvers(e), want, `seq ${e.seq}`);
-  // A window without the feed (or a copy of an event) never marks it: R0 alone.
+  // A window without the feed (or a copy of an event) never marks it: r0 alone.
   const plain = send({ seq: 11 }); windowOf([plain], { feed: null });
   assert.deepEqual([applicableResolvers(plain), applicableResolvers(structuredClone(cases[0][0]))], [['r0'], ['r0']]);
   assert.equal(requestFeedApplies(cases[0][0], null), false);
@@ -142,7 +142,7 @@ test('6. a refutation: no applied entry, a declared watermark past the bound, th
     [{ ...ok, headWall: ok.headWall + SKEW + 1 }, [], 'silent', 'the wall-to-monotonic offset moved by more than the skew (a step or a sleep)'],
     [{ ...ok, headWall: null }, [], 'silent', 'no wall clock at the head read'],
   ]) { const e = send({ seq: 1 }); assert.deepEqual(r1Of([e], [supplied(e, read({ ...fields, entries }))]), [want], why); }
-  // No wall clock at the connection end (PR342-REVIEW-R2 finding 7): never refuted; a route without settleMs or a feed without watermark neither.
+  // No wall clock at the connection end: never refuted; a route without settleMs or a feed without watermark neither.
   { const e = send({ seq: 1, endWall: null }); assert.deepEqual(r1Of([e], [supplied(e, read(ok))]), ['silent']); }
   { const e = send({ seq: 1, resource: OTHER }); assert.deepEqual(r1Of([e], [supplied(e, read(ok))]), ['silent'], 'the route declares no settleMs'); }
   { const e = send({ seq: 1 }); assert.deepEqual(r1Of([e], [supplied(e, read(ok))], { feed: { ...C.FEED, watermark: false } }), ['silent'], 'the feed declares no watermark'); }
@@ -181,7 +181,7 @@ test('7. in doubt: every anomaly of the feed, the key, the group or the clocks l
     [[send({ seq: 1 }), send({ seq: 2, key: { status: 'unreadable', key: null, fold: null, head: 'c'.repeat(64), firstSeq: null } })], 'host-dirty'],
   ];
   for (const [events, reason] of groups) assert.ok(one(two(read({ entries: [entry()] })), events).every(x => x === null || x === `failed:${reason}`) && one(two(read({ entries: [entry()] })), events).some(x => x === `failed:${reason}`), reason);
-  // An in-doubt member R1 cannot read (no transport record, a sub-path, or no record for it): the whole group is in doubt.
+  // An in-doubt member the feed cannot read (no transport record, a sub-path, or no record for it): the whole group is in doubt.
   for (const other of [k(2, { outcome: 'missing' }), k(2, { exact: false })]) { const a = send({ seq: 1 }); assert.deepEqual(r1Of([a, other], [supplied(a, two(read({ entries: [entry()] })))]), ['failed:group-unresolved', null]); }
   { const a = send({ seq: 1 }), b = k(2); assert.deepEqual(r1Of([a, b], [supplied(a, two(read({ entries: [entry()] })))]), ['failed:group-unresolved', null], 'a member with no record'); }
   { const a = send({ seq: 1 }), b = k(2); assert.deepEqual(r1Of([a, b], [supplied(a, two(read({ entries: [entry()] }))), supplied(b, two(read({ entries: [entry({ at: OFFSET + 1060 })] })))]), ['failed:record-mismatch', 'failed:record-mismatch']); }
@@ -193,7 +193,7 @@ test('7. in doubt: every anomaly of the feed, the key, the group or the clocks l
   { const e = send({ seq: 1 }); assert.throws(() => bindResolutions([windowOf([e])], [{ observer: C.INST, seq: 1, records: [{ resolver: 'r1', status: 'succeeded', result: 'confirms' }] }]), /resolution-record/); }
 });
 
-test('8. m6: an attempt reads only entries carrying its own exact key; a decline under K1 never confirms K1 when K2 later succeeds on the same object', () => {
+test('8. an attempt reads only entries carrying its own exact key; a decline under K1 never confirms K1 when K2 later succeeds on the same object', () => {
   const ok = { headMono: 2100 + SETTLE, headWall: OFFSET + 2100 + SETTLE, watermark: OFFSET + 2100 + SETTLE + SKEW };
   const k1 = send({ seq: 1, key: 'K1', content: 'c1' }), k2 = send({ seq: 2, key: 'K2', content: 'c1', arrived: 2000, ended: 2100 });
   const results = r1Of([k1, k2], [supplied(k1, read({ ...ok, entries: [entry({ state: 'not-applied' })] })), supplied(k2, read({ ...ok, entries: [entry({ at: OFFSET + 2050 })] }))]);
@@ -309,7 +309,7 @@ test('11. the reader fails closed: unsigned, wrong key, malformed, another feed 
   });
 });
 
-test('12. property: any fault in the served feed (an entry dropped, reordered, unsigned, re-signed by another key, edited under its old signature, redelivered with another body) is detected, so every R1 record fails; untouched, the reads are the feed\'s', async t => {
+test('12. property: any fault in the served feed (an entry dropped, reordered, unsigned, re-signed by another key, edited under its old signature, redelivered with another body) is detected, so every request-feed record fails; untouched, the reads are the feed\'s', async t => {
   const g = C.rng(1212), KEYS = ['A', 'B', 'C'];
   const FAULTS = {
     drop: stub => { stub.serve.drop.add(2 + Math.floor(g() * (stub.entries.length - 1))); },
@@ -339,7 +339,7 @@ test('12. property: any fault in the served feed (an entry dropped, reordered, u
   assert.ok(Object.values(counts).every(x => x >= 6), JSON.stringify(counts));
 });
 
-test('13. PR363-REVIEW minor 1: an absence refutation needs the key to list at least as many entries as members the provider answered (a positive control, as R2\'s C1)', () => {
+test('13. an absence refutation needs the key to list at least as many entries as members the provider answered (a positive control, as read-back\'s C1)', () => {
   const ok = read({ headMono: 1300 + SETTLE, headWall: OFFSET + 1300 + SETTLE, watermark: OFFSET + 1300 + SETTLE + SKEW, keySends: 2 });
   const group = first => [send({ seq: 1, outcome: first }), send({ seq: 2, firstSeq: 1, arrived: 1200, ended: 1300 })];
   const readsFor = (events, r) => events.filter(e => e.upstream.transport?.connected && e.upstream.outcome === 'unknown').map(e => supplied(e, r));
@@ -353,7 +353,7 @@ test('13. PR363-REVIEW minor 1: an absence refutation needs the key to list at l
   { const events = group('reset'); assert.deepEqual(r1Of(events, readsFor(events, ok)), ['refutes', 'refutes']); }
 });
 
-test('14. PR363-REVIEW minor 5: R1 and the key collapse read a group\'s identity and retention through one function, src/key-identity.mjs keyGroupIdentity; neither module keeps a copy', async () => {
+test('14. the request feed and the key collapse read a group\'s identity and retention through one function, src/key-identity.mjs keyGroupIdentity; neither module keeps a copy', async () => {
   for (const name of ['idempotency.mjs', 'request-feed-rules.mjs']) {
     const text = await readFile(new URL(`../src/${name}`, import.meta.url), 'utf8');
     assert.match(text, /import \{[^}]*\bkeyGroupIdentity\b[^}]*\} from '\.\/key-identity\.mjs';/, name);

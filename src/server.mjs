@@ -96,7 +96,7 @@ export async function startServer({ port = 4317, dataDir = resolve(root, 'data')
         if (active) return json(res, 409, { error: 'Another assessment is running. Try again after it finishes.', code: 'assessment-in-progress' });
         active = true;
         try {
-          // A configured target runs only under an authorization record that covers it now (CMP-ROE-01). The record is
+          // A configured target runs only under an authorization record that covers it now. The record is
           // read from authorizationFile (SCOPEHAVEN_AUTHORIZATION_FILE) at each run and checked before any request is
           // sent; a refusal is a 403 with the refusal's code. Built-in fixture targets need none and keep their shape.
           // The window is checked again before every request the run sends and when each observer call it makes starts,

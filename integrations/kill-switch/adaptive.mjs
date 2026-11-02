@@ -1,5 +1,5 @@
 // ADAPTIVE-01. A bounded generator over the owned control-tamper fixture's ALREADY-DECLARED
-// attempts. Design brief: a review record outside this repository
+// attempts.
 //
 // What it does: it chooses an ORDER for the declared tool calls, a DISTRIBUTION of them across
 // script steps, and a PAUSE POINT among the steps that distribution creates, then runs the
@@ -27,8 +27,8 @@ export const BOUNDS = Object.freeze({ maxAttempts: 64, maxRuns: 8, maxMs: 60000 
 
 // The bounds are CEILINGS: a caller may ask for less, never for more, and every bound must be a
 // finite number. `{ ...BOUNDS, ...bounds }` let a caller raise any of them (9 runs, 90 attempts),
-// and a NaN switched a check off while the record saved it as null (an earlier review round 4,
-// design deviation 7). Asking for more is a configuration error rather than a mode, like an
+// and a NaN switched a check off while the record saved it as null. Asking for more is a
+// configuration error rather than a mode, like an
 // origin, and so is a bound this module does not have.
 export function boundsFrom(bounds = {}) {
   if (bounds === null || typeof bounds !== 'object' || Array.isArray(bounds)) {
@@ -120,8 +120,8 @@ export function assertOwnedFixtureOnly(options = {}) {
 
 // `hooks` is forwarded into startAgentDesk, so an ALLOW-list rather than a deny-list: the desk's
 // dbPath, modelBaseUrl and tokens are infrastructure that control-tamper supplies, and letting a
-// caller set dbPath made the desk create a SQLite file at a path of the caller's choosing (lead
-// review of #253, low 2). These are the desk's BEHAVIOURAL flags only. A test asserts every name
+// caller set dbPath made the desk create a SQLite file at a path of the caller's choosing.
+// These are the desk's BEHAVIOURAL flags only. A test asserts every name
 // here appears in startAgentDesk's own signature, so the list cannot drift away from the desk.
 export const ALLOWED_HOOKS = Object.freeze(['recheckEachStep', 'modelTimeoutMs', 'refuseAllTools', 'serveSuspended', 'parkWhenSuspended',
   'commitAfterReplyMs', 'haltReply', 'eraseLedgerMs', 'rewriteNoteMs', 'readdSameIdMs', 'swapTablesMs', 'queueTableMs', 'lateControlMs',
@@ -131,7 +131,7 @@ export const ALLOWED_HOOKS = Object.freeze(['recheckEachStep', 'modelTimeoutMs',
 
 export function assertDeclaredHooks(hooks = {}) {
   // `hooks: null` does not take the default - null is not undefined - so Object.keys threw a
-  // bare TypeError instead of saying what was wrong (an earlier review round 2, low 5).
+  // bare TypeError instead of saying what was wrong.
   if (hooks === null || typeof hooks !== 'object' || Array.isArray(hooks)) {
     throw new Error('ADAPTIVE-01 hooks must be an object of the desk\'s declared behavioural flags.');
   }
@@ -187,13 +187,12 @@ export async function runAdaptive({ seed = 1, bounds = BOUNDS, hooks = {}, obser
     });
     attemptCount += plan.order.length;
     // sentDigest covers EVERYTHING passed to runControlTamper - the pause point as well as the
-    // script - because a replay can send the same calls and pause somewhere else. Round 2
-    // digested `script` alone, so a replay with an edited holdAt still read identical (lead
-    // review of #253 round 2). A digest taken on each side independently is what shows it;
-    // nothing here may be carried across from the record. The holdAt is the one the check says
-    // it RAN (`run.holdAt`), not `plan.holdAt` read a second time: round 3 read the plan twice,
-    // once for the call and once for the digest, so a run could pause at one point and log
-    // another, and the replay would then confirm the wrong record (an earlier review round 3).
+    // script - because a replay can send the same calls and pause somewhere else. Digesting
+    // `script` alone let a replay with an edited holdAt still read identical. A digest taken on
+    // each side independently is what shows it; nothing here may be carried across from the
+    // record. The holdAt is the one the check says it RAN (`run.holdAt`), not `plan.holdAt` read
+    // a second time: reading the plan twice, once for the call and once for the digest, would let
+    // a run pause at one point and log another, and the replay would then confirm the wrong record.
     runs.push({ runIndex, plan: { holdAt: plan.holdAt, pausePoint: plan.pausePoint, steps: plan.steps, order: plan.order, beforePause: plan.beforePause },
       sentDigest: digest({ holdAt: run.holdAt, script: plan.script }),
       refusals, rows: run.results.map(r => ({ id: r.id, status: r.status, ...(r.custodyReason ? { custodyReason: r.custodyReason } : {}) })) });
@@ -214,8 +213,8 @@ export function verifyRecordSeal(record) {
 
 export async function replayAdaptive(record, { hooks = {}, observe = 'audit' } = {}) {
   if (record?.schema !== ADAPTIVE_SCHEMA) throw new Error(`Not an ${ADAPTIVE_SCHEMA} record.`);
-  // Round 2 added the seal and a test that recomputes it, but the MODULE never read it, so
-  // replayAdaptive would happily drive a replay from an edited log (review, low 1). A
+  // A seal and a test that recomputes it are not enough if the MODULE never reads it:
+  // replayAdaptive would happily drive a replay from an edited log. A
   // replay is the reviewer's instrument; it has to refuse a record that is not the one sealed.
   const broken = verifyRecordSeal(record);
   if (broken !== null) throw new Error(`ADAPTIVE-01 will not replay a record it cannot vouch for: ${broken}.`);
@@ -231,7 +230,7 @@ export async function replayAdaptive(record, { hooks = {}, observe = 'audit' } =
     const script = [...groups.map(group => ({ toolCalls: group })), FINAL_STEP];
     const run = await runControlTamper({ holdAt: recorded.plan.holdAt, script, hooks, observe });
     // The digest is taken on the script THIS function built, and on the holdAt the check says it
-    // ran rather than recorded.plan.holdAt read again (round 3 review). `plan: recorded.plan`
+    // ran rather than recorded.plan.holdAt read again. `plan: recorded.plan`
     // below is the record's own object and is kept only for reading the result; it must never
     // be what the comparison rests on, which is the defect this fixes.
     runs.push({ runIndex: recorded.runIndex, plan: recorded.plan, sentDigest: digest({ holdAt: run.holdAt, script }), refusals: refusalsOf(run),
@@ -247,7 +246,7 @@ export function compareReplay(record, replayed) {
   // Compare the digest each side took of the script it actually sent. Comparing `r.plan` was
   // VACUOUS: replayAdaptive returned the record's own plan object, so this compared the log with
   // itself, and a replay that sent the reversed order still read identical. Two replay mutants
-  // survived the sweep because of it (an earlier review, Medium 1).
+  // survived the sweep because of it.
   const sequenceDifferences = [];
   record.runs.forEach((original, i) => {
     const again = replayed[i];

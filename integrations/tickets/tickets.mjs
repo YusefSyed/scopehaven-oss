@@ -1,4 +1,4 @@
-// Offline ticket export (CMP-TICKETS-01): one saved run, or one comparison, as tickets a
+// Offline ticket export: one saved run, or one comparison, as tickets a
 // team can import by hand: a Jira CSV file or GitHub-issue markdown. Pure and
 // deterministic: the same run (and baseline) always give identical bytes. No network:
 // no Jira or GitHub API, nothing is filed anywhere.

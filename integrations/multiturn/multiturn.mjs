@@ -1,4 +1,4 @@
-// Multi-turn, multi-identity task scripts judged from records (CMP-MULTITURN-01).
+// Multi-turn, multi-identity task scripts judged from records.
 //
 // What existed: integrations/conversations runs multi-turn chats per proven identity, with
 // values captured from one turn and used in later ones, but judges replies, GET state checks

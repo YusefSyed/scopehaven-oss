@@ -1,4 +1,4 @@
-// The core batch through the shipped entry points: ./scopehaven assess and ./scopehaven gate against the
+// The core practice cases through the shipped entry points: ./scopehaven assess and ./scopehaven gate against the
 // owned practice app (app.mjs), for the lifecycle phase, creator versus actor and settlement, each with its
 // allowed, forbidden, missing-observer and failed-control case. Loopback only, synthetic data, a private
 // temporary directory per case; no model, no provider, no hosted write.

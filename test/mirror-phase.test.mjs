@@ -1,4 +1,4 @@
-// The mirror phase (NC11; src/two-identities.mjs, src/http-connector.mjs, src/contracts.mjs): generated mirrors run after every declared
+// The mirror phase (src/two-identities.mjs, src/http-connector.mjs, src/contracts.mjs): generated mirrors run after every declared
 // check, the final mark, the observers' stop and every actor's identity-refusal probes, outside the identity brackets, between probe
 // points of their own. So nothing a mirror sends reaches a declared check's request, window, probe or verdict, and a mirror a per-user
 // limit answers reads inconclusive as produced, which the evidence validator recomputes. The app is an owned two-tenant stand-in on
@@ -200,7 +200,7 @@ test('the declared checks keep the budget they have with mirrors off, and the mi
   assert.equal(valid(run, profile(app.origin)), true);
 });
 
-test('mirrors that declare their own timeouts take nothing from the declared budget (#525 review R1 MINOR 2)', async t => {
+test('mirrors that declare their own timeouts take nothing from the declared budget', async t => {
   // The chat checks declare 20 s, so their mirrors do too; on a virtual clock at 4 s a request the declared run's deadline is reached.
   const slow = p => ({ ...p, checks: p.checks.map(c => (c.path === '/api/chat' && c.severity !== 'control' ? { ...c, timeoutMs: 20000 } : c)) });
   const timed = () => { let now = 0; return { clock: { now: () => now, sleep: async ms => { now += ms; } }, transport: async (origin, check, options) => { now += 4000; return observeHttp(origin, check, options); } }; };
@@ -235,7 +235,7 @@ function sleepyHost(asleepMs) {
   v.suspendClock = createSuspendDetector({ wall: () => 1.7e12 + v.now, awake: v.awake, elapsed: () => v.now, timersCountSuspend: true });
   return v;
 }
-test('a host suspend in a declared settle stops the run where it would with mirrors off: no declared wait keeps time for mirrors (#525 review R1 MINOR 2)', async () => {
+test('a host suspend in a declared settle stops the run where it would with mirrors off: no declared wait keeps time for mirrors', async () => {
   const sleepy = (mirrors, asleepMs) => {
     const p = profile('http://127.0.0.1:9', { mirrors, extra: { observers: [{ ...SINK, settleMs: 5000 }] } });
     p.checks = [...p.checks.slice(0, 4), NO_ALERT, ...p.checks.slice(4)];
@@ -254,7 +254,7 @@ test('a host suspend in a declared settle stops the run where it would with mirr
   assert((await sleepy('off', 30000)).run.results.some(r => r.trace?.[0]?.data?.notSent === SUSPEND_STOPPED), 'the longest suspend stops the run');
 });
 
-test('a declared check a per-user limit answers still reads as it does with mirrors off, and the run validates (#525 review R1 MINOR 2)', async t => {
+test('a declared check a per-user limit answers still reads as it does with mirrors off, and the run validates', async t => {
   const own = await ownCount(t), cap = { ...own, gil: own.gil - 4 };
   const offApp = await desk(t, { cap }), off = await runHttpAssessment(profile(offApp.origin, { mirrors: 'off' }), { env: ENV });
   const app = await desk(t, { cap }), p = profile(app.origin), run = await runHttpAssessment(p, { env: ENV });
@@ -264,7 +264,7 @@ test('a declared check a per-user limit answers still reads as it does with mirr
   assert.equal(valid(run, p), true);
 });
 
-test('a limit that runs out just after a mirror the app answered: that mirror is withheld, and the gate adds prohibition-observed-identity-unproven, and comparison-incomplete against a baseline (#525 review R1 MINOR 1)', async t => {
+test('a limit that runs out just after a mirror the app answered: that mirror is withheld, and the gate adds prohibition-observed-identity-unproven, and comparison-incomplete against a baseline', async t => {
   // One desk for both runs (the same origin, so the baseline is comparable): no limit for the baseline, then room for gil's first mirror only.
   const own = await ownCount(t), cap = {}, app = await desk(t, { cap }), p = profile(app.origin);
   const baseline = await runHttpAssessment(p, { env: ENV });
@@ -338,7 +338,7 @@ test('a mirror\'s request never lands in a declared window: a read that writes, 
   assert.equal(valid(on.run, on.p), true);
 });
 
-test('a run recorded and sealed at main before the mirror phase still validates at the head and compares', () => {
+test('a run recorded and sealed by an earlier build before the mirror phase still validates at the head and compares', () => {
   const { recordedAt, declared, undeclared } = structuredClone(recordedAtMain);
   assert.equal(recordedAt, '7134a8e9');
   for (const { run, suite } of [declared, undeclared]) {
@@ -347,11 +347,11 @@ test('a run recorded and sealed at main before the mirror phase still validates 
     validateHttpRunEvidence(run, { expectedSuite: suite });
     assert.equal(compareRuns(run, run).compatible, true);
   }
-  // Main ran the declared target's mirrors as ordinary bracketed checks, which its rows record nothing about.
+  // The earlier build ran the declared target's mirrors as ordinary bracketed checks, which its rows record nothing about.
   assert.equal(declared.run.results.some(r => Object.hasOwn(r.trace[0].data, 'mirrorOf')), false);
   assert.equal(declared.run.identityEvidence.actors.find(a => a.actorId === 'gil').between.length, 3);
-  // This head's suite for the declared target binds its mirrors (mirrorOf and the rate-limit statuses), so main's run is refused against
-  // it, as against any suite after an identity rule change; the undeclared target's suite is main's, and main's run validates against it.
+  // This head's suite for the declared target binds its mirrors (mirrorOf and the rate-limit statuses), so the earlier build's run is refused against
+  // it, as against any suite after an identity rule change; the undeclared target's suite is the earlier build's, and the earlier build's run validates against it.
   const here = suiteOf(declared.profile);
   assert.deepEqual(Object.keys(here).filter(k => JSON.stringify(here[k]) !== JSON.stringify(declared.suite[k])), ['checks', 'mirrorPhase']);
   assert.deepEqual(here.checks.map(({ mirrorOf: _m, ...c }) => c), declared.suite.checks);
@@ -368,7 +368,7 @@ const spawned = args => new Promise(resolve => {
 // Fields of a run that differ between any two runs, or with the origin's port, or with the evaluator identity.
 const VOLATILE = new Set(['id', 'createdAt', 'durationMs', 'requestId', 'routeSegments', 'sentRoute', 'bodyKeys', 'evidenceDigest', 'profileHash', 'targetConfigHash', 'evaluatorHash']);
 const steady = run => JSON.parse(JSON.stringify(run, (key, value) => (VOLATILE.has(key) ? '<volatile>' : value)));
-test('a target without "mirrors" stays byte for byte main\'s: its checks, order, digest, suite, requests, CLI output and run, apart from evaluatorHash', async t => {
+test('a target without "mirrors" stays byte for byte the earlier build\'s: its checks, order, digest, suite, requests, CLI output and run, apart from evaluatorHash', async t => {
   const main = structuredClone(recordedAtMain.undeclared), v = validated(main.profile);
   assert.deepEqual(v.checks, main.checks);
   assert.equal(contractDigest(v), main.contractDigest);
@@ -381,9 +381,9 @@ test('a target without "mirrors" stays byte for byte main\'s: its checks, order,
     const r = await spawned(['--config', join(dir, 'profiles.json'), flag]);
     assert.deepEqual({ status: r.status, stderr: r.stderr, target: JSON.parse(r.stdout).targets.find(x => x.id === 'two-desk') }, main.cli[flag], flag);
   }
-  // The same target on a fresh desk: the app sees main's requests in main's order, and the run differs only in the evaluator identity
+  // The same target on a fresh desk: the app sees the earlier build's requests in the earlier build's order, and the run differs only in the evaluator identity
   // and per-run noise (ids, times, keyed digests, and the origin's port in the profile and target-configuration hashes).
-  // Main's predicates kept their outcome only; the predicate record mode that writes that record (src/contracts.mjs predicate records) is 'outcome'.
+  // The earlier build's predicates kept their outcome only; the predicate record mode that writes that record (src/contracts.mjs predicate records) is 'outcome'.
   const app = await desk(t), run = await runHttpAssessment({ ...main.profile, origin: app.origin }, { env: ENV, predicateRecord: 'outcome' });
   assert.deepEqual(app.seen, main.seen);
   assert.deepEqual(steady(run), steady(main.run));
@@ -396,7 +396,7 @@ test('mirrorPlan returns before its precomputation for a target that declares no
   assert.deepEqual(mirrorPlan(target, new Map()).plan, [{ checkId: 'X', reason: 'mirrors-undeclared' }]);
   assert.deepEqual(mirrorPlan({ ...target, mirrors: 'off' }, new Map()).plan, [{ checkId: 'X', reason: 'mirrors-off' }]);
   assert.throws(() => mirrorPlan({ ...target, mirrors: { counterparts: [] } }, new Map()));
-  // #512 review R10 MINOR (:329): a target that declares no "mirrors" gets none, so the advice is to remove the hand-declared check.
+  // A target that declares no "mirrors" gets none, so the advice is to remove the hand-declared check.
   const p = profile('http://127.0.0.1:5001'), withMirror = validated(p), hand = profile('http://127.0.0.1:5001', { mirrors: null });
   hand.checks.push(withMirror.checks.find(c => c.id === 'ANA-CHAT-mirror'));
   assert.throws(() => validated(hand), error => /a check that declares "mirrorOf" must be exactly the mirror ScopeHaven generates from it; remove it \(mirrors are generated from the target's "mirrors" declaration, and a target without one gets none\)/.test(error.message) && !/"mirrors": "off"/.test(error.message));

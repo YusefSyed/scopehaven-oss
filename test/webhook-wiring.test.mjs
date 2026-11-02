@@ -162,7 +162,7 @@ test('wired: the connector sends declared webhook checks, records them, and the 
   assert.deepEqual(out.none.statuses, { WHOAMI: 'pass', 'SMS-SIGNED': 'pass', 'SMS-FORGED': 'fail', 'SMS-UNSIGNED': 'fail' });
 });
 
-// PR484-REVIEW finding 2 (and #476 decision 2): the connector sent the correlation header after the driver's headers and the
+// Earlier, the connector sent the correlation header after the driver's headers and the
 // credential before them, so a correlation header named x-twilio-signature replaced the signature and gave the unsigned check
 // one, and SMS-UNSIGNED read pass against an app that accepts unsigned deliveries; a credentialHeader of that name went out
 // as the unsigned check's signature while the run recorded it as the credential.
@@ -200,13 +200,13 @@ test('the profile validator: header and key clashes and a bad declaration are re
   assert.equal(load(hooks), 'loaded');
   assert.match(load(keyedProvider(hooks, 'stripe-signature')), /sends its key in Stripe-Signature, a stripe webhook header of its check "ST"/);
   assert.match(load(keyedProvider(hooks, 'Telnyx-Timestamp')), /sends its key in telnyx-timestamp, a telnyx webhook header of its check "TX"/);
-  // The webhook key's variable as an actor's credential (review mutant M3: the profile clash check).
+  // The webhook key's variable as an actor's credential (a mutant without the profile clash check).
   assert.match(load({ ...base, actors: { ...base.actors, provider: { principalId: 'sms-provider', credentialEnv: ENV.twilio } } }), /webhook signing key variable SCOPEHAVEN_TARGET_TWILIO_AUTH_TOKEN is also named elsewhere in the profile/);
-  // A declaration only the driver's rules refuse (review mutant M4: validateWebhookDeclaration in validCheck).
+  // A declaration only the driver's rules refuse (a mutant without validateWebhookDeclaration in validCheck).
   const declared = webhook => ({ ...base, checks: base.checks.map(c => (c.id === 'SMS-SIGNED' ? { ...c, webhook: { ...c.webhook, ...webhook } } : c)) });
   assert.match(load(declared({ encoding: 'xml' })), /"webhook\.encoding" for twilio is "form" or "json"/);
   assert.match(load(declared({ url: `${PUBLIC_URL}/twilio/other` })), /"webhook\.url" is its origin followed by the check's own "path"/);
-  // Unsigned checks only (round-2 X2 and X3): the rule covers every provider header name, the signature's included, whether or
+  // Unsigned checks only: the rule covers every provider header name, the signature's included, whether or
   // not the check is signed, at load and at driver creation.
   const unsignedOnly = { ...base, checks: base.checks.filter(c => c.id !== 'SMS-SIGNED' && c.id !== 'SMS-FORGED') };
   assert.equal(load(unsignedOnly), 'loaded');
@@ -215,12 +215,12 @@ test('the profile validator: header and key clashes and a bad declaration are re
   const unsignedStripe = { ...base, checks: [base.checks[0], hookCheck('ST-OMIT', '/stripe/events', structuredClone(EVENT), { provider: 'stripe', signature: 'omit' })] };
   assert.match(load(keyedProvider(unsignedStripe, 'stripe-signature')), /sends its key in Stripe-Signature, a stripe webhook header of its check "ST-OMIT"/);
   assert.match(drive(keyedProvider(unsignedStripe, 'stripe-signature'), { ...KEY }), /^webhook-header: actor "provider" sends its key in Stripe-Signature/);
-  // A check that does not apply is not sent, so its provider's header names are free (round-2 nit 2).
+  // A check that does not apply is not sent, so its provider's header names are free.
   const notApplicable = { ...unsignedOnly, checks: [unsignedOnly.checks[0], { ...hookCheck('SMS-OFF', '/twilio/sms', { ...SMS }, { provider: 'twilio', signature: 'omit' }), applicability: { applies: false, reason: 'No SMS route in this build.' } }] };
   assert.equal(load(correlated(notApplicable, 'x-twilio-signature')), 'loaded');
 });
 
-// PR484-REVIEW finding 4: read-back declares its credentials under "env" (readBack.credential.env, readBack.identities.*.env), which
+// Read-back declares its credentials under "env" (readBack.credential.env, readBack.identities.*.env), which
 // the clash rule's "...Env" match missed, so a webhook key could be ScopeHaven's read credential, by variable or by value.
 test('a webhook key is never a read-back credential, by variable or by value', () => {
   const p = R2.profileOf([[R2.EXISTS]]);
@@ -235,7 +235,7 @@ test('a webhook key is never a read-back credential, by variable or by value', (
   assert.equal(drive(target, env(null)), 'created');
 });
 
-// The requests exactly as they reach an app (review E4 and mutants M7 and M9): the received header names, one Content-Type of the
+// The requests exactly as they reach an app: the received header names, one Content-Type of the
 // driver's value, a Content-Length equal to the bytes received, the sent path, and each signature checked by an independent verifier.
 async function rawReceiver(t) {
   const seen = [];
@@ -311,7 +311,7 @@ test('the connector refuses, before writing, a webhook request with a header nam
     // A header the driver built (the signature), as the correlation header or the credential header, in any case.
     ['correlation header, signed', sent('TW'), { correlationHeader: { name: 'x-twilio-signature', value: token } }],
     ['credential header, signed', sent('TW'), { credential, credentialHeader: 'X-TWILIO-SIGNATURE' }],
-    // A provider header this request does not carry: the extra header, and the signature of an unsigned request (round-2 N1).
+    // A provider header this request does not carry: the extra header, and the signature of an unsigned request.
     ['credential header as the undeclared extra header', sent('TW'), { credential, credentialHeader: 'i-twilio-idempotency-token' }],
     ['correlation header, unsigned Twilio', sent('TW-OMIT'), { correlationHeader: { name: 'x-twilio-signature', value: token } }],
     ['credential header, unsigned Twilio', sent('TW-OMIT'), { credential, credentialHeader: 'x-twilio-signature' }],
@@ -330,7 +330,7 @@ test('the connector refuses, before writing, a webhook request with a header nam
     [[true, 'application/x-www-form-urlencoded', ['x-request-id', 'x-twilio-signature']], [true, 'application/x-www-form-urlencoded', ['x-api-key', 'x-twilio-signature']], [false, 'application/x-www-form-urlencoded', ['x-api-key']]]);
 });
 
-// Round-2 nit 4: a build refusal mid-run (the decision 1) names the check, never a value. An integer capture placed whole
+// A build refusal mid-run names the check, never a value. An integer capture placed whole
 // into a form value fills a number, which a form cannot carry; the checks before it were sent, the webhook was not.
 test('a webhook build refusal stops the run and names its check', async t => {
   const r = await rawReceiver(t);
@@ -345,7 +345,7 @@ test('a webhook build refusal stops the run and names its check', async t => {
   assert.deepEqual([Object.values(KEY).some(v => error.message.includes(v)), r.seen.map(x => `${x.method} ${x.url}`)], [false, ['GET /ping', 'GET /count']]);
 });
 
-// Review mutant M8 (no webhooks.close()) changes nothing a run shows: the keys are unreachable once the run returns. So the
+// A mutant without webhooks.close() changes nothing a run shows: the keys are unreachable once the run returns. So the
 // source is pinned instead: the driver's keys are zeroed on every exit of runHttpAssessment.
 test('runHttpAssessment closes its webhook driver on every exit (source)', async () => {
   const source = await readFile(new URL('../src/http-connector.mjs', import.meta.url), 'utf8');

@@ -9,7 +9,7 @@
 // This build is test-only. It is not in TARGETS and no run here is saved as
 // evidence.
 //
-// The second half of this file is the versioned forgery corpus (SURPASS-FORGE-01):
+// The second half of this file is the versioned forgery corpus:
 // record-forgery strategies a subject applies to the stores it controls, each
 // hashed, run by ./corpus.mjs against every observer configuration over owned
 // synthetic stores and loopback services only.
@@ -47,7 +47,7 @@ const entryFor = e => ({ seq: e.seq, actor: e.actor, operation: e.operation, nam
 // any tampering: that is the whole point of holding it outside the subject.
 // `reseal` models a subject that recomputes the chain after tampering, so the
 // records are internally consistent. Only an anchor the observer kept outside
-// the subject can then detect a dropped tail (M03 C5).
+// the subject can then detect a dropped tail.
 export function runForgingSubject(mode, { reseal = false } = {}) {
   if (!FORGERY_MODES.includes(mode)) throw new Error(`Unknown forgery mode ${String(mode)}.`);
   const honest = TRUTH.map(entryFor);
@@ -86,7 +86,7 @@ export function naiveVerdict(run) {
 }
 
 // ---------------------------------------------------------------------------
-// SURPASS-FORGE-01: the versioned forgery corpus.
+// The versioned forgery corpus.
 //
 // Each mode is one strategy a forging subject applies to the records it
 // controls, written against the subject API in ./corpus.mjs:

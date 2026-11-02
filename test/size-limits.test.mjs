@@ -1,4 +1,4 @@
-// Readiness gap 1 (size limits), first part: an effect.only clause lists up to 128 selectors (expect plus allow), at most 32 of
+// Size limits: an effect.only clause lists up to 128 selectors (expect plus allow), at most 32 of
 // them expected, and an egress destination lists up to 128 path prefixes. Past either cap the profile is refused at load.
 import test from 'node:test';
 import assert from 'node:assert/strict';

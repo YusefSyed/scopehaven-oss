@@ -1,12 +1,12 @@
-// In-doubt resolution R2 end to end on loopback (IDR-3): a real egress recorder (egress-recorder/9) whose crm.example destination declares
+// In-doubt resolution by read-back end to end on loopback: a real egress recorder (egress-recorder/9) whose crm.example destination declares
 // read-back, a loopback system of record (test/fixtures/read-back-stub.mjs) that applies a note (or not) and then resets the connection, so the
 // write is in doubt, and a small app that sends each task's notes through the recorder with the app's own bearer token. runHttpAssessment and
-// the shared validator, with the exported suite. The design's fault injection (IN-DOUBT-DESIGN section 10 test 9, ADDENDUM-R2 sections 1, 3,
-// 4 and m5): reset after apply is confirmed and reset before apply refuted; a commit inside the bound is confirmed and one after S2 is in doubt
+// the shared validator, with the exported suite. The fault injection:
+// reset after apply is confirmed and reset before apply refuted; a commit inside the bound is confirmed and one after S2 is in doubt
 // (never refuted); an incomplete list, a pre-image item deleted outside the recorder, a recorded delete or another note to the same ticket, and a
 // pre-image inside the settle bound of the recorder's start are in doubt; a pre-existing identical note never confirms; another credential's
-// identical note is not the write's; the PS1 keyed-retry shape (a reset, then a same-key retry proven 201) is decided, its defective twin
-// fails; the same app without read-back is main's. Each sealed run holds no note id, token or proof secret. Loopback only: 127.0.0.1, owned
+// identical note is not the write's; the keyed-retry shape (a reset, then a same-key retry proven 201) is decided, its defective twin
+// fails; the same app without read-back keeps the earlier reading. Each sealed run holds no note id, token or proof secret. Loopback only: 127.0.0.1, owned
 // synthetic names and dummy secrets in an env object (never the process environment). No real provider, no hosted write, no spend.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -48,7 +48,7 @@ async function appOf(t, sinkPort, actions) {
 }
 const verdictsOf = row => row.trace[1].data.effects.map(e => e.verdict);
 const byOf = row => row.trace[1].data.effects[0].resolution?.attempts?.map(a => a.by) ?? null;
-const PAST = { wait: 300 };   // past the route's settle bound after the recorder's start (ADDENDUM-R2 m5)
+const PAST = { wait: 300 };   // past the route's settle bound after the recorder's start
 
 // One run with one task. actions: the app's; plan and readHook: the stub's; seed(stub) before the run.
 async function scenario(t, { actions = [PAST, { note: 'hello' }], effects = [C.EXISTS, C.count(1)], plan = () => ({ reply: 'reset' }), readHook = () => ({}), seed = () => {}, readBack = true } = {}) {
@@ -78,8 +78,8 @@ const onT1 = fn => { let k = 0; return (info, stub) => (info.ticket === 'T-1' ? 
 
 test('1. reset after apply is confirmed, reset before apply refuted; a commit inside the bound is confirmed, one after S2 is in doubt and never refuted', async t => {
   const ra = await scenario(t), rb = await scenario(t, { plan: () => ({ reply: 'reset-before' }) });
-  assert.deepEqual([verdictsOf(ra.row), ra.row.status, ra.row.backendEvidence, byOf(ra.row)], [['pass', 'pass'], 'pass', 'observed', ['r2']], 'RA: confirmed');
-  assert.deepEqual([verdictsOf(rb.row), rb.row.status, byOf(rb.row)], [['fail', 'fail'], 'fail', ['r2']], 'RB: refuted');
+  assert.deepEqual([verdictsOf(ra.row), ra.row.status, ra.row.backendEvidence, byOf(ra.row)], [['pass', 'pass'], 'pass', 'observed', ['r2']], 'reset after apply: confirmed');
+  assert.deepEqual([verdictsOf(rb.row), rb.row.status, byOf(rb.row)], [['fail', 'fail'], 'fail', ['r2']], 'reset before apply: refuted');
   const e1 = ra.row.trace[1].data.windows[0].events[0];
   assert.deepEqual([e1.upstream.readBack.preImage, e1.upstream.readBack.route, Object.keys(e1.upstream.transport).sort()], ['first', 0, ['connected', 'mono', 'wall']]);
   assert.deepEqual([ra.run.observers[0].collector.label, Object.keys(ra.run.observers[0].readBack.hosts)], ['egress-recorder/13', [C.CRM]]);
@@ -118,12 +118,12 @@ test('3. identical notes: a pre-existing one never confirms the write; another c
   assert.deepEqual([verdictsOf(foreign.row), byOf(foreign.row)], [['fail', 'fail'], ['r2']], 'not confirmed by another identity\'s note: refuted by the exact count');
   // The same note sent by the jobs component through the recorder in the window: another group, which intervenes.
   const recorded = await scenario(t, { plan: ({ identity }) => (identity === 'jobs' ? {} : { reply: 'reset-before' }), actions: [PAST, { note: 'hello' }, { note: 'hello', token: 'tok-jobs-0000', key: 'k-j' }] });
-  // The jobs note's own proven 201 matches the clauses (selectors read no credential), as on main; the app's write stays in doubt.
+  // The jobs note's own proven 201 matches the clauses (selectors read no credential), as before; the app's write stays in doubt.
   const attempts = recorded.row.trace[1].data.effects[1].resolution.attempts;
   assert.deepEqual([verdictsOf(recorded.row), attempts.map(a => [a.fate, a.by])], [['pass', 'missing'], [['in-doubt', 'none'], ['applied', 'proof']]], 'a recorded write by another credential to the object intervenes');
 });
 
-test('4. the PS1 keyed-retry shape (a reset, then a same-key same-body retry proven 201) is decided by read-back on a backend that dedupes the key, stays in doubt on one that does not, and its defective twin fails; without read-back it stays in doubt', async t => {
+test('4. the keyed-retry shape (a reset, then a same-key same-body retry proven 201) is decided by read-back on a backend that dedupes the key, stays in doubt on one that does not, and its defective twin fails; without read-back it stays in doubt', async t => {
   const effects = [C.EXISTS, C.count(1), C.KEYED_COUNT(1)];
   // Reset after apply, then the retry is replayed under its key (the same note id): one application.
   let n = 0;
@@ -133,8 +133,8 @@ test('4. the PS1 keyed-retry shape (a reset, then a same-key same-body retry pro
   let m = 0;
   const before = await scenario(t, { effects, actions: [PAST, { note: 'hello', key: 'k-1' }, { note: 'hello', key: 'k-1' }], plan: () => (++m === 1 ? { keyed: true, reply: 'reset-before' } : { keyed: true }) });
   assert.deepEqual([verdictsOf(before.row), before.row.status], [['pass', 'pass', 'pass'], 'pass'], 'one application');
-  // A backend that does not dedupe the key (PR373-REVIEW major 1): the same-key, same-body retry writes a second note. R2 could confirm the reset
-  // only as a second application of one key identity, which the key collapse would read as one, so it confirms nothing: main's reading.
+  // A backend that does not dedupe the key: the same-key, same-body retry writes a second note. Read-back could confirm the reset
+  // only as a second application of one key identity, which the key collapse would read as one, so it confirms nothing: the earlier reading.
   let u = 0;
   const notDeduped = await scenario(t, { effects, actions: [PAST, { note: 'hello', key: 'k-1' }, { note: 'hello', key: 'k-1' }], plan: () => (++u === 1 ? { reply: 'reset' } : {}) });
   assert.deepEqual([verdictsOf(notDeduped.row), notDeduped.stub.notes('T-1').length, notDeduped.row.trace[1].data.effects[1].resolution.attempts.map(a => a.by)], [['pass', 'missing', 'missing'], 2, ['none', 'proof']], 'in doubt, never one application');
@@ -142,7 +142,7 @@ test('4. the PS1 keyed-retry shape (a reset, then a same-key same-body retry pro
   let d = 0;
   const twice = await scenario(t, { effects: [C.EXISTS, C.count(1)], actions: [PAST, { note: 'hello', key: 'k-1' }, { note: 'hello', key: 'k-2' }], plan: () => (++d === 1 ? { reply: 'reset' } : {}) });
   assert.deepEqual(verdictsOf(twice.row), ['pass', 'fail'], 'two applications');
-  // Without read-back: main's reading, in doubt.
+  // Without read-back: the earlier reading, in doubt.
   let q = 0;
   const plain = await scenario(t, { effects, readBack: false, actions: [PAST, { note: 'hello', key: 'k-1' }, { note: 'hello', key: 'k-1' }], plan: () => (++q === 1 ? { keyed: true, reply: 'reset' } : { keyed: true }) });
   assert.deepEqual(verdictsOf(plain.row), ['pass', 'missing', 'missing']);

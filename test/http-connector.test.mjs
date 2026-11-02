@@ -287,7 +287,7 @@ test('a boundary check cannot pass when its actor\'s required control failed; fa
   assert.deepEqual(run.results.map(r => [r.id, r.status]), [['allowed', 'fail'], ['member-denied', 'inconclusive'], ['anonymous-denied', 'pass']]);
   const downgraded = run.results[1];
   assert.deepEqual(downgraded.assertions.map(a => [a.name, a.status]), [['HTTP status matches contract', 'pass'], ['Actor identity established by required controls', 'inconclusive']]);
-  // The third state's summary (core batch v3 review D-F3): identity or allowed use not established, whichever reason it carries.
+  // The third state's summary: identity or allowed use not established, whichever reason it carries.
   assert.match(downgraded.summary, /identity or allowed use not established/);
   assert.equal(run.counts.pass, 1); assert.equal(run.counts.inconclusive, 1);
   assert.equal(run.results[2].assertions.some(a => a.name.startsWith('Actor identity')), false);
@@ -298,7 +298,7 @@ test('a boundary check cannot pass when its actor\'s required control failed; fa
 });
 
 const IDENTITY = 'Actor identity established by required controls';
-// Rebuild a run as connector v1 (Scopehaven 0.6.0, origin/main 8d3e29b) recorded
+// Rebuild a run as connector v1 (Scopehaven 0.6.0) recorded
 // it: v1 versions and evaluator, schema-2 suite/profile hashes, no v2 evidence fields.
 function asV1(run, target) {
   const [p] = validateTargetFile(manifest(target)), v1 = structuredClone(run);
@@ -348,7 +348,7 @@ test('previous-version runs still compare with each other, but never as fixed ag
 });
 
 test('a credentialed actor without a required control can never pass: an expired session redirected to sign-in is not "restored"', async t => {
-  // Review probe: the auditor's session expires, the app redirects it to sign-in,
+  // The auditor's session expires, the app redirects it to sign-in,
   // and a refusal set that includes 302 would otherwise read as a repair.
   let expired = false;
   const origin = await server(t, (req, res) => {
@@ -394,7 +394,7 @@ test('identity is established only when every required control of the actor pass
   // actor-identity/4: 'second-control' is a surface control (a required GET on a protected route), re-sent in the brackets.
   // In 'two-controls' the protected route refuses the credential (401) that the identity route accepts, so the login is
   // not proven at every probe point (surface-refused) and the actor is not established. Under actor-identity/5 a refused
-  // surface probe is route-level (core batch v3 decision 3): it withholds every row of the actor, the identity control
+  // surface probe is route-level (the surface-refusal rule): it withholds every row of the actor, the identity control
   // that passed included, as under actor-identity/4.
   for (const [current, control] of [['timeout', 'error'], ['non-json', 'inconclusive'], ['two-controls', 'inconclusive']]) {
     mode = current;
@@ -451,7 +451,7 @@ test('the owned lab accepts its lab_session cookie exactly like its Bearer token
   assert.equal(await status(`x=1; lab_session=${lab.memberToken}`), 200);
 });
 
-// Round-3 identity proof. A shared Auth.js-like app: /ping is public, /api/auth/session
+// Identity proof. A shared Auth.js-like app: /ping is public, /api/auth/session
 // answers 200 with JSON null when signed out, /records/foreign redirects signed-out
 // users to sign-in. `session.alive` lets a test kill or expire the member's login.
 async function sessionApp(t, session) {
@@ -478,7 +478,7 @@ const sessionEnv = { SCOPEHAVEN_TARGET_SESSION: 'synthetic-session' };
 const statusOnly = [{ kind: 'status.equals', expected: 200 }];
 const identifying = [{ kind: 'status.equals', expected: 200 }, { kind: 'json.equals', pointer: '/user/email', expected: 'member@example.test' }];
 
-test('V3: a status-only control on a public route proves no login; no "restored" label', async t => {
+test('a status-only control on a public route proves no login; no "restored" label', async t => {
   const session = { alive: true, exposed: true, requests: [] }, origin = await sessionApp(t, session), target = sessionProfile(origin, statusOnly, '/ping');
   const before = await runHttpAssessment(target, { env: sessionEnv });
   session.alive = false; session.exposed = false;
@@ -491,7 +491,7 @@ test('V3: a status-only control on a public route proves no login; no "restored"
   assert.equal(comparison.summary.fixed, 0); assert.notEqual(comparison.rows[1].transition, 'contract-restored'); assert.equal(comparison.controlsPass, false);
 });
 
-test('V3b: an Auth.js-style session route answering 200 null when signed out establishes only through its identity predicate', async t => {
+test('an Auth.js-style session route answering 200 null when signed out establishes only through its identity predicate', async t => {
   const session = { alive: false, exposed: false, requests: [] }, origin = await sessionApp(t, session);
   const loose = await runHttpAssessment(sessionProfile(origin, statusOnly), { env: sessionEnv });
   assert.deepEqual(loose.results.map(r => r.status), ['inconclusive', 'inconclusive'], 'Expired cookie: neither the status-only control nor the 302 boundary can pass.');
@@ -508,21 +508,21 @@ test('V3b: an Auth.js-style session route answering 200 null when signed out est
   assert.deepEqual(entry.anonymous.map(o => [o.httpStatus, o.predicates.find(p => p.identity).outcome]), [[200, 'fail']], 'Signed out, the same route answers 200 null, which does not name the member: a refusal.');
 });
 
-test('V4 and B4: the identity control brackets the actor\'s other checks, so expiry after the control or a login not yet valid before the boundary never passes', async t => {
+test('the identity control brackets the actor\'s other checks, so expiry after the control or a login not yet valid before the boundary never passes', async t => {
   const session = { alive: true, exposed: true, requests: [] }, origin = await sessionApp(t, session), target = sessionProfile(origin, identifying);
   const before = await runHttpAssessment(target, { env: sessionEnv });
   assert.deepEqual(before.results.map(r => r.status), ['pass', 'fail']);
   Object.assign(session, { alive: true, exposed: false, expireAfterControl: true, requests: [] });
   const after = await runHttpAssessment(target, { env: sessionEnv });
   assert.deepEqual(session.requests.map(r => [r.path, r.signedIn]), [['/api/auth/session', true], ['/api/auth/session', false], ['/records/foreign', false], ['/api/auth/session', false], ['/api/auth/session', false], ['/api/auth/session', false]]);
-  // actor-identity/5: the boundary's opening point did not pass, so it never passes. Re-pinned for Decision 3b (DECISIONS-2026-10-09,
-  // round 3): the expired session's identity probes answer 200 null, a complete 2xx that names no one, which identityRefused counts as
+  // actor-identity/5: the boundary's opening point did not pass, so it never passes. Re-pinned for the other-principal
+  // rule: the expired session's identity probes answer 200 null, a complete 2xx that names no one, which identityRefused counts as
   // a refusal; a refused identity probe withholds every row of the actor, so the control's own row is now inconclusive too (it kept
   // its pass on the route proof while only refusal statuses counted).
   assert.deepEqual(after.results.map(r => r.status), ['inconclusive', 'inconclusive']); assert.equal(after.identityEvidence.actors[0].reason, 'bracket-not-passed');
   const comparison = compareRuns(before, after);
   assert.equal(comparison.summary.fixed, 0); assert.notEqual(comparison.rows[1].transition, 'contract-restored');
-  // B4: the boundary is declared before the control and runs while the login is not yet valid.
+  // The boundary is declared before the control and runs while the login is not yet valid.
   const reordered = sessionProfile(origin, identifying); reordered.checks.reverse();
   let requests = 0; const late = await server(t, (req, res) => {
     const signedIn = ++requests > 2 && req.headers.cookie === 'sid=synthetic-session';
@@ -531,7 +531,7 @@ test('V4 and B4: the identity control brackets the actor\'s other checks, so exp
     json(res, 403, {});
   });
   const early = await runHttpAssessment({ ...reordered, origin: late }, { env: sessionEnv });
-  // actor-identity/5: the boundary's own opening point did not pass. Re-pinned for Decision 3b: that point's identity probe, sent
+  // actor-identity/5: the boundary's own opening point did not pass. Re-pinned for the other-principal rule: that point's identity probe, sent
   // before the login is valid, answers 200 null, which identityRefused counts as a refusal, so the control's row is withheld as well
   // (it kept its pass on the route proof while only refusal statuses counted).
   assert.deepEqual(early.results.map(r => [r.id, r.status]), [['member-denied', 'inconclusive'], ['whoami', 'inconclusive']]);
@@ -563,7 +563,7 @@ test('controls of credentialed actors must expect 2xx, and the dashboard waits f
   assert.match(host, /url\.pathname === '\/api\/runs' \? ASSESSMENT_TIMEOUT_MS/);
 });
 
-// Round 4: positive identity, refusal semantics and the exported suite shape.
+// Positive identity, refusal semantics and the exported suite shape.
 function authApp(t, { anonymousStatus = 401, anonymousBody, presenceOnly = false } = {}) {
   const state = { valid: true };
   return server(t, (req, res) => {
@@ -577,14 +577,14 @@ function authApp(t, { anonymousStatus = 401, anonymousBody, presenceOnly = false
       }
       return json(res, 200, valid ? { user: { email: 'member@example.test', admin: true } } : null);
     }
-    // Presence-only middleware (B2): any cookie is treated as signed in.
+    // Presence-only middleware: any cookie is treated as signed in.
     if (req.url === '/records/foreign') return presenceOnly && credentialed ? json(res, 403, {}) : valid ? json(res, 403, {}) : (res.writeHead(302, { Location: '/sign-in' }), res.end());
     if (req.url === '/records/own') return presenceOnly && credentialed ? json(res, 200, { items: [] }) : valid ? json(res, 200, { items: [] }) : (res.writeHead(302, { Location: '/sign-in' }), res.end());
     json(res, 404, {});
   }).then(origin => ({ origin, state }));
 }
 
-test('B3 and refusal semantics: only 401, 403, a declared sign-in redirect or a 2xx JSON response that does not name the actor count as refused', async t => {
+test('refusal semantics: only 401, 403, a declared sign-in redirect or a 2xx JSON response that does not name the actor count as refused', async t => {
   const cases = [
     [{ anonymousStatus: 401 }, 'established'], [{ anonymousStatus: 403 }, 'established'], [{ anonymousStatus: 200, anonymousBody: null }, 'established'],
     [{ anonymousStatus: 200, anonymousBody: { user: { email: 'someone-else@example.test' } } }, 'established'],
@@ -604,7 +604,7 @@ test('B3 and refusal semantics: only 401, 403, a declared sign-in redirect or a 
   assert.equal(run.identityEvidence.actors[0].reason, 'established'); assert.deepEqual(run.identityEvidence.actors[0].refusalStatuses, [401, 403, 307]);
 });
 
-test('B2: presence-only middleware lets an expired cookie through, but the identity control fails, so the boundary cannot pass', async t => {
+test('presence-only middleware lets an expired cookie through, but the identity control fails, so the boundary cannot pass', async t => {
   const { origin, state } = await authApp(t, { presenceOnly: true });
   const target = sessionProfile(origin, identifying, undefined, { surface: true });
   assert.deepEqual((await runHttpAssessment(target, { env: sessionEnv })).results.map(r => r.status), ['pass', 'pass', 'pass']);
@@ -615,7 +615,7 @@ test('B2: presence-only middleware lets an expired cookie through, but the ident
   assert.equal(expired.identityEvidence.actors[0].reason, 'identity-control-not-passed');
 });
 
-test('B1: a control-only actor and non-required controls cannot be restored on an unproven login', async t => {
+test('a control-only actor and non-required controls cannot be restored on an unproven login', async t => {
   // A negative predicate ("not an admin") on Auth.js /api/auth/session flips from fail to pass when the session expires (200 null).
   const { origin, state } = await authApp(t);
   const notAdmin = { id: 'not-admin', title: 'Member is not an admin', category: 'Access', severity: 'control', actorId: 'member', method: 'GET', path: '/api/auth/session', evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 200 }, { kind: 'json.exists', pointer: '/user/admin', expected: false }] };
@@ -657,8 +657,8 @@ test('exported HTTP suites name each check\'s actor alias and credential mode, n
   assert.equal(JSON.stringify(registry.exportSuite('demo-vulnerable')), JSON.stringify({ ...SUITE, scope: 'Owned fixture, deterministic policies; not a general customer connector.', runnableWith: './scopehaven assess --target demo-repaired' }));
 });
 
-// Round 5: baseline identity (F1), bracketing every other check (F2), credential
-// binding probes (F3a/b), declared sign-in redirects (L1), POST once, suite binding.
+// Baseline identity, bracketing every other check, credential binding probes,
+// declared sign-in redirects, POST once, suite binding.
 function sessionServer(t, state) {
   // /api/auth/session: names the member only for the valid, unexpired cookie; 200 null otherwise.
   // /records/foreign: 403 for the signed-in member, 302 to sign-in otherwise.
@@ -695,7 +695,7 @@ function memberProfile(origin, { controls, boundary = [403], other = false, surf
   return { id: 'member-app', name: 'Member app', applicationId: 'member-app', origin, buildLabel: 'b', contextId: 'synthetic', actors, requiredControlIds: checks.filter(c => c.severity === 'control').map(c => c.id), checks };
 }
 
-test('F1: a baseline taken while the login was not proven can show no fix; a baseline whose only failure is a non-identity control still can', async t => {
+test('a baseline taken while the login was not proven can show no fix; a baseline whose only failure is a non-identity control still can', async t => {
   const state = { alive: false, requests: [] }, origin = await sessionServer(t, state), target = memberProfile(origin, { surface: true });
   const expired = await runHttpAssessment(target, { env: memberSessionEnv });
   assert.equal(expired.identityEvidence.actors[0].loginProven, false); assert.equal(expired.results[2].trace[0].data.httpStatus, 302);
@@ -717,7 +717,7 @@ test('F1: a baseline taken while the login was not proven can show no fix; a bas
   assert.equal(restored.summary.fixed, 2); assert.deepEqual(restored.rows.map(r => r.transition), ['preserved', 'contract-restored', 'contract-restored']);
 });
 
-test('F2: every other check of the actor is bracketed, including non-identity required controls and control-only actors', async t => {
+test('every other check of the actor is bracketed, including non-identity required controls and control-only actors', async t => {
   const notAdmin = { id: 'not-admin', title: 'Member is not an admin', category: 'Access', severity: 'control', actorId: 'member', method: 'GET', path: '/api/auth/session', evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 200 }, { kind: 'json.exists', pointer: '/user/admin', expected: false }] };
   const state = { alive: true, admin: true, requests: [] }, origin = await sessionServer(t, state);
   const target = memberProfile(origin); target.checks = [target.checks[0], notAdmin]; target.requiredControlIds = ['whoami', 'not-admin'];
@@ -733,7 +733,7 @@ test('F2: every other check of the actor is bracketed, including non-identity re
   assert.equal(comparison.summary.fixed, 0); assert.equal(comparison.controlsPass, false);
 });
 
-test('F3: an identity control that accepts an invalid credential or another actor\'s credential cannot prove the login', async t => {
+test('an identity control that accepts an invalid credential or another actor\'s credential cannot prove the login', async t => {
   const lookup = { id: 'whoami', title: 'Member lookup', category: 'Identity', severity: 'control', actorId: 'member', method: 'GET', path: '/api/users/member', evidenceRequirement: 'response', assertions: identifying };
   const state = { alive: true, lookup: 'presence', requests: [] }, origin = await sessionServer(t, state);
   const presence = await runHttpAssessment(memberProfile(origin, { controls: [lookup] }), { env: memberSessionEnv });
@@ -748,7 +748,7 @@ test('F3: an identity control that accepts an invalid credential or another acto
   assert.deepEqual(sessionDerived.identityEvidence.actors.map(a => [a.actorId, a.reason]), [['member', 'established'], ['other', 'established']]);
 });
 
-test('L1: a declared sign-in redirect on a checked request means the login did not hold; undeclared it stays a refusal', async t => {
+test('a declared sign-in redirect on a checked request means the login did not hold; undeclared it stays a refusal', async t => {
   // The foreign route redirects the signed-in member to sign-in: the login did not hold for that request.
   const redirecting = await server(t, (req, res) => { if (req.url.startsWith('/records/foreign')) { res.writeHead(307, { Location: '/sign-in' }); return res.end(); } return json(res, req.headers.cookie === 'sid=member-session' ? 200 : 401, req.headers.cookie === 'sid=member-session' ? { user: { email: 'member@example.test' } } : {}); });
   // With a surface control (actor-identity/4), so an undeclared redirect counts as the refusal.
@@ -787,7 +787,7 @@ test('the dashboard labels both identity gate reasons in plain language', async 
   assert.match(dashboard, /'baseline-identity-not-established':'The earlier run’s login wasn’t proven, so it can’t show a fix\.'/);
 });
 
-test('D1: compareRuns refuses a candidate the gate would reject (edited identity evidence or a v1 downgrade)', async t => {
+test('compareRuns refuses a candidate the gate would reject (edited identity evidence or a v1 downgrade)', async t => {
   const state = { alive: true, exposed: true, requests: [] }, origin = await sessionServer(t, state), target = memberProfile(origin, { surface: true });
   const before = await runHttpAssessment(target, { env: memberSessionEnv }); state.exposed = false;
   const after = await runHttpAssessment(target, { env: memberSessionEnv });
@@ -850,7 +850,7 @@ test('run history omits identityEvidence while the saved full run keeps it', asy
   const full = await store.get(run.id);
   assert.equal(full.identityEvidence.schema, 'actor-identity/6'); assert.equal(full.identityEvidence.actors[0].reason, 'established');
   // Through the local API: the bootstrap history row omits it and GET /api/runs/:id keeps it.
-  // CMP-ROE-01: the dashboard's run path needs a covering record (test/authorization.test.mjs pins the refusals).
+  // The authorization record: the dashboard's run path needs a covering record (test/authorization.test.mjs pins the refusals).
   const authorizationFile = writeTestAuthorization(join(await directory(t), 'authorization.json'), memberProfile(origin));
   const app = await startServer({ port: 0, dataDir: await directory(t), profiles: [memberProfile(origin)], env: memberSessionEnv, authorizationFile }); t.after(() => app.close());
   const call = (method, path, payload) => new Promise((resolve, reject) => {
@@ -900,8 +900,8 @@ test('a control-only actor whose login is not proven is never a clean pass: asse
   assert.equal(result.code, 1, result.stderr); assert.deepEqual(JSON.parse(result.stdout).counts, { pass: 0, fail: 0, inconclusive: 1, error: 0, not_applicable: 0 });
 });
 
-// 2026-10-16 security scan F7: a malformed target or an aborted body is answered or dropped, never a crash of the lab.
-test('SEC-F7: the HTTP lab answers a target that is no URL (//) with 400 and survives an aborted body; ordinary requests still work', async t => {
+// A malformed target or an aborted body is answered or dropped, never a crash of the lab.
+test('the HTTP lab answers a target that is no URL (//) with 400 and survives an aborted body; ordinary requests still work', async t => {
   const lab = await createHttpLab(); t.after(() => lab.close());
   const port = Number(new URL(lab.origin).port);
   const raw = text => new Promise((resolve, reject) => {

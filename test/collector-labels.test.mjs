@@ -1,4 +1,4 @@
-// The Postgres and DNS collector labels (NC9 items 1 to 3, src/collector-identity.mjs; pg-wal/5 since pg_net on the wire): pg-wal/3 over the WAL observer, the
+// The Postgres and DNS collector labels (src/collector-identity.mjs; pg-wal/5 since pg_net on the wire): pg-wal/3 over the WAL observer, the
 // background-writer rules, the actor capture and the Supabase rules it reads, and dns-stub/1 equal to the stub's own record. Neither is yet an observer type a profile
 // declares, so no run carries either until the type is wired. Reads local files only.
 import test from 'node:test';
@@ -59,10 +59,10 @@ test('docs/PG-WAL.md names pg-wal\'s label and every file its digest covers', as
   for (const name of COLLECTOR_FILES['pg-wal']) assert.ok(doc.includes(`\`${name.replace('../../', '')}\``), name);
 });
 
-test('pg-wal/4 is refused as this head\'s record: a suite exported here does not accept a run main recorded under it', () => {
+test('pg-wal/4 is refused as this head\'s record: a suite exported here does not accept a run an earlier build recorded under it', () => {
   const { profile, suite, run } = structuredClone(recordedBeforeWire);
   assert.deepEqual([suite.observers[0].collector.label, COLLECTOR_RECORDS['pg-wal'].label], ['pg-wal/4', 'pg-wal/5']);
-  // The earlier label stays known, so main's run still validates against main's own suite (test/pg-wal-profile.test.mjs).
+  // The earlier label stays known, so that build's run still validates against its own suite (test/pg-wal-profile.test.mjs).
   validateHttpRunEvidence(run, { expectedSuite: suite });
   const here = createRegistry({ profiles: [profile], env: { SCOPEHAVEN_TARGET_BOB: 'x', SCOPEHAVEN_TARGET_WAL: 'u:p' } }).exportSuite(profile.id);
   assert.deepEqual(here.observers[0].collector, COLLECTOR_RECORDS['pg-wal']);
@@ -87,7 +87,7 @@ test('a collector record\'s label must name its own type: no label is valid for 
   for (const label of ['pg-wal/6', 'pg-snapshot/6', 'dns-stub/2']) assert.equal(validCollector(label.split('/')[0], { ...COLLECTOR_RECORDS['pg-wal'], label }), false, label);
 });
 
-// NC9 item 4 made pg-wal a profile observer type (test/pg-wal-profile.test.mjs); dns-stub stays a registered collector only.
+// pg-wal is a profile observer type (test/pg-wal-profile.test.mjs); dns-stub stays a registered collector only.
 test('dns-stub is a registered collector only: not an observer type a profile may declare yet', () => {
   assert.ok(OBSERVER_TYPES.includes('pg-wal'));
   for (const type of ['dns-stub']) {

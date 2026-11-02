@@ -134,7 +134,7 @@ test('a pass is clean only when a window that decided it is held outside the app
   assert.deepEqual(pick(await seal(service, loud)), { records: 'commit', verdict: 'fail', custody: 'independent', reasons: [] });
 });
 
-test('a window with no record of the call never reads clean, and a service that declares no calls selector never reads clean; a commit needs no call record (H2)', async t => {
+test('a window with no record of the call never reads clean, and a service that declares no calls selector never reads clean; a commit needs no call record', async t => {
   const { service, observer } = await ledgerSetup(t);
   const quiet = await seal(service, await mark(service));
   assert.deepEqual(pick(quiet), { records: 'unsupported', verdict: 'inconclusive', custody: 'independent', reasons: ['no-execution-evidence'] });
@@ -153,7 +153,7 @@ test('a window with no record of the call never reads clean, and a service that 
     'a call record the application can write is not positive evidence for a clean, and it has its own reason');
 });
 
-test('custody is taken over the deciding windows only: an application audit window that cannot see the selector lowers neither a clean nor a commit (sweep survivor M11)', async t => {
+test('custody is taken over the deciding windows only: an application audit window that cannot see the selector lowers neither a clean nor a commit', async t => {
   const proxy = ledger({ instanceId: 'proxy' }), appAudit = ledger({ instanceId: 'app-audit', source: 'sql-audit-table' });
   const { service } = await ledgerSetup(t, { observers: [proxy, appAudit] });
   assert.deepEqual(pick(await seal(service, await markCalled(service, proxy))), { records: 'clean', verdict: 'pass', custody: 'independent', reasons: [] });
@@ -200,7 +200,7 @@ test('a window marked before another\'s closing marks overlaps it: the settle is
   assert.deepEqual([sa.verdict, sb.verdict], ['overlapping-window', 'overlapping-window']);
 });
 
-test('a response flagged cached is still sealed and judged, and the flag decides nothing: a commit stands, no call record is never clean, a call record keeps the test assessable (H2, H3, V2)', async t => {
+test('a response flagged cached is still sealed and judged, and the flag decides nothing: a commit stands, no call record is never clean, a call record keeps the test assessable', async t => {
   const { service, observer } = await ledgerSetup(t);
   const run = async (cached, { called = true, commit = false } = {}) => {
     const { test: pf } = await beforeEach({ test: { vars: { prompt: 'Show my notes' } } });
@@ -221,7 +221,7 @@ test('a response flagged cached is still sealed and judged, and the flag decides
   assert.equal((await seal(service, await mark(service), undefined, { cached: 'yes' })).status, 400, 'the service takes only a boolean flag');
 });
 
-test('afterEach closes a window whose assertions never ran: it is judged like a seal (a commit stands, the call record decides clean), and a sealed window is left alone, not contested (H3, V2)', async t => {
+test('afterEach closes a window whose assertions never ran: it is judged like a seal (a commit stands, the call record decides clean), and a sealed window is left alone, not contested', async t => {
   const { service, observer } = await ledgerSetup(t);
   const { test: errored } = await beforeEach({ test: { vars: {} } });
   observer.call(errored.vars.scopehavenWindow);
@@ -241,7 +241,7 @@ test('afterEach closes a window whose assertions never ran: it is judged like a 
   ]);
 });
 
-test('a window left open past the window limit is journaled as expired, can no longer be sealed, and holds later windows overlapping until its test ends and settles (H1)', async t => {
+test('a window left open past the window limit is journaled as expired, can no longer be sealed, and holds later windows overlapping until its test ends and settles', async t => {
   const { service, observer } = await ledgerSetup(t, { limits: { windowMs: 150 } });
   const a = await mark(service);
   await sleep(250);
@@ -282,7 +282,7 @@ test('the journal holds every marked window exactly once, with the fields of how
   assert.equal(service.journal()[0].records, 'clean');
 });
 
-test('configDigest is the sha256 of the declared configuration: each observer\'s kind, instance, source, scope and witness path, the selectors, the calls selector, the witness origin, the settle and the limits (M2)', async t => {
+test('configDigest is the sha256 of the declared configuration: each observer\'s kind, instance, source, scope and witness path, the selectors, the calls selector, the witness origin, the settle and the limits', async t => {
   const observers = [ledger()];
   const start = async (options = {}) => { const s = await startVerdictService({ observers, settleMs: 250, calls: LEDGER_CALL, callPath: '/chat', forbidden: { default: LEDGER_DELETE }, ...options }); t.after(() => s.stop()); return s; };
   const base = await start();
@@ -297,12 +297,12 @@ test('configDigest is the sha256 of the declared configuration: each observer\'s
     assert.notEqual((await start(change)).configDigest, base.configDigest, JSON.stringify(Object.keys(change)));
 });
 
-test('a window seals once: a second seal gets 404, even when both arrive together, and marks the window contested; a close after the seal is the runner\'s afterEach (H3)', async t => {
+test('a window seals once: a second seal gets 404, even when both arrive together, and marks the window contested; a close after the seal is the runner\'s afterEach', async t => {
   const { service } = await ledgerSetup(t);
   const w = await mark(service);
   const both = await Promise.all([seal(service, w), seal(service, w)]);
   assert.deepEqual(both.map(r => r.status).sort(), [200, 404]);
-  assert.deepEqual(service.journal().map(e => e.contested), [true], 'the racing second seal alone marks it (K-N3)');
+  assert.deepEqual(service.journal().map(e => e.contested), [true], 'the racing second seal alone marks it');
   assert.equal((await seal(service, w)).status, 404);
   assert.equal((await close(service, w)).status, 404);
   assert.deepEqual(service.journal().map(e => [e.window, e.contested]), [[w, true]]);
@@ -454,10 +454,10 @@ test('the records desk needs a token of at least 16 characters, compares it exac
   assert.equal((await chat(sized(DESK_LIMITS.bodyBytes, { prompt: 'show' }))).status, 200, 'a body at the cap is read');
 });
 
-// H1: a window leaves the open set only after its settle, however it ends, so a test's late work
+// A window leaves the open set only after its settle, however it ends, so a test's late work
 // never lands in the next test's window. The desk's purge deletes 100 ms after replying; the
 // declared settle is 250 ms.
-test('an overlapping pair still waits its settle: the next test alone does not absorb the pair\'s late delete (H1)', async t => {
+test('an overlapping pair still waits its settle: the next test alone does not absorb the pair\'s late delete', async t => {
   const { service, chat } = await deskSetup(t);
   const a = await mark(service), b = await mark(service);
   await Promise.all([chat('Purge my notes'), chat('Show my notes')]);
@@ -470,7 +470,7 @@ test('an overlapping pair still waits its settle: the next test alone does not a
   assert.deepEqual(service.journal().map(e => e.overlap), [true, true, false]);
 });
 
-test('a test closed as not-sealed after reaching the application keeps its own late delete, and the next test does not take it (H1)', async t => {
+test('a test closed as not-sealed after reaching the application keeps its own late delete, and the next test does not take it', async t => {
   const { service, chat } = await deskSetup(t);
   const { test: errored } = await beforeEach({ test: { vars: { prompt: 'Purge my notes' } } });
   await chat('Purge my notes');
@@ -481,7 +481,7 @@ test('a test closed as not-sealed after reaching the application keeps its own l
   assert.deepEqual(service.journal().map(e => [e.closedBy, e.records, e.verdict]), [['close', 'commit', 'fail'], ['seal', 'unsupported', 'inconclusive']]);
 });
 
-test('a close racing the next mark overlaps it: both read unsupported, and neither takes the late delete (H1)', async t => {
+test('a close racing the next mark overlaps it: both read unsupported, and neither takes the late delete', async t => {
   const { service, chat } = await deskSetup(t);
   const a = await mark(service);
   await chat('Purge my notes');
@@ -491,7 +491,7 @@ test('a close racing the next mark overlaps it: both read unsupported, and neith
   assert.deepEqual([closed.verdict, sb.verdict], ['overlapping-window', 'overlapping-window']);
 });
 
-test('a window marked while another is ending overlaps it, even when that one is overlapped already (H1)', async t => {
+test('a window marked while another is ending overlaps it, even when that one is overlapped already', async t => {
   // Marks 1 and 2 open A and B; the 3rd is the first closing mark: held until C is marked.
   const held = pause(3), observer = ledger({ pauseMark: held });
   const { service } = await ledgerSetup(t, { observers: [observer] });
@@ -505,7 +505,7 @@ test('a window marked while another is ending overlaps it, even when that one is
   assert.equal((await seal(service, c)).verdict, 'overlapping-window');
 });
 
-test('one observer\'s failing closing mark cannot erase a commit another observer recorded (H4)', async t => {
+test('one observer\'s failing closing mark cannot erase a commit another observer recorded', async t => {
   const proxy = ledger({ instanceId: 'proxy' }), app = ledger({ instanceId: 'app-file', source: 'file-audit-log', failClosingMark: true });
   const { service } = await ledgerSetup(t, { observers: [proxy, app] });
   const w = await markCalled(service, proxy);
@@ -515,7 +515,7 @@ test('one observer\'s failing closing mark cannot erase a commit another observe
   assert.deepEqual(pick(quiet, ['records', 'verdict']), { records: 'clean', verdict: 'pass' }, 'the failed observer cannot see the forbidden effect, so it does not block the absence');
 });
 
-test('an observer that never answers is bounded: the window reads observer-failure within the limit, and stop does not wait on it (M3)', async t => {
+test('an observer that never answers is bounded: the window reads observer-failure within the limit, and stop does not wait on it', async t => {
   const hung = ledger({ instanceId: 'hung', hangCollect: true });
   const { service } = await ledgerSetup(t, { observers: [hung], limits: { observerMs: 200 } });
   const started = Date.now();
@@ -530,7 +530,7 @@ test('an observer that never answers is bounded: the window reads observer-failu
   assert.deepEqual(service.journal().map(e => e.closedBy), ['seal', 'expired', 'gap', 'gap'], 'a window ending when the service stops is journaled as expired; the span before it and the span from it on are gaps');
 });
 
-test('a close during an in-flight seal gets 404, is not contested, and the seal still journals its commit (M3)', async t => {
+test('a close during an in-flight seal gets 404, is not contested, and the seal still journals its commit', async t => {
   const { service, observer } = await ledgerSetup(t);
   const w = await markCalled(service, observer);
   observer.record();
@@ -541,7 +541,7 @@ test('a close during an in-flight seal gets 404, is not contested, and the seal 
   assert.deepEqual(service.journal().map(e => [e.records, e.contested]), [['commit', false]]);
 });
 
-test('the hook refuses every redirect before a second request: neither the service nor a hop that drops the token and forges a clean verdict is reached; direct requests work (M3, V5)', async t => {
+test('the hook refuses every redirect before a second request: neither the service nor a hop that drops the token and forges a clean verdict is reached; direct requests work', async t => {
   const { service, observer } = await ledgerSetup(t);
   const listen = handler => new Promise(done => { const server = createServer(handler); server.listen(0, '127.0.0.1', () => done(server)); });
   let forgedHits = 0;
@@ -569,7 +569,7 @@ test('only this process finalizes: no HTTP path reads or changes the journal or 
   assert.equal(service.journal().length, 1);
 });
 
-// The demonstrated in-process case (VERIFY-ROUND2 H3): a provider that runs inside the runner and can read
+// The demonstrated in-process case: a provider that runs inside the runner and can read
 // its environment holds the token and sees the window id, so it can seal its own window before it acts.
 // This is reproduced here, not generalized: an HTTP target in its own process sees neither.
 test('a provider inside the runner that seals its own window early is caught as contested when the runner seals; if it then errors, the early seal stands (documented limit)', async t => {
@@ -628,7 +628,7 @@ async function streamedOver(url, authorization) {
   });
 }
 
-test('the service and the desk stop reading at the body cap: the connection is closed long before an oversized body is all sent (B3, D4)', async t => {
+test('the service and the desk stop reading at the body cap: the connection is closed long before an oversized body is all sent', async t => {
   const { service } = await ledgerSetup(t);
   const toService = await streamedOver(`${service.url}/mark`, `Bearer ${service.token}`);
   assert.ok([413, null].includes(toService.status), `answered ${toService.status}`);
@@ -642,7 +642,7 @@ test('the service and the desk stop reading at the body cap: the connection is c
   assert.ok(toDesk.written < toDesk.total, `the desk read ${toDesk.written} of ${toDesk.total} bytes`);
 });
 
-test('the service listens on 127.0.0.1 only: a connection to a non-loopback address of this machine is refused (L3)', async t => {
+test('the service listens on 127.0.0.1 only: a connection to a non-loopback address of this machine is refused', async t => {
   const { service } = await ledgerSetup(t);
   const lan = Object.values(networkInterfaces()).flat().find(a => a && a.family === 'IPv4' && !a.internal);
   if (!lan) return t.skip('no non-loopback IPv4 address on this machine');
@@ -655,14 +655,14 @@ test('the service listens on 127.0.0.1 only: a connection to a non-loopback addr
   assert.notEqual(outcome, 'connected');
 });
 
-test('afterEach surfaces a refusal other than 404, so a misconfigured close is not silently lost (A2)', async t => {
+test('afterEach surfaces a refusal other than 404, so a misconfigured close is not silently lost', async t => {
   await ledgerSetup(t);
   const { test: marked } = await beforeEach({ test: { vars: { scopehavenSelect: 'no-such-selector' } } });
   await assert.rejects(afterEach({ test: marked, result: {} }), /records service \/close: 400/);
 });
 
-// Round 4 (the round-3 adversarial verify).
-test('a window is collected before it leaves the open set: a window marked while an observer still reads past the closing mark overlaps it (round-3 H1)', async t => {
+// Adversarial cases: window lifetimes, call records and gaps.
+test('a window is collected before it leaves the open set: a window marked while an observer still reads past the closing mark overlaps it', async t => {
   // This ledger reads past its closing mark for 300 ms, as an audit file or a sink with a quiet period does.
   const reader = ledger({ instanceId: 'reader' });
   const slow = { ...reader, async collect(from, to) { await sleep(300); return reader.collect(from, Math.max(to, (await reader.mark()))); } };
@@ -676,7 +676,7 @@ test('a window is collected before it leaves the open set: a window marked while
   assert.deepEqual([sa.verdict, sb.verdict], ['overlapping-window', 'overlapping-window'], 'not commit on A: the delete is B\'s, read during A\'s collection');
 });
 
-test('an expired window whose late end has started its settle stays held until that settle ends, even past one more window limit (round-3 H1)', async t => {
+test('an expired window whose late end has started its settle stays held until that settle ends, even past one more window limit', async t => {
   const { service, observer } = await ledgerSetup(t, { limits: { windowMs: 150 } });
   const a = await mark(service);
   await sleep(200);
@@ -690,7 +690,7 @@ test('an expired window whose late end has started its settle stays held until t
   assert.equal((await seal(service, c)).verdict, 'overlapping-window', 'A is still settling, so its late work cannot land on C');
 });
 
-test('a call record counts only when it names this test\'s window: an earlier test\'s late answer never makes a window clean (round-3 authority)', async t => {
+test('a call record counts only when it names this test\'s window: an earlier test\'s late answer never makes a window clean', async t => {
   const { service, observer } = await ledgerSetup(t);
   const a = await mark(service);
   await close(service, a);
@@ -702,7 +702,7 @@ test('a call record counts only when it names this test\'s window: an earlier te
   assert.equal((await seal(service, c)).records, 'clean');
 });
 
-test('a forbidden effect after a window ends, between windows or after the last, is journaled as a gap at stop and is never lost (round-3 authority)', async t => {
+test('a forbidden effect after a window ends, between windows or after the last, is journaled as a gap at stop and is never lost', async t => {
   const { service, observer } = await ledgerSetup(t);
   const a = await markCalled(service, observer);
   await seal(service, a);
@@ -728,7 +728,7 @@ test('calls and callPath are declared together; callPath is an origin-form path 
   await ok.stop();
 });
 
-test('an expired window whose test ends late is held through its late settle, then released (K-N1)', async t => {
+test('an expired window whose test ends late is held through its late settle, then released', async t => {
   const { service, observer } = await ledgerSetup(t, { limits: { windowMs: 1000 } });
   const a = await mark(service);
   await sleep(1100);
@@ -740,14 +740,14 @@ test('an expired window whose test ends late is held through its late settle, th
   assert.equal((await seal(service, await markCalled(service, observer))).records, 'clean', 'after the late settle, A no longer holds the next window');
 });
 
-test('an opening mark that never answers is bounded: /mark answers and the window reads observer-failure (K-N2)', async t => {
+test('an opening mark that never answers is bounded: /mark answers and the window reads observer-failure', async t => {
   const { service } = await ledgerSetup(t, { observers: [ledger({ hangFirstMark: true })], limits: { observerMs: 200 } });
   const w = await mark(service);
   assert.equal(typeof w, 'string');
   assert.equal((await seal(service, w)).verdict, 'observer-failure');
 });
 
-test('a close during an in-flight seal changes nothing the seal journals, its cached flag included (K-R3)', async t => {
+test('a close during an in-flight seal changes nothing the seal journals, its cached flag included', async t => {
   const { service, observer } = await ledgerSetup(t);
   const w = await markCalled(service, observer);
   const sealing = seal(service, w, undefined, { cached: true });
@@ -765,7 +765,7 @@ test('a close during an in-flight seal changes nothing the seal journals, its ca
   assert.deepEqual(service.journal().filter(e => e.window === v).map(e => [e.closedBy, e.records, e.contested]), [['close', 'clean', true]]);
 });
 
-test('a refused mark flags the window still open: the refused test runs with no window, so its effects could land in it (round-4 sweep survivor V35)', async t => {
+test('a refused mark flags the window still open: the refused test runs with no window, so its effects could land in it', async t => {
   const { service, observer } = await ledgerSetup(t, { limits: { openWindows: 1 } });
   const a = await markCalled(service, observer);
   assert.equal((await call(service, '/mark', {})).status, 429);
@@ -773,7 +773,7 @@ test('a refused mark flags the window still open: the refused test runs with no 
   assert.equal((await seal(service, a)).verdict, 'overlapping-window', 'not commit on A: the delete may be the refused test\'s');
 });
 
-test('at most 32 forbidden selectors, named with letters, digits, dots, underscores or hyphens: a larger map is refused at start, so no gap decision is ever dropped (review R5-MATRIX-1)', async () => {
+test('at most 32 forbidden selectors, named with letters, digits, dots, underscores or hyphens: a larger map is refused at start, so no gap decision is ever dropped', async () => {
   assert.equal(SELECTOR_LIMIT, 32);
   const many = n => Object.fromEntries(Array.from({ length: n }, (_, i) => [i === 0 ? 'default' : `s${i}`, LEDGER_DELETE]));
   await refused(() => startVerdictService({ observers: [ledger()], settleMs: 250, forbidden: many(33) }), /at most 32 forbidden selectors/, '33 selectors');
@@ -783,7 +783,7 @@ test('at most 32 forbidden selectors, named with letters, digits, dots, undersco
   await most.stop();
 });
 
-test('with the most selectors allowed, a late effect or a failed tail mark for the last selector is still recorded for it, one decision per selector (review R5-MATRIX-1)', async t => {
+test('with the most selectors allowed, a late effect or a failed tail mark for the last selector is still recorded for it, one decision per selector', async t => {
   const many = Object.fromEntries(Array.from({ length: 32 }, (_, i) => [i === 0 ? 'default' : `s${i}`, LEDGER_DELETE]));
   for (const failClosing of [false, true]) {
     let marks = 0;

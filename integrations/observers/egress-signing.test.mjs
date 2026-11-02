@@ -1,4 +1,4 @@
-// Verified signature headers (b', HMAC-SIG-DESIGN.md and its addendum R1) end to end over real loopback HTTP: the recorder reads a
+// Verified signature headers end to end over real loopback HTTP: the recorder reads a
 // destination's declared signing secrets once, verifies each send on the raw body bytes it received, and lets a re-signed redelivery
 // count as one application only when both sends verified under the same declared secret. Every request goes to 127.0.0.1;
 // destination hosts are names only and are never resolved or contacted. Every secret is synthetic and built at run time, and the

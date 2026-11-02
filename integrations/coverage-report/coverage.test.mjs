@@ -1,4 +1,4 @@
-// Coverage report (recall plan C8) on a small synthetic app: two tenants, three roles, a fixture id per tenant.
+// Coverage report on a small synthetic app: two tenants, three roles, a fixture id per tenant.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -184,7 +184,7 @@ test('ids and names that are JavaScript built-ins resolve to nothing: object-own
 });
 
 test('marks: drafted, then unreachable, then not judgeable, then needs an actor, then stated-only or unstated', () => {
-  // The connector-method rule, shown with a connector that sends GET and POST only (DR16b: the default is now the
+  // The connector-method rule, shown with a connector that sends GET and POST only (the default is the
   // HTTP connector's own set, which sends PATCH).
   const r = report({ connectorMethods: ['GET', 'POST'] });
   assert.deepEqual(markOf(r, 'viewer', 't2', 'GET /api/items/:id', 'own'), ['unreachable', 'no-user-with-this-role-in-this-tenant']);
@@ -321,10 +321,10 @@ test('per-datastore observer coverage: table-mapped observers count, application
   assert.match(coverageLines(coverageReport({ inventory: bare, contract: contract(), target: target() })).join('\n'), /Which operations write which datastore is not declared in this inventory\./);
 });
 
-test('intent read from the application carries the R9 warning: a declaration-based contract and policy-imported checks', () => {
+test('intent read from the application carries the declared-intent warning: a declaration-based contract and policy-imported checks', () => {
   const declared = report({ contract: contract({ basis: 'app-declaration' }) });
-  assert.match(declared.warning, /R9/);
-  assert.match(coverageLines(declared).join('\n'), /^Warning: .*R9/m);
+  assert.match(declared.warning, /own declarations/);
+  assert.match(coverageLines(declared).join('\n'), /^Warning: .*own declarations/m);
   assert.equal(report().warning, undefined);
   const t = target(); t.checks.push({ ...check('PI-1', 'a1', 'GET', '/api/items/2'), category: 'Declared policy' });
   const imported = report({ target: t });
@@ -568,8 +568,8 @@ test('the allowed-side number computes for every shipped example profile (C8 in-
   }
 });
 
-// DR16b (claims register v124): #223 let a profile check send PUT, PATCH and DELETE, but the coverage report kept
-// a GET/POST literal, so those cells read not judgeable. The default is now the connector's own method set.
+// A profile check may send PUT, PATCH and DELETE, so the coverage report reads the connector's own method set; a GET/POST
+// literal would leave those cells not judgeable.
 test('the default connector methods are the HTTP connector\'s own set, PUT, PATCH and DELETE included', () => {
   assert.deepEqual(CONNECTOR_METHODS, HTTP_CHECK_METHODS);
   for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) assert.ok(CONNECTOR_METHODS.includes(method), method);

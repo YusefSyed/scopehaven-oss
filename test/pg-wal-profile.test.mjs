@@ -1,4 +1,4 @@
-// pg-wal in profiles (NC9 item 4; integrations/observers/pg-wal.mjs, docs/PG-WAL.md): a profile observer type with a source of its own
+// pg-wal in profiles (integrations/observers/pg-wal.mjs, docs/PG-WAL.md): a profile observer type with a source of its own
 // (sql-wal: lineage database-log, custody observer-held), so a database-only prohibition on a Postgres target can reach a verdict
 // through an authoritative observer. Through runHttpAssessment and the shared validator, against pg-wal's scripted session (no server).
 import test from 'node:test';
@@ -94,7 +94,7 @@ test('a pg-wal observer\'s profile shape: loopback, plain identifiers, value col
   reject({ credentialEnv: 'SCOPEHAVEN_TARGET_BOB' }, /the REPLICATION role's own, never an actor's credential/);
   reject({ actorCapture: { block: { testCopy: true, installCredentialEnv: 'SCOPEHAVEN_TARGET_PG_SUPERUSER', tables: [{ table: 'orders', key: 'id' }], actor: { from: 'jwt-claims' }, principals: { s: 'eve' } }, installedSha256: 'a'.repeat(64) } }, /principalId of a declared actor/);
   // pg_net on the wire (integrations/observers/pg-net-wire.mjs): the database container and the witness role's own credential.
-  // The tap's image is required and named by digest only (never pulled; F4).
+  // The tap's image is required and named by digest only (never pulled).
   const wire = { container: 'supabase_db_copy', credentialEnv: 'SCOPEHAVEN_TARGET_PGNET', image: 'python@sha256:' + 'a'.repeat(64) };
   assert.doesNotThrow(() => load(profile('http://127.0.0.1:4000', [walObserver({ pgNetWire: wire })])));
   assert.doesNotThrow(() => load(profile('http://127.0.0.1:4000', [walObserver({ pgNetWire: { ...wire, witnessWaitMs: 5000, quietMs: 1500 } })])));
@@ -110,20 +110,20 @@ test('a pg-wal observer\'s profile shape: loopback, plain identifiers, value col
   // Nor another observer's: a second pg-wal observer's REPLICATION credential.
   assert.throws(() => load(profile('http://127.0.0.1:4000', [walObserver({ pgNetWire: { ...wire, credentialEnv: 'SCOPEHAVEN_TARGET_WAL2' } }), walObserver({ id: 'wal2', credentialEnv: 'SCOPEHAVEN_TARGET_WAL2' })])),
     /the witness role's own, never an actor's, the REPLICATION role's or another observer's/);
-  // pg-snapshot takes the same background-writer options (N12) from a profile now.
+  // pg-snapshot takes the same background-writer options from a profile now.
   const snapshot = { id: 'db', type: 'pg-snapshot', host: '127.0.0.1', port: 5432, database: 'app', credentialEnv: 'SCOPEHAVEN_TARGET_WAL', tables: [{ table: 'orders', key: 'id' }], settleMs: 250 };
   assert.doesNotThrow(() => load(profile('http://127.0.0.1:4000', [{ ...snapshot, platform: 'supabase', queues: [{ table: 'jobs' }], runLease: true }])));
   assert.throws(() => load(profile('http://127.0.0.1:4000', [{ ...snapshot, platform: 'mysql' }])), /"platform" is "none" or "supabase"/);
 });
 
 test('the factory builds pg-wal as declared, and passes pg-snapshot its background-writer options', () => {
-  // Only a caller that pairs and validates pg-wal windows (the HTTP connector) is given one; sequences are refused (PR521 MINOR 2).
+  // Only a caller that pairs and validates pg-wal windows (the HTTP connector) is given one; sequences are refused.
   assert.throws(() => buildObservers([walObserver()], { env }), /pg-wal is built only for an HTTP assessment's observers/);
   const [wal] = buildObservers([walObserver()], { env, pgWal: true });
   assert.deepEqual([wal.instanceId, wal.source, wal.kind, wal.scope.actorAttribution, wal.postResponseSettleMs], ['pg-wal-wal', 'sql-wal', 'postgres-wal-decode', 'none', 250]);
   // The observer's own rules run at build: an ignore entry naming an observed table is refused (the option reached it).
   assert.throws(() => buildObservers([walObserver({ ignore: ['public.orders'] })], { env, pgWal: true }), /ignore/i);
-  // Each declared key reaches the observer (PR521 review MINOR 4): its own refusal at build shows it was passed.
+  // Each declared key reaches the observer: its own refusal at build shows it was passed.
   const builds = (type, extra) => () => buildObservers([type === 'pg-wal' ? walObserver(extra) : { id: 'db', type: 'pg-snapshot', host: '127.0.0.1', port: 5432, database: 'app', credentialEnv: 'SCOPEHAVEN_TARGET_WAL', tables: [{ table: 'orders', key: 'id' }], ...extra }], { env, pgWal: true });
   for (const type of ['pg-wal', 'pg-snapshot']) {
     assert.doesNotThrow(builds(type, { queues: [{ table: 'jobs' }] }), type);
@@ -158,7 +158,7 @@ test('a database-only prohibition on Postgres passes on the WAL observer when no
   assert.throws(() => validateHttpRunEvidence(forged), /invalid-run-evidence/);
 });
 
-// PR521 review MAJOR 1 and 2: sql-wal's custody holds for an absence only, and no observer names an acting principal from outside the
+// sql-wal's custody holds for an absence only, and no observer names an acting principal from outside the
 // application, so a boundary pass resting on either reads inconclusive with its reason; a fail stays a fail, a control keeps its verdict.
 test('custody on the WAL: an absence passes observer-held; a presence pass and an actor-pinned pass do not', () => {
   const window = (events = [], attribution = 'none') => ({ source: 'sql-wal', instanceId: 'pg-wal-wal', scope: { operations: ['insert', 'update', 'delete'], names: ['orders'], actorAttribution: attribution, evidence: 'authoritative' },
@@ -168,7 +168,7 @@ test('custody on the WAL: an absence passes observer-held; a presence pass and a
   const custody = (kind, verdict, windows, extra = {}, role = 'boundary', expected) => clauseCustody({ kind, select: { ...select, ...extra }, verdict, windows, role, expected });
   assert.deepEqual(custody('effect.none', 'pass', [window()]), { verdict: 'pass', custody: 'observer-held' });
   assert.deepEqual(custody('effect.count', 'pass', [window()], {}, 'boundary', 0), { verdict: 'pass', custody: 'observer-held' });
-  // A count of one or more cannot pass without showing the write, so its lower bound is the app's own (PR521 review R2-MAJOR 1).
+  // A count of one or more cannot pass without showing the write, so its lower bound is the app's own.
   for (const expected of [1, undefined]) {
     const counted = custody('effect.count', 'pass', [window([event(null)])], {}, 'boundary', expected);
     assert.deepEqual([counted.verdict, counted.custody, counted.custodyReason], ['inconclusive', 'subject-writable', CUSTODY_REASON], String(expected));
@@ -184,7 +184,7 @@ test('custody on the WAL: an absence passes observer-held; a presence pass and a
   assert.match(pinned.custodyUpgrade, /names the acting principal from outside the application/);
   assert.deepEqual(custody('effect.none', 'pass', [window([], 'principal')], { actor: 'bob' }, 'control'), { verdict: 'pass', custody: 'observer-held' });
   assert.equal(custody('effect.none', 'fail', [window([event('bob')], 'principal')], { actor: 'bob' }).verdict, 'fail');
-  // A window held outside the app that names principals itself keeps the pass (PR521 review R3: pairing, settlement and timing read
+  // A window held outside the app that names principals itself keeps the pass (pairing, settlement and timing read
   // such windows), beside the WAL or alone; the rule reaches only actor names the capture supplies (CAPTURED_ACTOR_SOURCES).
   const named = { source: 'http-egress', instanceId: 'egress-recorder-egress', scope: { operations: ['send'], names: ['api.stripe.com'], actorAttribution: 'principal', evidence: 'authoritative' }, coverage: 'complete', reason: null, events: [] };
   const SENT = { source: 'http-egress', operation: 'send', name: 'api.stripe.com', actor: 'bob' };
@@ -192,7 +192,7 @@ test('custody on the WAL: an absence passes observer-held; a presence pass and a
   const both = clauseCustody({ kind: 'effect.none', select: { operation: 'update', actor: 'bob' }, verdict: 'pass', windows: [window([], 'principal'), { ...named, scope: { ...named.scope, operations: ['insert', 'update', 'delete', 'send'] } }], role: 'boundary' });
   assert.deepEqual([both.verdict, both.custody], ['pass', 'independent'], 'a held window that names principals decides beside the WAL');
   // effect.only through the HTTP path (decideEffects). It cannot pass without its expected effects: one the WAL window holds is the
-  // app's own write (R2-MAJOR 1), an actor-pinned one included. Expecting a send another observer holds, the WAL decides only the
+  // app's own write, an actor-pinned one included. Expecting a send another observer holds, the WAL decides only the
   // absence of other writes, which holds, unless an allowed selector pins an actor (principal-unverified).
   const { content, ...sealed } = event('bob');
   const wal = (events = []) => window(events.map(e => ({ ...e, contentDigest: null })), 'principal');
@@ -216,12 +216,12 @@ test('custody on the WAL: an absence passes observer-held; a presence pass and a
   // An expected send pinned to an actor, on an egress window that names principals itself: no capture supplies the names, so it stands.
   const expectPinned = only({ ...SEND, actor: 'bob' }, [], [{ ...egress, scope: { ...egress.scope, actorAttribution: 'principal' }, events: egress.events.map(e => ({ ...e, actor: 'bob' })) }]);
   assert.deepEqual([expectPinned.verdict, expectPinned.custody], ['pass', 'independent']);
-  // A pin no window in scope could match (no window names principals) decides nothing: the pass stands (app-log-admission M8).
+  // A pin no window in scope could match (no window names principals) decides nothing: the pass stands (as in test/app-log-admission.test.mjs).
   const unmatchable = only(SEND, [{ source: 'http-egress', operation: 'send', name: 'api.stripe.com', resource: 'POST /other', actor: 'svc-sync' }], [egress]);
   assert.deepEqual([unmatchable.verdict, unmatchable.custody], ['pass', 'independent']);
 });
 
-test('a boundary presence on the WAL is not satisfied by a row the app stamped itself (PR521 review MAJOR 2 and R2-MAJOR 1), through the connector', async t => {
+test('a boundary presence on the WAL is not satisfied by a row the app stamped itself, through the connector', async t => {
   const STAMP = { source: 'sql-wal', name: 'orders', operation: 'update', resource: 'orders/a' };
   // The forms a presence takes: effect.exists, effect.count of one, and effect.only expecting the write beside that count.
   for (const [form, effects] of [['exists', [{ kind: 'effect.exists', select: STAMP }]], ['count', [{ kind: 'effect.count', select: STAMP, expected: 1 }]],
@@ -239,10 +239,10 @@ test('a boundary presence on the WAL is not satisfied by a row the app stamped i
   }
 });
 
-test('pg-wal holds a store channel\'s records (PR521 review MINOR 1)', () => {
+test('pg-wal holds a store channel\'s records', () => {
   assert.ok(CHANNEL_OBSERVERS.store.includes('pg-wal'));
   assert.equal(channelDeclarationProblem({ confinement: 'confined', list: [{ id: 'orders-db', kind: 'store', observedBy: ['wal'], names: ['orders'], port: 5432 }] }, [walObserver()]), null);
-  // The review's probe: a stray committed insert recorded by an observer no channel lists reads channels-undeclared, under pg-wal as
+  // A stray committed insert recorded by an observer no channel lists reads channels-undeclared, under pg-wal as
   // under pg-snapshot, so a boundary absence on another channel does not pass beside it.
   const event = source => ({ schema: 'scopehaven-effect/1', source, observer: { kind: 'k', instanceId: 'x' }, seq: 1, observedAt: '2026-01-01T00:00:00.000Z', actor: null, operation: 'insert',
     name: 'refund_requests', resource: 'refund_requests/1', outcome: 'committed', correlation: {}, contentDigest: null });
@@ -257,8 +257,8 @@ test('pg-wal holds a store channel\'s records (PR521 review MINOR 1)', () => {
   }
 });
 
-// PR521 review MINOR 3: a degraded database-write absence in an HTTP assessment names pg-wal as its upgrade, only where a Postgres
-// observer's window decided it (PR518-520-521 stack review MAJOR 1); a presence, an actor-pinned clause, a send, another engine's or an
+// A degraded database-write absence in an HTTP assessment names pg-wal as its upgrade, only where a Postgres
+// observer's window decided it; a presence, an actor-pinned clause, a send, another engine's or an
 // audit table's window, and every caller that cannot build pg-wal (sequences, collateral) keep their text.
 test('a degraded database-write absence names a pg-wal observer as its upgrade only on a Postgres window; nothing else does', () => {
   const store = (instanceId, source = 'sql-snapshot') => ({ source, instanceId, scope: { operations: ['insert', 'update', 'delete'], names: ['orders'], actorAttribution: source === 'sql-audit-table' ? 'principal' : 'none', evidence: 'authoritative' }, coverage: 'complete', reason: null, events: [] });
@@ -272,7 +272,7 @@ test('a degraded database-write absence names a pg-wal observer as its upgrade o
   assert.match(none, /^No shipped observer held outside the application sees operation update/);
   assert.equal(upgrade('effect.none', select, false), none, 'a caller that cannot build pg-wal');
   assert.equal(upgrade('effect.exists', select), none, 'a presence: the WAL holds custody for an absence only');
-  assert.equal(upgrade('effect.count', select, true, 1), none, 'a count of one or more is a presence too (R2-MAJOR 1)');
+  assert.equal(upgrade('effect.count', select, true, 1), none, 'a count of one or more is a presence too');
   assert.match(upgrade('effect.none', { ...select, actor: 'bob' }), /^No shipped observer held outside the application sees operation update, name orders, acting principal bob\./);
   assert.match(upgrade('effect.none', { operation: 'send', name: 'api.stripe.com' }), /^Add an egress recorder or SMTP sink that sees/);
   // The engine is the deciding window's: a Postgres window beside it that does not see the clause decides nothing.
@@ -302,18 +302,18 @@ test('a degraded database-write absence names a pg-wal observer as its upgrade o
   assert.match(onlyRow.custodyUpgrade, /^For insert, update, delete effects: add a pg-wal observer on the tables they write .*, and an egress recorder or SMTP sink for the sends, or accept this row as inconclusive\.$/);
   const [auditNone, auditOnly] = decideEffects(clauses('sql-audit-table'), [store('audit-table-audit', 'sql-audit-table'), egress]);
   assert.deepEqual([auditNone.custodyUpgrade, auditOnly.custodyUpgrade], [custodyUpgrade({ ...select, source: 'sql-audit-table' }), onlyCustodyUpgrade(['insert', 'update', 'delete', 'send'])]);
-  // walUpgrade false is the text main wrote, which the recompute also accepts (an earlier record, below).
+  // walUpgrade false is the text an earlier build wrote, which the recompute also accepts (an earlier record, below).
   const [earlierNone, earlierOnly] = decideEffects(clauses('sql-snapshot'), [pg, egress], { walUpgrade: false });
   assert.deepEqual([earlierNone.custodyUpgrade, earlierOnly.custodyUpgrade], [none, onlyCustodyUpgrade(['insert', 'update', 'delete', 'send'])]);
 });
 
-// PR518-520-521 stack review MAJOR 1: a run recorded and sealed at main before pg-wal profiles (test/fixtures/pre-pgwal-run-9d2e44a6.mjs,
-// written by main's own connector over the scripted fake Postgres, not by hand) still validates here and a comparison reads it, although
+// A run recorded and sealed by an earlier build before pg-wal profiles (test/fixtures/pre-pgwal-run-9d2e44a6.mjs,
+// written by that build's own connector over the scripted fake Postgres, not by hand) still validates here and a comparison reads it, although
 // this head writes the pg-wal text on the same degraded row. Only that text may differ: any other, resealed, is refused.
-test('a run recorded at main before pg-wal profiles still validates, and its custody text stays bound', async () => {
+test('a run recorded by an earlier build before pg-wal profiles still validates, and its custody text stays bound', async () => {
   const { recordedAt, profile, suite, run } = structuredClone(recordedAtMain);
   assert.equal(recordedAt, '9d2e44a6');
-  // As the regression gate and a comparison read a saved run (src/runner.mjs), and against the suite main exported for its profile.
+  // As the regression gate and a comparison read a saved run (src/runner.mjs), and against the suite that build exported for its profile.
   validateHttpRunEvidence(run);
   validateHttpRunEvidence(run, { expectedSuite: suite });
   assert.equal(compareRuns(run, run).compatible, true);
@@ -336,18 +336,18 @@ test('a run recorded at main before pg-wal profiles still validates, and its cus
   validateHttpRunEvidence(resealed(wal), { expectedSuite: suite });
   for (const text of ['Any other upgrade text.', custodyUpgrade({ ...clause.select, operation: 'insert' })])
     assert.throws(() => validateHttpRunEvidence(resealed(text), { expectedSuite: suite }), /invalid-run-evidence/, text);
-  // The effect trace's own recompute binds it too, before the assertion rows are compared: main's text and this head's pass, no other.
+  // The effect trace's own recompute binds it too, before the assertion rows are compared: that build's text and this head's pass, no other.
   const check = profile.checks.find(c => c.id === id), traceWith = text => resealed(text).results.find(x => x.id === id).trace[1];
   for (const text of [clause.custodyUpgrade, wal]) assert.equal(recomputeEffectTrace(traceWith(text), check.effects, profile.observers, { role: 'boundary' }).decisions[0].custodyUpgrade, text);
   assert.throws(() => recomputeEffectTrace(traceWith('Any other upgrade text.'), check.effects, profile.observers, { role: 'boundary' }), /effect-verdict/);
 });
 
-// pg_net on the wire, "no pgNetWire, no change": a run recorded and sealed at main 8ecfe737 by main's own connector
+// pg_net on the wire, "no pgNetWire, no change": a run recorded and sealed by an earlier build's own connector
 // (test/fixtures/pre-pgnet-run-8ecfe737.mjs), a pg-wal profile with no pgNetWire over the scripted session in which pg_net's unlogged
-// queue exists. It validates here, with and without the suite main exported; this head exports the same suite for its profile apart
+// queue exists. It validates here, with and without the suite that build exported; this head exports the same suite for its profile apart
 // from the collector record (pg-wal/4 then /5, the announced move); and the same profile run here decides the same rows for the same
 // reason. Only evaluatorHash (b1c4a90d then this head's) and the collector record differ.
-test('no pgNetWire, no change: a pg-wal run recorded at main validates here, the suite differs only in its collector record, and the rows decide the same', async t => {
+test('no pgNetWire, no change: a pg-wal run recorded by an earlier build validates here, the suite differs only in its collector record, and the rows decide the same', async t => {
   const { recordedAt, profile: recorded, suite, run } = structuredClone(recordedBeforeWire);
   assert.equal(recordedAt, '8ecfe737');
   assert.ok(!Object.hasOwn(recorded.observers[0], 'pgNetWire'));

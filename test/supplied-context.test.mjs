@@ -264,7 +264,7 @@ test('T13 bounds: anything over a bound is cut and flagged, and the reading then
   assert.ok(readingsOf(view).every(g => g.reading !== 'inconclusive' || g.reason !== 'context-malformed'));
 });
 
-test('T14 (review H1) a channel record alone never makes CANARY-01 pass or adds a canary tenant', () => {
+test('T14 a channel record alone never makes CANARY-01 pass or adds a canary tenant', () => {
   // docs-sync's repro: strip Bob's reply and retrieval events (his own delivery evidence), reseal, re-evaluate.
   const strip = (run, keepChannel) => {
     const copy = structuredClone(run), row = copy.results.find(r => r.id === 'CANARY-01');
@@ -286,7 +286,7 @@ test('T14 (review H1) a channel record alone never makes CANARY-01 pass or adds 
   for (const tenants of withChannel.canary) assert.ok(!(tenants ?? []).includes('cobalt'), 'no canary tenant from the channel');
 });
 
-test('T15 (review M1) the caller tenant is wired: baseline leaks read foreign, the repair reads none', () => {
+test('T15 the caller tenant is wired: baseline leaks read foreign, the repair reads none', () => {
   const foreignBy = view => view.checks.reduce((acc, c) => {
     const n = c.observations.reduce((sum, o) => sum + (o.readings.groundedness.bySource?.foreign ?? 0), 0);
     return n ? { ...acc, [c.checkId]: n } : acc;
@@ -298,7 +298,7 @@ test('T15 (review M1) the caller tenant is wired: baseline leaks read foreign, t
   assert.ok(own(contractView(vulnerable)) > 0 && own(contractView(repaired)) > 0, 'own-grounded tokens on both builds');
 });
 
-test('T16 (review L2) the truth gate turns a derived check reading inconclusive', () => {
+test('T16 the truth gate turns a derived check reading inconclusive', () => {
   const copy = structuredClone(repaired), row = copy.results.find(r => r.id === 'CANARY-01');
   row.attempts.splice(0, 1);
   const evaluated = evaluateCheck(CHECKS.find(c => c.id === 'CANARY-01'), row.attempts);

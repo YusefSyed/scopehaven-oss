@@ -1,5 +1,4 @@
-// A round-3 review probes (a review record outside this repository
-// p3probe.mjs), ported: Node and Python on encoding, number and shape edge inputs, writer-produced
+// Edge probes (E00-E28 and P01-P14): Node and Python on encoding, number and shape edge inputs, writer-produced
 // ledgers with large integers, run files the verifiers cannot read back, and proof inputs. Every row
 // must get the same verdict, reason and exit code from both, and the stated outcomes must hold.
 import test from 'node:test';
@@ -212,9 +211,8 @@ await proofBoth('P14 consistency: proof path with a lone-surrogate string', 'con
   await both('X07 one envelope, two runs, with both run files', base(await L.readLedgerFiles(T)), { runFiles: [exported[0], exported[1]], expect: 'verified, 2 checked' });
 }
 
-// Added in round 4 for the review's remaining gaps: an integer past 2^53 written with 17 digits (N3-14), an
-// invalid byte inside a value no shape rule checks (N3-20, N3-35), and a key-holder entry for a run nested
-// deeper than the limit, which the writer now refuses to record (N3-18).
+// Also: an integer past 2^53 written with 17 digits, an invalid byte inside a value no shape rule checks,
+// and a key-holder entry for a run nested deeper than the limit, which the writer now refuses to record.
 await both('E17d 17-digit index 12345678901234567 in entry 3 (raw)', swap3(l => l.replace('"index":3', '"index":12345678901234567')));
 { const b = Buffer.from(Sl[3]); const id = JSON.parse(Sl[3]).runs[0].id; b[b.indexOf(Buffer.from(`"id":"${id}"`)) + 6] = 0xff;
   await both('E05c raw 0xFF inside entry 3\'s run id', base(SB, { entries: Buffer.concat([Buffer.from(Sl.slice(0, 3).map(l => `${l}\n`).join('')), b, Buffer.from('\n')]) })); }
@@ -228,16 +226,16 @@ await both('E17d 17-digit index 12345678901234567 in entry 3 (raw)', swap3(l => 
 }
 
 const row = label => log.find(r => r.label === label) ?? proofs.find(r => r.label === label);
-test('every round-3 review probe gets the same verdict, reason and exit code from Node and Python', { skip: !PY && 'no Python 3' }, () => {
+test('every E and P probe gets the same verdict, reason and exit code from Node and Python', { skip: !PY && 'no Python 3' }, () => {
   for (const r of log) assert.ok(r.agree, `${r.label}: node ${JSON.stringify(r.node)} python ${JSON.stringify(r.python)}`);
   for (const r of proofs) assert.ok(r.agree && r.node[0] === r.python[0], `${r.label}: node ${JSON.stringify(r.node)} python ${JSON.stringify(r.python)}`);
   assert.ok(log.length >= 50 && proofs.length >= 14);
 });
 
-test('round-3 review probes with a stated outcome get it', { skip: !PY && 'no Python 3' }, () => {
+test('E and P probes with a stated outcome get it', { skip: !PY && 'no Python 3' }, () => {
   const is = (label, verdict, reason = null) => { const r = row(label); assert.deepEqual([r.node[0], r.node[1]], [verdict, reason], label); assert.deepEqual([r.python[0], r.python[1]], [verdict, reason], label); };
   is('E00 baseline', 'verified');
-  // Safe integers of 16 digits are integers in both (High 2a, 2c); a list or object id is a shape error, not a crash (2b).
+  // Safe integers of 16 digits are integers in both; a list or object id is a shape error, not a crash.
   for (const label of ['E21 key holder: anchor count 1000000000000000 (16 digits, safe integer)', 'E21b key holder: anchor count 999999999999999 (15 digits)']) is(label, 'verified');
   for (const count of [999999999999999, 1e15, 2 ** 53 - 1]) { is(`E23 writer-appended anchor count ${count} (source ${Object.keys(CUSTODY_BY_SOURCE)[0]})`, 'verified'); assert.equal(notes[`anchorFor count ${count}`], count); }
   for (const label of ['E17 16-digit index 1000000000000000 in entry 3 (raw)', 'E17b 2^53-1 index in entry 3 (raw)', 'E17c 15-digit index in entry 3 (raw)']) is(label, 'rejected', 'index-mismatch');
@@ -248,7 +246,7 @@ test('round-3 review probes with a stated outcome get it', { skip: !PY && 'no Py
   is('R04e key holder: a run nested 300 deep, with its run file', 'rejected', 'verdict-mismatch');
   // A BOM is never stripped: the file is judged as it is, the same way in both.
   for (const label of ['E01 entries.jsonl starts with a UTF-8 BOM', 'E06 ledger.json with a BOM', 'E09 checkpoints.jsonl with a BOM']) assert.equal(row(label).node[0], 'rejected', label);
-  // The writer refuses a run file nested past the depth limit instead of recording what --run-files would reject (Medium 1).
+  // The writer refuses a run file nested past the depth limit instead of recording what --run-files would reject.
   for (const depth of [257, 300]) assert.match(notes[`writer run file nested ${depth}`], /^refused: .*read back/, `${depth}`);
   const x07 = row('X07 one envelope, two runs, with both run files');
   assert.deepEqual([x07.node[0], x07.node[5]], ['verified', 2]); assert.deepEqual([x07.python[0], x07.python[5]], ['verified', 2]);

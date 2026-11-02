@@ -1,4 +1,4 @@
-// Grant versus use (lane B6). Owned synthetic records only: every HTTP run is a real connector run over the support-desk
+// Grant versus use. Owned synthetic records only: every HTTP run is a real connector run over the support-desk
 // fixture (an injected transport and in-memory observers on a virtual clock, fixtures/support-desk.mjs), and every sequence
 // run a real sequence run over in-memory observers. No socket, database, model or provider is used.
 //

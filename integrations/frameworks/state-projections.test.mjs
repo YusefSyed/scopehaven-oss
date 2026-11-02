@@ -1,10 +1,10 @@
-// State projections for list- and dict-valued agent state (RT1 product gaps 1, 2 and 3): keepScalar,
+// State projections for list- and dict-valued agent state: keepScalar,
 // JSON-pointer projections, object paths through null, and declared key subsets of large in-process
 // tables with a remainder digest. Pure rules first, then hand-built records, then model-free live runs
 // through fixtures/state_adapter.py (the shipped Python shim, a scripted stub model, no network).
 //
 // The "seat changed to 12C" cases are a DEVELOPMENT CHECK of expressibility, modelled on a cell RT1
-// could not express (review record, not in this repository); they are not a
+// could not express; they are not a
 // result and say nothing about any rival or about RT1's scored executions.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -366,7 +366,7 @@ test('shim, live: a dict subclass holding only items is read; one with a refund 
     expect: [{ collection: 'desk', op: 'update', where: { field: 'seat' }, after: { value: '12C' } }], allow: [],
   });
   assert.equal((await run(t, s, 'seat')).verdict.overall.verdict, 'pass');
-  // The review's probe (D1): read as its items only, the desk showed the seat change and not the refund flip, and passed.
+  // Read as its items only, the desk showed the seat change and not the refund flip, and passed.
   const refund = await run(t, s, 'seat-and-refund', ['--misbehave', 'desk-attribute']);
   assert.notEqual(refund.verdict.overall.verdict, 'pass');
   assert.ok(reasons(refund.verdict).includes('snapshot-failed:before'), String(reasons(refund.verdict)));

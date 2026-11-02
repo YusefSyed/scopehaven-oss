@@ -1,4 +1,4 @@
-// E2: re-signed redeliveries (declared signature and timestamp headers) and event ids read from a declared body pointer.
+// Re-signed redeliveries (declared signature and timestamp headers) and event ids read from a declared body pointer.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateIdempotencyDeclaration, validIdempotencyMap, idempotencyRecordOf, readBodyKey, IDEMPOTENCY_SIGNATURE_HEADERS, IDEMPOTENCY_VOLATILE_HEADERS } from '../src/idempotency.mjs';

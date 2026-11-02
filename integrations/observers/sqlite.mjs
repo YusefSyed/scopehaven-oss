@@ -36,7 +36,7 @@
 // keys and hashes; values are never stored. node:sqlite is still flagged
 // experimental in Node 24.
 //
-// Background writers (N12), each opt-in on the snapshot observer, so a profile that declares none reads exactly as before:
+// Background writers, each opt-in on the snapshot observer, so a profile that declares none reads exactly as before:
 //   - platform / ignore (./ignore-lists/ignore-list.mjs): declaring either makes each mark also digest every other table
 //     in the copy (SQLite's own sqlite_ tables and virtual tables excepted; a virtual table's content is in its shadow
 //     tables, which are read), names compared without case as SQLite does, and a window in which one that is neither
@@ -49,7 +49,7 @@
 //     start() to stop(); start() refuses while another run holds one, and a window either of whose marks saw one reads
 //     partial with shared-database (its events stay).
 //
-// Catalog fingerprint (N13, ./catalog.mjs), always on, in both modes: each mark also reads the database's catalog
+// Catalog fingerprint (./catalog.mjs), always on, in both modes: each mark also reads the database's catalog
 // fingerprint (sqlite_master, user_version, application_id and the schema cookie) from the same private copy, and
 // start() keeps its own as the run's baseline (an observer marked without start() keeps its first mark's). A window whose
 // marks' definitions differ from the baseline, or whose cookie moved between its two marks, reads schema-drift; one

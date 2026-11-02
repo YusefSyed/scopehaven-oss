@@ -5,10 +5,9 @@
 // Covers what a scripted server cannot: VACUUM and VACUUM FREEZE, row locks,
 // HOT updates, a transaction spanning the start mark, a transaction in flight
 // at the end mark, a write reverted within the window, a role without SELECT,
-// an idle (quiescent) window, partitions and inheritance children, and the review
-// round 3 shapes (temporary child, pending detach, duplicated key, detach), and the
-// round 4 shapes (DDL between a mark's snapshot and its scan, a rewrite between marks), and the
-// round 5 shapes (a child joining during the lock wait, renamed keys, columns and encodings), and read-back (each type's
+// an idle (quiescent) window, partitions and inheritance children, descendant
+// shapes (temporary child, pending detach, duplicated key, detach), DDL between a mark's snapshot and its scan,
+// a rewrite between marks, a child joining during the lock wait, renamed keys, columns and encodings, and read-back (each type's
 // text output read as its canonical value, refused types, and a value written wrong by a real UPDATE).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -92,7 +91,7 @@ test('live: a role without SELECT on the table fails the window', { skip }, asyn
   assert.deepEqual([w.coverage, w.reason], ['failed', 'permission-denied']);
 });
 
-test('live (review H2): with row-level security on the table, the mark fails instead of reading only the policy\'s rows', { skip }, async t => {
+test('live: with row-level security on the table, the mark fails instead of reading only the policy\'s rows', { skip }, async t => {
   const f = await fixture(t);
   await f.admin.query(`ALTER TABLE ${f.table} ENABLE ROW LEVEL SECURITY; CREATE POLICY only_a ON ${f.table} FOR SELECT TO ${f.reader} USING (id = 'a')`);
   const o = f.readerOn(f.table);
@@ -101,7 +100,7 @@ test('live (review H2): with row-level security on the table, the mark fails ins
   assert.deepEqual([w.coverage, w.reason], ['failed', 'permission-denied']);
 });
 
-test('live (review H3): a view and a foreign table are refused before any row is read', { skip }, async t => {
+test('live: a view and a foreign table are refused before any row is read', { skip }, async t => {
   const f = await fixture(t);
   await f.admin.query(`CREATE VIEW ${f.table}_v AS SELECT * FROM ${f.table}; GRANT SELECT ON ${f.table}_v TO ${f.reader}`);
   const view = f.readerOn(`${f.table}_v`);
@@ -125,9 +124,9 @@ test('live (review H3): a view and a foreign table are refused before any row is
   }
 });
 
-test('live (review round 3): an idle window is quiescent and a table-wide absence is exact; any other committed transaction ends that', { skip }, async t => {
+test('live: an idle window is quiescent and a table-wide absence is exact; any other committed transaction ends that', { skip }, async t => {
   const f = await fixture(t);
-  // Created before the first mark: a table created during the run is a schema change (N13, ./catalog.mjs).
+  // Created before the first mark: a table created during the run is a schema change (./catalog.mjs).
   await f.admin.query(`CREATE TABLE ${f.table}_other (id int)`);
   const wide = { kind: 'effect.none', select: { source: 'sql-snapshot', name: f.table, operation: 'update' } };
   const idle = await f.window(async () => {});
@@ -142,7 +141,7 @@ test('live (review round 3): an idle window is quiescent and a table-wide absenc
   } finally { await f.admin.query(`DROP TABLE IF EXISTS ${f.table}_other`); }
 });
 
-test('live (review round 3): partitions and inheritance children are read with their parent and checked', { skip }, async t => {
+test('live: partitions and inheritance children are read with their parent and checked', { skip }, async t => {
   const f = await fixture(t);
   const part = `${f.table}_part`, child = `${f.table}_inh`;
   try {
@@ -160,7 +159,7 @@ test('live (review round 3): partitions and inheritance children are read with t
     assert.equal(evaluateEffectAssertion(none('b'), [w]).verdict, 'pass');
     // A partition attached during the window: the set of descendants changed.
     from = await o.mark(); await f.admin.query(`CREATE TABLE ${part}_ap PARTITION OF ${part} FOR VALUES IN ('ap'); GRANT SELECT ON ${part}_ap TO ${f.reader}`); w = await collectWindow(o, from, await o.mark());
-    // The set of descendants changed: the rows cannot be identified, so the window fails with no events (R4).
+    // The set of descendants changed: the rows cannot be identified, so the window fails with no events.
     assert.deepEqual([w.coverage, w.reason, w.events.length], ['failed', 'relation-unverified', 0]); assert.notEqual(evaluateEffectAssertion(none('b'), [w]).verdict, 'pass');
     // Inheritance: the child's rows are read through the parent, from a verified heap child.
     const parent = f.readerOn(f.table, { watchedResources: [`${f.table}/a`, `${f.table}/d`] });
@@ -170,7 +169,7 @@ test('live (review round 3): partitions and inheritance children are read with t
   } finally { await f.admin.query(`DROP TABLE IF EXISTS ${part} CASCADE; DROP TABLE IF EXISTS ${child}`); }
 });
 
-test('live (review round 3, R4): unread descendants fail the mark; rows that cannot be identified fail the window with no events', { skip }, async t => {
+test('live: unread descendants fail the mark; rows that cannot be identified fail the window with no events', { skip }, async t => {
   const f = await fixture(t);
   const part = `${f.table}_r4p`, tmp = `${f.table}_tmp`;
   const reasonOf = async o => { const m = await o.mark(), n = await o.mark(); const w = await collectWindow(o, m, n); return [w.coverage, w.reason, w.events.length]; };
@@ -211,7 +210,7 @@ test('live (review round 3, R4): unread descendants fail the mark; rows that can
   }
 });
 
-test('live (review round 4, R5): DDL between a mark\'s snapshot and its scan waits for the mark; a rewrite between marks fails the window', { skip }, async t => {
+test('live: DDL between a mark\'s snapshot and its scan waits for the mark; a rewrite between marks fails the window', { skip }, async t => {
   const f = await fixture(t);
   const [, adminUser, adminPassword, port, database] = live;
   const watcher = await pgConnect({ host: '127.0.0.1', port: Number(port), database, user: adminUser, password: adminPassword });
@@ -282,7 +281,7 @@ test('live (review round 4, R5): DDL between a mark\'s snapshot and its scan wai
   }
 });
 
-test('live (review round 5, R6): a child that joins during the lock wait fails the mark; renamed keys, columns and encodings never read as deletes plus inserts', { skip }, async t => {
+test('live: a child that joins during the lock wait fails the mark; renamed keys, columns and encodings never read as deletes plus inserts', { skip }, async t => {
   const f = await fixture(t);
   const [, adminUser, adminPassword, port, database] = live;
   const session = () => pgConnect({ host: '127.0.0.1', port: Number(port), database, user: adminUser, password: adminPassword });
@@ -298,26 +297,26 @@ test('live (review round 5, R6): a child that joins during the lock wait fails t
     const until = Date.now() + 5000;
     while ((await f.other.query("SELECT count(*)::text FROM pg_catalog.pg_locks WHERE NOT granted AND locktype = 'relation'"))[0].rows[0][0] === '0') { if (Date.now() > until) break; await new Promise(r => setTimeout(r, 50)); }
     await joiner.query(`ALTER TABLE ${x} INHERIT ${f.table}`);
-    // Another session holds a lock on x when the mark reads pg_locks: only this backend's own locks count (R7 N4, B05).
+    // Another session holds a lock on x when the mark reads pg_locks: only this backend's own locks count.
     await f.other.query(`BEGIN; LOCK TABLE ${x} IN ACCESS SHARE MODE`);
     await holder.query('COMMIT');
     const m1 = await pending;
     assert.deepEqual((({ coverage, reason, events }) => [coverage, reason, events.length])(await collectWindow(o, m0, m1)), ['failed', 'descendant-not-locked', 0]);
     await f.other.query('COMMIT');
     await f.admin.query(`ALTER TABLE ${x} NO INHERIT ${f.table}; DROP TABLE ${x}; DROP TABLE ${y}`);
-    // K1: two columns swap names between the marks (no write, no new row version, same file node).
+    // Two columns swap names between the marks (no write, no new row version, same file node).
     await f.admin.query(`CREATE TABLE ${k} (id text PRIMARY KEY, alt text NOT NULL); INSERT INTO ${k} VALUES ('a', 'zz1'), ('b', 'zz2'); GRANT SELECT ON ${k} TO ${f.reader}`);
     const kk = f.readerOn(k, { watchedResources: [`${k}/a`] });
     const k0 = await kk.mark(); await f.admin.query(`ALTER TABLE ${k} RENAME COLUMN id TO tmp; ALTER TABLE ${k} RENAME COLUMN alt TO id; ALTER TABLE ${k} RENAME COLUMN tmp TO alt`);
     assert.deepEqual((({ coverage, reason }) => [coverage, reason])(await collectWindow(kk, k0, await kk.mark())), ['failed', 'columns-changed']);
     await f.admin.query(`DROP TABLE ${k}`);
-    // K3: an enum key label renamed between the marks. Since R7 an enum key is refused at every mark.
+    // An enum key label renamed between the marks. An enum key is refused at every mark.
     await f.admin.query(`CREATE TYPE ${mood} AS ENUM ('calm', 'busy'); CREATE TABLE ${k} (id ${mood} PRIMARY KEY, v text); INSERT INTO ${k} VALUES ('calm', 'x'), ('busy', 'y'); GRANT SELECT ON ${k} TO ${f.reader}`);
     const ke = f.readerOn(k, { watchedResources: [`${k}/calm`] });
     const e0 = await ke.mark(); await f.admin.query(`ALTER TYPE ${mood} RENAME VALUE 'busy' TO 'swamped'`);
     assert.deepEqual((({ coverage, reason }) => [coverage, reason])(await collectWindow(ke, e0, await ke.mark())), ['failed', 'key-type-refused']);
     await f.admin.query(`DROP TABLE ${k}; DROP TYPE ${mood}`);
-    // K2: a role-level client_encoding default added between the marks does not change how keys decode.
+    // A role-level client_encoding default added between the marks does not change how keys decode.
     await f.admin.query(`INSERT INTO ${f.table} VALUES ('café', 'x', 1)`);
     const ce = f.readerOn(f.table, { watchedResources: [`${f.table}/café`] });
     const c0 = await ce.mark(); await f.admin.query(`ALTER ROLE ${f.reader} SET client_encoding = 'LATIN1'`);
@@ -331,7 +330,7 @@ test('live (review round 5, R6): a child that joins during the lock wait fails t
   }
 });
 
-test('live (R6 sweep): a row written by a subtransaction in progress at the start mark is an insert, not a relabelled key', { skip }, async t => {
+test('live: a row written by a subtransaction in progress at the start mark is an insert, not a relabelled key', { skip }, async t => {
   const f = await fixture(t);
   // A top-level id, then a subtransaction id for the insert; then another transaction commits, so the subtransaction
   // id is below the start mark's xmax.
@@ -351,13 +350,13 @@ test('live (R6 sweep): a row written by a subtransaction in progress at the star
   assert.deepEqual([w.coverage, w.reason, w.events.map(e => `${e.operation} ${e.resource}`)], ['net-only', 'net-change-between-snapshots', [`insert ${f.table}/d`]]);
 });
 
-test('live (review round 6, R7): keys whose text is not fixed by stored bytes, and unlogged tables, fail the mark; a domain over text is accepted', { skip }, async t => {
+test('live: keys whose text is not fixed by stored bytes, and unlogged tables, fail the mark; a domain over text is accepted', { skip }, async t => {
   const f = await fixture(t);
   const k = `${f.table}_k`, mood = `${f.table}_mood`, dmood = `${f.table}_dm`, dtext = `${f.table}_dt`, fn = `${f.table}_fn`, u = `${f.table}_u`, uc = `${f.table}_uc`;
   const windowOn = async (relation, extra = {}, between = async () => {}) => { const o = f.readerOn(relation, { watchedResources: [], ...extra }); const m0 = await o.mark(); await between(); return collectWindow(o, m0, await o.mark()); };
   const outcome = w => [w.coverage, w.reason, w.events.length];
   try {
-    // KS1: enum labels swapped between two rows by three RENAME VALUEs, with no row written.
+    // Enum labels swapped between two rows by three RENAME VALUEs, with no row written.
     await f.admin.query(`CREATE TYPE ${mood} AS ENUM ('c1', 'c2'); CREATE TABLE ${k} (id ${mood} PRIMARY KEY, v text); INSERT INTO ${k} VALUES ('c1', 'x'), ('c2', 'y'); GRANT SELECT ON ${k} TO ${f.reader}`);
     const swapped = await windowOn(k, { watchedResources: [`${k}/c1`, `${k}/c2`] },
       () => f.admin.query(`ALTER TYPE ${mood} RENAME VALUE 'c1' TO 'tmp'; ALTER TYPE ${mood} RENAME VALUE 'c2' TO 'c1'; ALTER TYPE ${mood} RENAME VALUE 'tmp' TO 'c2'`));
@@ -385,7 +384,7 @@ test('live (review round 6, R7): keys whose text is not fixed by stored bytes, a
     assert.match((await f.admin.query(`BEGIN; SET LOCAL search_path = pg_catalog; SELECT (r.to_jsonb)::text FROM public.${k} AS r; ROLLBACK`))[2].rows[0][0], /"id": "a"/);
     assert.deepEqual(outcome(await windowOn(k, { tables: [{ table: k, key: 'to_jsonb' }] })), ['failed', 'key-type-refused', 0]);
     await f.admin.query(`DROP TABLE ${k} CASCADE`);
-    // N2: an unlogged table, and an unlogged inheritance child of a permanent table.
+    // An unlogged table, and an unlogged inheritance child of a permanent table.
     await f.admin.query(`CREATE UNLOGGED TABLE ${u} (id text PRIMARY KEY); GRANT SELECT ON ${u} TO ${f.reader}`);
     assert.deepEqual(outcome(await windowOn(u)), ['failed', 'unlogged-table', 0]);
     await f.admin.query(`CREATE UNLOGGED TABLE ${uc} () INHERITS (${f.table}); GRANT SELECT ON ${uc} TO ${f.reader}`);
@@ -395,7 +394,7 @@ test('live (review round 6, R7): keys whose text is not fixed by stored bytes, a
   }
 });
 
-test('live (review round 7, R8): a role rename relabels an aclitem key with no row written, and the key is refused; pinned-setting outputs are accepted', { skip }, async t => {
+test('live: a role rename relabels an aclitem key with no row written, and the key is refused; pinned-setting outputs are accepted', { skip }, async t => {
   const f = await fixture(t);
   const k = `${f.table}_acl`, ra = `${f.table}_ra`, rb = `${f.table}_rb`, rt = `${f.table}_rt`, dacl = `${f.table}_dacl`, ts = `${f.table}_ts`;
   const windowOn = async (relation, extra = {}, between = async () => {}) => { const o = f.readerOn(relation, { watchedResources: [], ...extra }); const m0 = await o.mark(); await between(); return collectWindow(o, m0, await o.mark()); };
@@ -460,9 +459,9 @@ test('live read-back: each supported type reads as its canonical value; refused 
   }
 });
 
-// Read-back review fixes on the real server: a 64-bit id in jsonb compared digit for digit (F1), the JSON value null
-// (m1), a uuid expected in upper case (m2) and an exact-key delete count (m4).
-test('live read-back review: a rounded 64-bit id in jsonb fails and the exact one passes; JSON null, an upper-case uuid and an exact-key delete read as declared', { skip }, async t => {
+// Read-back on the real server: a 64-bit id in jsonb compared digit for digit, the JSON value null,
+// a uuid expected in upper case and an exact-key delete count.
+test('live read-back: a rounded 64-bit id in jsonb fails and the exact one passes; JSON null, an upper-case uuid and an exact-key delete read as declared', { skip }, async t => {
   const [, adminUser, adminPassword, port, database] = live;
   const admin = await pgConnect({ host: '127.0.0.1', port: Number(port), database, user: adminUser, password: adminPassword });
   const suffix = randomBytes(4).toString('hex'), docs = `sh_rbrev_${suffix}`, reader = `sh_rbrevreader_${suffix}`, readerPass = randomBytes(12).toString('base64url');
@@ -496,9 +495,9 @@ test('live read-back review: a rounded 64-bit id in jsonb fails and the exact on
   assert.deepEqual([judgeReadBack(wrong.readBack).verdict, judgeReadBack(wrong.readBack).reasons], ['fail', ['deletes-mismatch', 'remainder-changed']]);
 });
 
-// Read-back review m5 on the real server: an exact key is compared as the key column prints it. A uuid key written in
+// Read-back on the real server: an exact key is compared as the key column prints it. A uuid key written in
 // upper case is printed in lower case, a char(4) key is read without its padding, and an int4 key by its digits.
-test('live read-back review m5: a forbidden delete of an upper-case uuid key fails and its fixed twin passes; char and integer keys read as their columns print them', { skip }, async t => {
+test('live read-back: a forbidden delete of an upper-case uuid key fails and its fixed twin passes; char and integer keys read as their columns print them', { skip }, async t => {
   const [, adminUser, adminPassword, port, database] = live;
   const admin = await pgConnect({ host: '127.0.0.1', port: Number(port), database, user: adminUser, password: adminPassword });
   const suffix = randomBytes(4).toString('hex'), byUuid = `sh_rbm5u_${suffix}`, byChar = `sh_rbm5c_${suffix}`, byInt = `sh_rbm5i_${suffix}`, reader = `sh_rbm5reader_${suffix}`;

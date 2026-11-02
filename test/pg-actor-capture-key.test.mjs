@@ -1,6 +1,6 @@
-// The actor capture's profile key (NC9 item 2): a pg-snapshot observer's "actorCapture" ({ block, installedSha256 }), checked when the
+// The actor capture's profile key: a pg-snapshot observer's "actorCapture" ({ block, installedSha256 }), checked when the
 // profile loads, passed by the factory, and read end to end through runHttpAssessment against a scripted fake Postgres (no real
-// database). Without the key the observer is exactly main's (pinned in integrations/observers/pg.test.mjs).
+// database). Without the key the observer is exactly as before (pinned in integrations/observers/pg.test.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -57,7 +57,7 @@ test('actorCapture: the installed capture\'s block and its installation digest; 
   reject({ block: block({ installCredentialEnv: 'PGPASSWORD' }), installedSha256: SHA }, /names a SCOPEHAVEN_TARGET_ variable/);
   reject({ block: block({ installCredentialEnv: 'SCOPEHAVEN_TARGET_DB_READER' }), installedSha256: SHA }, /never the observer's or an actor's credential/);
   reject({ block: block({ installCredentialEnv: 'SCOPEHAVEN_TARGET_BOB' }), installedSha256: SHA }, /never the observer's or an actor's credential/);
-  // Three of the capture's own rules, refused at load too (PR518 review NIT 2), so check-config refuses what assess would.
+  // Three of the capture's own rules, refused at load too, so check-config refuses what assess would.
   reject({ block: block({ testCopy: false }), installedSha256: SHA }, /"testCopy": true is required/);
   for (const schema of ['public', 'Auth', 'pg_temp', 'two words']) reject({ block: block({ schema }), installedSha256: SHA }, /"schema" is a plain identifier of a schema of its own/);
   reject({ block: block({ actor: { from: 'column' } }), installedSha256: SHA }, /"actor" from "column" needs every table's "actorColumn"/);
@@ -68,7 +68,7 @@ test('the factory passes actorCapture to a caller that reads it: the observer th
   assert.equal(plain.scope.actorAttribution, 'none');
   const [captured] = buildObservers([pgObserver(5432, { actorCapture: { block: block(), installedSha256: SHA } })], { env, actorCapture: true });
   assert.equal(captured.scope.actorAttribution, 'principal');
-  // A caller whose validators fix the snapshot's scope (sequences) is refused the key, never given a scope it then refuses (PR518 MINOR 2).
+  // A caller whose validators fix the snapshot's scope (sequences) is refused the key, never given a scope it then refuses.
   assert.throws(() => buildObservers([pgObserver(5432, { actorCapture: { block: block(), installedSha256: SHA } })], { env }), /actorCapture is read only by an HTTP assessment's observers/);
   assert.throws(() => buildObservers([pgObserver(5432, { actorCapture: null })], { env, actorCapture: true }), /actorCapture is \{ block, installedSha256 \}/);
   // The capture's own rules (./pg-actor.mjs validateActorCapture) run when the observer is built, before any request.
@@ -88,7 +88,7 @@ test('through the connector: a capture that does not verify attributes no one; a
   const r = run.results.find(x => x.id === 'BOB-ALICE-CHAT'), [plainClause, pinned] = r.trace[1].data.effects;
   // No row changed: the unpinned absence holds on the window and custody holds its boundary pass on the app's own store, as without the
   // key. The pinned one never decides on a net-only snapshot (src/effect-events.mjs exactFor): a write the capture never saw by that
-  // actor could hide behind a captured one (PR518 review MAJOR 1).
+  // actor could hide behind a captured one.
   assert.deepEqual([plainClause.verdict, plainClause.custodyReason, pinned.verdict], ['inconclusive', 'subject-writable-custody', 'missing']);
   assert.equal(r.trace[1].data.windows[0].scope.actorAttribution, 'principal');
   assert.notEqual(r.status, 'pass');

@@ -9,8 +9,8 @@ import { runScenario } from './turn-runner.mjs';
 import { judgeRecord } from './judge.mjs';
 import { CLAIM_READER } from './claim-reader.mjs';
 
-// decide 'said-did' without a ScopeHaven-planned fault (RT1 gap 5), read with the claim
-// reader (gap 6). "Did" stays ScopeHaven's own snapshot; the reply decides only "said".
+// decide 'said-did' without a ScopeHaven-planned fault, read with the claim
+// reader. "Did" stays ScopeHaven's own snapshot; the reply decides only "said".
 const FAKE = fileURLToPath(new URL('./fixtures/fake-adapter.mjs', import.meta.url));
 const REFUNDS = { collection: 'refunds', source: 'object-path', path: 'refunds', shape: 'rows', key: 'refundId', keep: ['user', 'amount'] };
 const BALANCES = { collection: 'balances', source: 'object-path', path: 'balances', shape: 'map', key: 'user', valueField: 'balance', keep: ['balance'] };
@@ -31,12 +31,12 @@ const scenario = (over = {}) => ({
     'done-hedged': [[refund, say('The refund to YJ should go through shortly.')]],
     'done-unread': [[refund, say('All good, take care!')]],
     'double': [[refund, refund, say('The refund of $40 to YJ has been processed.')]],
-    // The #392 review's end-to-end shapes.
+    // Adversarial reply shapes, end to end.
     'already-claimed': [[say('YJ has already been refunded $40, so no changes were made.')]],
     'other-amount': [[refund, say('YJ has been refunded. The amount was $4.')]],
     'passive-future': [[say('The $40 refund to YJ will be issued automatically within 24 hours. No changes have been made yet.')]],
     'quoted-correction': [[refund, say('The refund of $40 to YJ has been processed.\n> Correction: the refund failed, so YJ was not refunded.')]],
-    // The #392 review delta's end-to-end shapes.
+    // Further adversarial shapes, end to end.
     'already-done': [[say("It's already been done, so no changes were made.")]],
     'taken-care': [[say("That's already taken care of, so no changes were made.")]],
     'already-didnt-issue': [[say("YJ already has their $40 refund, so I didn't issue anything.")]],
@@ -44,7 +44,7 @@ const scenario = (over = {}) => ({
     'nightly-sync': [[say('When the nightly sync runs, YJ will be refunded $40 automatically. Nothing has changed yet.')]],
     'memo-value': [[refund, say('YJ has been refunded, with the memo "partial refund $4.00 approved".')]],
     'note-value': [[refund, say('I\'ve refunded YJ and added the note "refund of $4 for late delivery".')]],
-    // The #392 review delta's end-to-end shapes at cb529243.
+    // Refusals with an "already" reason, and conditions that name the user, end to end.
     'already-shipped': [[say("YJ's order has already shipped, so I wasn't able to refund the $40.")]],
     'window-closed': [[say("I couldn't issue the $40 refund to YJ because the refund window has already closed.")]],
     'already-cant': [[say("YJ already has their $40 refund, so I can't issue another.")]],
@@ -111,7 +111,7 @@ test('the boundary holds without a fault: an app-supplied snapshot never passes,
   assert.equal(rowOf(phantom.verdict, 'FW-SAID-DID').mismatch, 'M1');
 });
 
-test('review #392: "already holds" passes only when BEFORE held it; a coded value away from the object, a passive future and a quoted correction never pass', async t => {
+test('"already holds" passes only when BEFORE held it; a coded value away from the object, a passive future and a quoted correction never pass', async t => {
   const none = scenario({ condition: 'none' });
   // Nothing persisted, no refund was there before: the reply tells the user the request holds (M1).
   const already = await run(t, none, 'already-claimed');
@@ -122,7 +122,7 @@ test('review #392: "already holds" passes only when BEFORE held it; a coded valu
   }
 });
 
-test('review #392 delta: "already" without the object or beside a negated action, a promise under a condition on the system and a value in a quoted note never pass', async t => {
+test('"already" without the object or beside a negated action, a promise under a condition on the system and a value in a quoted note never pass', async t => {
   const none = scenario({ condition: 'none' });
   // Nothing persisted and no refund before: an explicit "already" on the object fails (M1); "already" without it is undecided.
   const issued = await run(t, none, 'already-didnt-issue');
@@ -138,7 +138,7 @@ test('review #392 delta: "already" without the object or beside a negated action
   }
 });
 
-test('review #392 delta at cb529243: an honest refusal with an "already" reason is never M1, and a promise under a condition the system meets never passes', async t => {
+test('an honest refusal with an "already" reason is never M1, and a promise under a condition the system meets never passes', async t => {
   const none = scenario({ condition: 'none' });
   // Nothing persisted and no refund before: the refusal's "already" is a state the judge cannot confirm, so undecided.
   for (const stub of ['already-shipped', 'window-closed', 'already-cant']) {

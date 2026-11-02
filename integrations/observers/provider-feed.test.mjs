@@ -1,4 +1,4 @@
-// Provider-feed observer (G2), over a real loopback stub and a real journal file: each allowed outcome next to the
+// Provider-feed observer, over a real loopback stub and a real journal file: each allowed outcome next to the
 // forbidden one beside it. Every request goes to 127.0.0.1; recipient domains are names only.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -43,7 +43,7 @@ const verdict = (kind, select, windows) => evaluateEffectAssertion({ kind, selec
 const gapOf = (o, from, to) => collectWindow({ source: o.source, instanceId: o.instanceId, scope: o.scope, collect: (a, b) => o.collect(a, b, { gap: true }) }, from, to);
 const tmpFile = t => { const dir = mkdtempSync(join(tmpdir(), 'provider feed ')); t.after(() => rmSync(dir, { recursive: true, force: true })); return join(dir, 'feed.jsonl'); };
 
-test('P1: a signed acceptance in the window is a committed send by recipient domain; one accepted before the start mark is not in it', async t => {
+test('a signed acceptance in the window is a committed send by recipient domain; one accepted before the start mark is not in it', async t => {
   const stub = await startStub(t);
   // A slow poller: only the signed head and the read in mark() keep the earlier acceptance out of the window.
   const o = await observe(t, feedOf(stub, { pollMs: 500, quietMs: 1000 }));
@@ -55,7 +55,7 @@ test('P1: a signed acceptance in the window is a committed send by recipient dom
   assert.equal(verdict('effect.exists', sel({ resource: VIP }), [w]), 'pass');
   assert.equal(verdict('effect.exists', sel({ resource: `other@${EXT}` }), [w]), 'fail', 'the acceptance before the start mark is not this window\'s');
   // The feed declares no key source, so its window names it "undeclared" and custody cannot count the key as held outside the app
-  // (FIX-06, provider-feed/7); the same stub declared as one keeps its windows independent.
+  // (`keySource`, provider-feed/7); the same stub declared as one keeps its windows independent.
   assert.equal(custodyOf(w), 'subject-writable');
   assert.deepEqual(Object.keys(w.scope.feed), ['feedId', 'keyDigest', 'route', 'keySource']);
   assert.equal(w.scope.feed.keySource, 'undeclared');
@@ -64,7 +64,7 @@ test('P1: a signed acceptance in the window is a committed send by recipient dom
   assert.match(w.scope.feed.keyDigest, /^[a-f0-9]{64}$/);
 });
 
-test('P2: absence passes only on a proven feed; a seq gap before the witness leaves it partial (missing)', async t => {
+test('absence passes only on a proven feed; a seq gap before the witness leaves it partial (missing)', async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub));
   const clean = await windowOf(o, stub);
@@ -77,7 +77,7 @@ test('P2: absence passes only on a proven feed; a seq gap before the witness lea
   assert.equal(verdict('effect.none', sel({ resource: VIP }), [gapped]), 'missing');
 });
 
-test('P3 and route (ii): a stub-signed export file can show a send; lines anyone else signed fail the window; it never proves absence', async t => {
+test('route (ii): a stub-signed export file can show a send; lines anyone else signed fail the window; it never proves absence', async t => {
   const path = tmpFile(t);
   const stub = await startStub(t, { journal: path });
   const o = await observe(t, fileFeedOf(stub, path));
@@ -104,7 +104,7 @@ test('P3 and route (ii): a stub-signed export file can show a send; lines anyone
   assert.throws(() => createProviderFeedObserver({ ...feedOf(stub), feed: { file: { path } } }), /presence-only in v1/);
 });
 
-test('P4: an entry of another epoch under the same key, fresh and next in seq, is an integrity fault: the window fails', async t => {
+test('an entry of another epoch under the same key, fresh and next in seq, is an integrity fault: the window fails', async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub));
   const w = await windowOf(o, stub, async () => {
@@ -114,14 +114,14 @@ test('P4: an entry of another epoch under the same key, fresh and next in seq, i
   assert.equal(verdict('effect.exists', sel({ resource: VIP }), [w]) === 'pass', false);
 });
 
-test('P6: the feed is anchored at a signed genesis; a feed without one never starts, and a stub reset fails every later window', async t => {
+test('the feed is anchored at a signed genesis; a feed without one never starts, and a stub reset fails every later window', async t => {
   const empty = await startStub(t, { genesis: false });
   await assert.rejects(startOf(t, feedOf(empty)), /provider-feed/);
   // A feed whose seq 1 is an ordinary acceptance has no anchor: it never starts.
   const headless = await startStub(t, { genesis: false });
   headless.accept([VIP]);
   await assert.rejects(startOf(t, feedOf(headless)), /provider-feed-genesis-missing/);
-  // The R0 blocker: a prohibited send, then a reset before the next read, then the witness in the new epoch.
+  // A prohibited send, then a reset before the next read, then the witness in the new epoch.
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub));
   const w = await windowOf(o, stub, async () => { stub.accept([VIP]); stub.reset(); });
@@ -442,14 +442,14 @@ test('what the app writes never blinds the feed: too many, empty or overlong rec
   assert.equal(later.coverage, 'complete', 'the feed is still read');
 });
 
-// Feed v2, template binding: a feed that declares a template vocabulary (label -> provider id) reads the entry's signed
+// Template binding: a feed that declares a template vocabulary (label -> provider id) reads the entry's signed
 // "template" contract field as a declared label; anything else reads unknown. Only labels are ever stored.
 const TEMPLATES = Object.freeze({ order_cancelled: 'tmpl-order-cancelled', ticket_update: 'tmpl-ticket-update', refund_confirmation: 'd-0c1f43daeeaef504760851f727007e0b' });
 const pin = (op, value) => [{ pointer: '/template', [op]: value }];
 const countOf = (expected, select, windows) => evaluateEffectAssertion({ kind: 'effect.count', expected, select }, windows).verdict;
 const templateOfEvents = w => w.events.map(e => e.captured?.values?.['/template'] ?? null);
 
-test('feed v2 A1: a clause pinned to a template counts only that template; mail of another declared template to the same recipient is outside it', async t => {
+test('a clause pinned to a template counts only that template; mail of another declared template to the same recipient is outside it', async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub, { templates: TEMPLATES }));
   assert.deepEqual(o.scope.capture, { [EXT]: ['/template'], [IDN]: ['/template'] });
@@ -478,7 +478,7 @@ test('feed v2 A1: a clause pinned to a template counts only that template; mail 
   assert.equal(verdict('effect.none', sel({ resource: VIP, fields: pin('equals', 'order_cancelled') }), [bw]), 'unobservable');
 });
 
-test('feed v2 A2: an entry without a template reads unknown under a template pin: never a pass, never a "no"', async t => {
+test('an entry without a template reads unknown under a template pin: never a pass, never a "no"', async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub, { templates: TEMPLATES }));
   const w = await windowOf(o, stub, async () => { stub.accept([VIP]); });
@@ -489,7 +489,7 @@ test('feed v2 A2: an entry without a template reads unknown under a template pin
   assert.equal(verdict('effect.exists', sel({ resource: VIP }), [w]), 'pass', 'it is still a send');
 });
 
-test('feed v2 A3: only an id exactly equal to a declared one is labeled; a case or space variant, another id or a non-string reads unknown', async t => {
+test('only an id exactly equal to a declared one is labeled; a case or space variant, another id or a non-string reads unknown', async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub, { templates: TEMPLATES }));
   for (const template of ['TMPL-ORDER-CANCELLED', 'tmpl-order-cancelled ', 'tmpl-weekly-digest', 7, null, ['tmpl-order-cancelled']]) {
@@ -501,7 +501,7 @@ test('feed v2 A3: only an id exactly equal to a declared one is labeled; a case 
   }
 });
 
-test('feed v2 A4: a template edited after signing is an integrity fault: the window fails, and no template clause passes', async t => {
+test('a template edited after signing is an integrity fault: the window fails, and no template clause passes', async t => {
   const stub = await startStub(t);
   // A slow poller, so the edit (in the same tick as the send) is what the observer reads.
   const o = await observe(t, feedOf(stub, { templates: TEMPLATES, pollMs: 500, quietMs: 1000 }));
@@ -514,7 +514,7 @@ test('feed v2 A4: a template edited after signing is an integrity fault: the win
   assert.equal(verdict('effect.none', sel({ resource: VIP, fields: pin('equals', 'ticket_update') }), [w]), 'observer-failure');
 });
 
-test('feed v2 A5: a template the app writes under "app" is never read', async t => {
+test('a template the app writes under "app" is never read', async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub, { templates: TEMPLATES }));
   const w = await windowOf(o, stub, async () => { stub.accept([VIP], { fields: { app: { subject: 'Your order', template: 'tmpl-order-cancelled' } } }); });
@@ -522,7 +522,7 @@ test('feed v2 A5: a template the app writes under "app" is never read', async t 
   assert.equal(verdict('effect.exists', sel({ resource: VIP, fields: pin('equals', 'order_cancelled') }), [w]), 'missing');
 });
 
-test('feed v2 A7: the template vocabulary: labels only in a run, short and not secret-shaped; ids distinct even with case and spaces folded', () => {
+test('the template vocabulary: labels only in a run, short and not secret-shaped; ids distinct even with case and spaces folded', () => {
   const keys = generateKeyPairSync('ed25519'), actors = { ops: {} };
   const base = { id: 'mail', type: 'provider-feed', feedId: 'helplane-mail', feed: { endpoint: { port: 4471, path: '/feed' } }, publicKey: publicKeyOf(keys), domains: [{ domain: EXT }], templates: TEMPLATES };
   assert.deepEqual(validateProviderFeedConfig(base, actors).templates, TEMPLATES);
@@ -546,7 +546,7 @@ test('feed v2 A7: the template vocabulary: labels only in a run, short and not s
   assert.deepEqual([built.scope.capture, built.scope.feed.templates], [{ [EXT]: ['/template'] }, ['order_cancelled', 'refund_confirmation', 'ticket_update']]);
 });
 
-test('feed v2 B1: in effect.only a send whose template reads unknown beside a template-pinned expect is never absorbed by a recipient-only allow', async t => {
+test('in effect.only a send whose template reads unknown beside a template-pinned expect is never absorbed by a recipient-only allow', async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub, { templates: TEMPLATES }));
   const only = { kind: 'effect.only', expect: [{ select: sel({ resource: VIP, fields: pin('equals', 'order_cancelled') }), count: 1 }], allow: [sel({ resource: VIP })] };
@@ -564,7 +564,7 @@ test('feed v2 B1: in effect.only a send whose template reads unknown beside a te
   assert.equal(judged(ticket).verdict, 'pass', judged(ticket).basis);
 });
 
-test('feed v2: a signed body that repeats the template key reads its template undeclared (readers disagree on which one counts)', async t => {
+test('a signed body that repeats the template key reads its template undeclared (readers disagree on which one counts)', async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub, { templates: TEMPLATES, pollMs: 500, quietMs: 1000 }));
   const w = await windowOf(o, stub, async () => {
@@ -578,7 +578,7 @@ test('feed v2: a signed body that repeats the template key reads its template un
   assert.deepEqual(templateOfEvents(nested), [{ type: 'string', value: 'order_cancelled' }]);
 });
 
-test('feed v2: a recipient domain over 128 characters is unusable, never shortened into a declared domain', async t => {
+test('a recipient domain over 128 characters is unusable, never shortened into a declared domain', async t => {
   const LONG = `${'a'.repeat(63)}.${'b'.repeat(56)}.example`;
   assert.equal(LONG.length, 128);
   const stub = await startStub(t);
@@ -591,9 +591,9 @@ test('feed v2: a recipient domain over 128 characters is unusable, never shorten
   assert.deepEqual(at.events.map(e => [e.name, e.captured?.values['/template']]), [[LONG, { type: 'string', value: 'order_cancelled' }]]);
 });
 
-// Feed v2, Part B: scoped late entries. A check window as the connector collects it on a witnessed endpoint feed (scoped), with
+// Scoped late entries. A check window as the connector collects it on a witnessed endpoint feed (scoped), with
 // sends the app makes after the witness request split (late) and before the witness mail.
-// as: the observer collectWindow sees (default o); Part C tests pass one without templateLift, as a provider-feed/3 build was.
+// as: the observer collectWindow sees (default o); the template-lift tests pass one without templateLift, as a provider-feed/3 build was.
 async function scopedWindowOf(o, stub, { during = async () => {}, late = async () => {}, as = o } = {}) {
   const from = await o.mark();
   await sleep(5);
@@ -607,7 +607,7 @@ const OTHER = `vip@${IDN}`;
 const scopedVerdict = (kind, select, windows, expected) => evaluateEffectAssertion({ kind, select, ...(expected === undefined ? {} : { expected }) }, windows, { scoped: true }).verdict;
 const mail = (stub, to, template) => stub.accept([to], template === undefined ? {} : { fields: { template } });
 
-test('feed v2 B1: a late entry names its recipient; a clause on another recipient is decided, one it could fit reads missing', async t => {
+test('a late entry names its recipient; a clause on another recipient is decided, one it could fit reads missing', async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub));
   const w = await scopedWindowOf(o, stub, { late: async () => { mail(stub, OTHER); } });
@@ -623,7 +623,7 @@ test('feed v2 B1: a late entry names its recipient; a clause on another recipien
   assert.equal(v1.scoped, undefined);
 });
 
-test('feed v2 B2: a lone late entry whose signed template is another declared label is outside a template-pinned clause; a merged, same-template or unknown one is not', async t => {
+test('a lone late entry whose signed template is another declared label is outside a template-pinned clause; a merged, same-template or unknown one is not', async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub, { templates: TEMPLATES }));
   const countCancel = ws => scopedVerdict('effect.count', sel({ resource: VIP, fields: pin('equals', 'order_cancelled') }), ws, 1);
@@ -643,7 +643,7 @@ test('feed v2 B2: a lone late entry whose signed template is another declared la
   assert.equal(countCancel([merged]), 'missing');
 });
 
-test('feed v2 B3: effect.only lifts a feed entry by a recipient-only allow, never while an expect could take it; by its template only as the window\'s one lone entry (Part C)', async t => {
+test('effect.only lifts a feed entry by a recipient-only allow, never while an expect could take it; by its template only as the window\'s one lone entry', async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub, { templates: TEMPLATES }));
   const judged = (only, w) => judgeOnly(only, [w], { fields: true, countBy: true, scopedComplete: onlyScopedComplete(only, [w]) }).verdict;
@@ -652,15 +652,15 @@ test('feed v2 B3: effect.only lifts a feed entry by a recipient-only allow, neve
   // Side 1: the late send is to another recipient, which no expect could take; a recipient-only allow for it lifts the window.
   const other = await scopedWindowOf(o, stub, { during: own, late: async () => { mail(stub, OTHER, 'tmpl-weekly'); } });
   assert.equal(judged({ kind: 'effect.only', expect: expectCancel, allow: [{ source: 'provider-feed', operation: 'send', name: IDN, resource: OTHER }] }, other), 'pass');
-  // Side 2: the late send is to the expected recipient. Its template reads unknown under the expect (the #312 rule would hold it
-  // undecided), so a recipient-only allow does not lift it; and a known ticket update is not lifted by its template either.
+  // Side 2: the late send is to the expected recipient. Its template reads unknown under the expect,
+  // so a recipient-only allow does not lift it; and a known ticket update is not lifted by its template either.
   const variant = await scopedWindowOf(o, stub, { during: own, late: async () => { mail(stub, VIP, 'TMPL-TICKET-UPDATE'); } });
   assert.equal(judged({ kind: 'effect.only', expect: expectCancel, allow: [sel({ resource: VIP })] }, variant), 'missing');
   const known = await scopedWindowOf(o, stub, { during: own, late: async () => { mail(stub, VIP, 'tmpl-ticket-update'); } });
   assert.equal(judged({ kind: 'effect.only', expect: expectCancel, allow: [sel({ resource: VIP })] }, known), 'missing');
   assert.equal(judged({ kind: 'effect.only', expect: expectCancel, allow: [sel({ resource: VIP, fields: pin('equals', 'ticket_update') })] }, known), 'missing');
   // Where no expect could take it, the window's only late entry, one signed send with a declared template, lifts by an allow it
-  // matches template included (Part C, provider-feed/4); before Part C it never did.
+  // matches template included (provider-feed/4); under provider-feed/3 it never did.
   const elsewhere = [{ select: { source: 'provider-feed', operation: 'send', name: IDN, resource: OTHER, fields: pin('equals', 'order_cancelled') }, count: 1 }];
   const lateTicket = await scopedWindowOf(o, stub, { during: async () => { mail(stub, OTHER, 'tmpl-order-cancelled'); }, late: async () => { mail(stub, VIP, 'tmpl-ticket-update'); } });
   assert.equal(judged({ kind: 'effect.only', expect: elsewhere, allow: [sel({ resource: VIP, fields: pin('equals', 'ticket_update') })] }, lateTicket), 'pass');
@@ -668,7 +668,7 @@ test('feed v2 B3: effect.only lifts a feed entry by a recipient-only allow, neve
   assert.equal(judged({ kind: 'effect.only', expect: elsewhere, allow: [sel({ resource: VIP })] }, lateTicket), 'pass', 'the recipient-only allow lifts it');
 });
 
-test('feed v2 B4: what could hide a send keeps the window partial window-wide: an alias form, an undeclared domain, a stall', async t => {
+test('what could hide a send keeps the window partial window-wide: an alias form, an undeclared domain, a stall', async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub));
   const alias = await scopedWindowOf(o, stub, { late: async () => { mail(stub, `vip+x@${EXT}`); } });
@@ -683,7 +683,7 @@ test('feed v2 B4: what could hide a send keeps the window partial window-wide: a
   assert.equal(scopedVerdict('effect.none', sel({ resource: VIP }), [stalled]), 'missing');
 });
 
-test('feed v2 B5: the run-end drain reads to a signed head until the feed is quiet, never past its cap; markClear needs the head read', { timeout: 20000 }, async t => {
+test('the run-end drain reads to a signed head until the feed is quiet, never past its cap; markClear needs the head read', { timeout: 20000 }, async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub, { quietMs: 150, pollMs: 25 }));
   assert.equal(o.drainCapMs(), 10 * 150 + 2 * PROVIDER_FEED_LIMITS.requestTimeoutMs);
@@ -724,7 +724,7 @@ test('provider-feed/8: the drain\'s confirming head is held to the read it found
   assert.ok(since >= 300, `quiescent ${Math.round(since)} ms after an email the drain read (quietMs 300)`);
 });
 
-test('feed v2 B5: a gap after a late collect means entries may be unseen, so the drain follows nothing', async t => {
+test('a gap after a late collect means entries may be unseen, so the drain follows nothing', async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub));
   assert.equal(o.closedAfterCollect(), false);
@@ -737,7 +737,7 @@ test('feed v2 B5: a gap after a late collect means entries may be unseen, so the
   assert.equal((await o.drain({ capMs: 1000 })).closedAfterCollect, true);
 });
 
-test('feed v2 B6: every witnessed endpoint feed drains, whatever the egress gate; a file or unwitnessed feed never does', () => {
+test('every witnessed endpoint feed drains, whatever the egress gate; a file or unwitnessed feed never does', () => {
   const records = [{ id: 'out', type: 'egress-recorder' }, { id: 'mail', type: 'provider-feed', witnessed: true, feed: { route: 'endpoint' } },
     { id: 'log', type: 'provider-feed', witnessed: false, feed: { route: 'file' } }, { id: 'quiet', type: 'provider-feed', witnessed: false, feed: { route: 'endpoint' } }];
   assert.deepEqual(drainersOf({ observers: records }).map(o => o.id), ['mail']);
@@ -753,8 +753,8 @@ test('feed v2 B6: every witnessed endpoint feed drains, whatever the egress gate
   assert.equal(validDrains([drain('egress-recorder-out'), drain('provider-feed-mail')], drainersOf({ attribution: { background: [] }, observers: records })), true);
 });
 
-test('feed v2 B7: template narrowing applies only on a feed window that sees every pinned field; on a blind one the late send still fits', () => {
-  // Review finding (fv2b MINOR 1): a selector pinning /template and a field the feed does not capture (/subject, which an egress
+test('template narrowing applies only on a feed window that sees every pinned field; on a blind one the late send still fits', () => {
+  // A selector pinning /template and a field the feed does not capture (/subject, which an egress
   // window captures). The feed window is blind to the selector, so the same send seen there would be undecided, never "no".
   const N = 'x.example', R = `bob@${N}`;
   const rec = label => ({ status: 'captured', values: { '/template': { type: 'string', value: label } } });
@@ -774,7 +774,7 @@ test('feed v2 B7: template narrowing applies only on a feed window that sees eve
   for (const role of ['boundary', 'control']) assert.equal(decideEffects([{ kind: 'effect.none', select: seenSelect }], [late()], { role })[0].verdict, 'pass', role);
 });
 
-test('feed v2 B8: the drain never waits past its cap, even on a slow signed head; waitedMs never exceeds it', { timeout: 20000 }, async t => {
+test('the drain never waits past its cap, even on a slow signed head; waitedMs never exceeds it', { timeout: 20000 }, async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub, { quietMs: 150, pollMs: 25 }));
   mail(stub, VIP);
@@ -792,9 +792,9 @@ test('feed v2 B8: the drain never waits past its cap, even on a slow signed head
   assert.deepEqual([quick.quiescent, quick.waitedMs <= 3000], [true, true]);
 });
 
-// Feed v2, Part C (provider-feed/4): the window's only late entry, one signed send whose template is a declared label, lifts
+// The template lift (provider-feed/4): the window's only late entry, one signed send whose template is a declared label, lifts
 // effect.only through an allow it matches, template included. Expected on R1 (vip@IDN, in the window); the late send to R2 (VIP).
-test('feed v2 C1 to C5: a lone late feed entry lifts by its own signed template only as the window\'s one entry, a declared label, under a fields-only allow no expect could take', async t => {
+test('a lone late feed entry lifts by its own signed template only as the window\'s one entry, a declared label, under a fields-only allow no expect could take', async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub, { templates: TEMPLATES }));
   const judged = (only, w) => judgeOnly(only, [w], { fields: true, countBy: true, scopedComplete: onlyScopedComplete(only, [w]) }).verdict;
@@ -802,35 +802,35 @@ test('feed v2 C1 to C5: a lone late feed entry lifts by its own signed template 
   const own = async () => { mail(stub, OTHER, 'tmpl-order-cancelled'); };
   const allowR2 = template => sel({ resource: VIP, fields: pin('in', [template]) });
   const only = allow => ({ kind: 'effect.only', expect: expectR1, allow });
-  // C1: its own template matches the allow: pass. Another template: missing.
+  // Its own template matches the allow: pass. Another template: missing.
   const ticket = await scopedWindowOf(o, stub, { during: own, late: async () => { mail(stub, VIP, 'tmpl-ticket-update'); } });
   assert.equal(ticket.scoped.length, 1);
   assert.equal(judged(only([allowR2('ticket_update')]), ticket), 'pass');
   assert.equal(judged(only([allowR2('order_cancelled')]), ticket), 'missing');
-  // C2: absent, undeclared and variant templates never lift.
+  // Absent, undeclared and variant templates never lift.
   for (const template of [undefined, 'tmpl-weekly', 'TMPL-TICKET-UPDATE']) {
     const w = await scopedWindowOf(o, stub, { during: own, late: async () => { mail(stub, VIP, template); } });
     assert.equal(judged(only([allowR2('ticket_update')]), w), 'missing', String(template));
   }
-  // C3: two late entries never lift by template; fix C's recipient-only lift still lifts each.
+  // Two late entries never lift by template; the recipient-only lift still lifts each.
   const two = await scopedWindowOf(o, stub, { during: own, late: async () => { mail(stub, VIP, 'tmpl-ticket-update'); mail(stub, `other@${EXT}`, 'tmpl-ticket-update'); } });
   assert.equal(two.scoped.length, 2);
   assert.equal(judged(only([allowR2('ticket_update'), sel({ resource: '*', fields: pin('in', ['ticket_update']) })]), two), 'missing');
   assert.equal(judged(only([sel({ resource: VIP }), sel({ resource: '*' })]), two), 'pass');
-  // C4: could-fit stays template-blind: an expect on R2 itself, of another template, still blocks.
+  // Could-fit stays template-blind: an expect on R2 itself, of another template, still blocks.
   const expectR2 = [{ select: sel({ resource: VIP, fields: pin('equals', 'order_cancelled') }), count: 1 }];
   assert.equal(judged({ kind: 'effect.only', expect: [...expectR1, ...expectR2], allow: [allowR2('ticket_update')] }, ticket), 'missing');
-  // C5: an allow with any other pin (an actor here; effect.only refuses an outcome or upstream pin outright) never lifts.
+  // An allow with any other pin (an actor here; effect.only refuses an outcome or upstream pin outright) never lifts.
   assert.equal(judged(only([{ ...allowR2('ticket_update'), actor: 'ops' }]), ticket), 'missing');
   // The gate: a window collected from a feed that does not say templateLift (a provider-feed/3 build) never lifts this way.
   const as = { source: o.source, instanceId: o.instanceId, scope: o.scope, collect: (a, b, opts) => o.collect(a, b, opts) };
   const old = await scopedWindowOf(o, stub, { during: own, late: async () => { mail(stub, VIP, 'tmpl-ticket-update'); }, as });
   assert.equal(judged(only([allowR2('ticket_update')]), old), 'missing');
-  assert.equal(judged(only([sel({ resource: VIP })]), old), 'pass', 'fix C still lifts it');
+  assert.equal(judged(only([sel({ resource: VIP })]), old), 'pass', 'the recipient-only lift still lifts it');
 });
 
-test('feed v2 C9: one late entry per check, not per window: two feed windows each holding one lone entry never lift by template', () => {
-  // Review finding (fv2c NOTE 2): two feed observers in one check, each window with exactly one late lone entry.
+test('one late entry per check, not per window: two feed windows each holding one lone entry never lift by template', () => {
+  // Two feed observers in one check, each window with exactly one late lone entry.
   const N = 'customers.example', R1 = `vip@${N}`, R2 = `aisha@${N}`, R3 = `bob@${N}`;
   const rec = label => ({ status: 'captured', values: { '/template': { type: 'string', value: label } } });
   const scope = { operations: ['send'], names: [N], actorAttribution: 'none', evidence: 'authoritative', capture: { [N]: ['/template'] } };
@@ -844,7 +844,7 @@ test('feed v2 C9: one late entry per check, not per window: two feed windows eac
   assert.equal(judged([lateWin('provider-feed-a', R2, true), lateWin('provider-feed-b', R3, false)]), 'missing', 'two windows, one late entry each: never lifts');
 });
 
-test('feed v2 C10: an allow that also pins a pointer the feed does not capture never lifts; a late rejected entry lifts only through an allow it matches', async t => {
+test('an allow that also pins a pointer the feed does not capture never lifts; a late rejected entry lifts only through an allow it matches', async t => {
   const stub = await startStub(t);
   const o = await observe(t, feedOf(stub, { templates: TEMPLATES }));
   const judged = (only, w) => judgeOnly(only, [w], { fields: true, countBy: true, scopedComplete: onlyScopedComplete(only, [w]) }).verdict;
@@ -861,14 +861,14 @@ test('feed v2 C10: an allow that also pins a pointer the feed does not capture n
   assert.equal(judged({ kind: 'effect.only', expect: expectR1, allow: [sel({ resource: VIP, fields: pin('in', ['order_cancelled']) })] }, refused), 'missing');
 });
 
-// Later outcomes, PR-1 (PROVIDER-LATER-OUTCOME design with ADDENDUM-R1; collector provider-feed/5). A feed that declares "outcomes" reads
+// Later outcomes (collector provider-feed/5). A feed that declares "outcomes" reads
 // signed outcome entries, binds each to an in-run send by the provider's message id and canonical recipient, and seals { clear, records }
 // up to the final mark's signed head. The records decide nothing in this build; these tests pin what is read, bound and cleared.
 const laterFeedOf = (stub, extra = {}) => feedOf(stub, { outcomes: { waitMs: 2000 }, ...extra });
 const laterAt = async o => o.laterRecords(await o.mark());
 const idOf = entry => JSON.parse(entry.body).messageId;
 
-test('later P1, P3, P20: an outcome binds by the provider message id and canonical recipient to the event collect names, never by recipient alone', async t => {
+test('later: an outcome binds by the provider message id and canonical recipient to the event collect names, never by recipient alone', async t => {
   const stub = await startStub(t);
   const o = await observe(t, laterFeedOf(stub));
   // A recipient whose domain cannot be read comes first and is skipped, so the declared address's event index is not its signed position.
@@ -883,7 +883,7 @@ test('later P1, P3, P20: an outcome binds by the provider message id and canonic
   assert.ok(!JSON.stringify(later).includes('msg_') && !JSON.stringify(later).includes('@'), 'no provider id or address is kept');
 });
 
-test('later P12 and the witness: an outcome for a message accepted before the run, or for the witness message, binds nothing and is no orphan', async t => {
+test('later: an outcome for a message accepted before the run, or for the witness message, binds nothing and is no orphan', async t => {
   const stub = await startStub(t);
   stub.accept([VIP], { messageId: 'msg_pre' });
   const o = await observe(t, laterFeedOf(stub));
@@ -895,7 +895,7 @@ test('later P12 and the witness: an outcome for a message accepted before the ru
   assert.deepEqual(await laterAt(o), { clear: true, records: [{ of: w.events[0].seq, outcome: 'succeeded' }] });
 });
 
-test('later P2b: a named recipient that maps to two events of its message (an address listed twice) makes every event of it ambiguous and clears the horizon', async t => {
+test('later: a named recipient that maps to two events of its message (an address listed twice) makes every event of it ambiguous and clears the horizon', async t => {
   const stub = await startStub(t);
   const o = await observe(t, laterFeedOf(stub));
   const w = await windowOf(o, stub, async () => { stub.accept([VIP, VIP, `x@${EXT}`], { messageId: 'msg_twice' }); });
@@ -905,7 +905,7 @@ test('later P2b: a named recipient that maps to two events of its message (an ad
   assert.deepEqual(await laterAt(o), { clear: false, records: w.events.map(e => ({ of: e.seq, outcome: 'ambiguous' })) });
 });
 
-test('later P5b, P5c, P5d: a message id seen twice in the epoch (before the run, on a rejected entry, or after the send) reads ambiguous', async t => {
+test('later: a message id seen twice in the epoch (before the run, on a rejected entry, or after the send) reads ambiguous', async t => {
   const stub = await startStub(t);
   stub.accept([`old@${EXT}`], { messageId: 'msg_old' });
   const o = await observe(t, laterFeedOf(stub));
@@ -928,7 +928,7 @@ test('later P5b, P5c, P5d: a message id seen twice in the epoch (before the run,
   assert.equal(after.clear, true, 'a repeated id makes its sends ambiguous; it does not clear the horizon');
 });
 
-test('later P4, P13 to P16b: every refused outcome entry, and a status entry, leaves its window partial and clears the later horizon', async t => {
+test('later: every refused outcome entry, and a status entry, leaves its window partial and clears the later horizon', async t => {
   const idOfAccept = stub => stub.entries.map(e => JSON.parse(e.body)).find(b => b.type === 'accepted' && b.messageId === 'msg_1').id;
   // [what, the window code, the entries, whether the in-run send reads ambiguous]
   const cases = [
@@ -955,7 +955,7 @@ test('later P4, P13 to P16b: every refused outcome entry, and a status entry, le
   }
 });
 
-test('later MAJOR 2 of the PR-1 review: a later mark behind its signed head (a gap before a failure) is not clear', async t => {
+test('later: a later mark behind its signed head (a gap before a failure) is not clear', async t => {
   const stub = await startStub(t);
   const o = await observe(t, laterFeedOf(stub));
   await windowOf(o, stub, async () => { stub.accept([VIP], { messageId: 'msg_1' }); });
@@ -967,7 +967,7 @@ test('later MAJOR 2 of the PR-1 review: a later mark behind its signed head (a g
   assert.deepEqual(o.laterRecords(mark), { clear: false, records: [] });
 });
 
-test('later P16: past the per-send cap of 16 words, and past the per-feed cap of 20000 records, the horizon is not clear', async t => {
+test('later: past the per-send cap of 16 words, and past the per-feed cap of 20000 records, the horizon is not clear', async t => {
   const stub = await startStub(t);
   const o = await observe(t, laterFeedOf(stub));
   const w = await windowOf(o, stub, async () => { stub.accept([VIP], { messageId: 'msg_1' }); });
@@ -990,7 +990,7 @@ test('later P16: past the per-send cap of 16 words, and past the per-feed cap of
   assert.deepEqual([over.clear, over.records.length], [false, 20000]);
 });
 
-test('later P7: an outcome read after the final mark is not sealed', async t => {
+test('later: an outcome read after the final mark is not sealed', async t => {
   const stub = await startStub(t);
   const o = await observe(t, laterFeedOf(stub));
   const w = await windowOf(o, stub, async () => { stub.accept([VIP], { messageId: 'msg_1' }); });
@@ -1002,7 +1002,7 @@ test('later P7: an outcome read after the final mark is not sealed', async t => 
   assert.deepEqual((await laterAt(o)).records.map(r => r.outcome), ['succeeded', 'failed']);
 });
 
-test('later P8: an outcome signed with another key is an integrity fault: later windows fail and the horizon is not clear', async t => {
+test('later: an outcome signed with another key is an integrity fault: later windows fail and the horizon is not clear', async t => {
   const stub = await startStub(t);
   const o = await observe(t, laterFeedOf(stub));
   await windowOf(o, stub, async () => { stub.accept([VIP], { messageId: 'msg_1' }); });
@@ -1014,7 +1014,7 @@ test('later P8: an outcome signed with another key is an integrity fault: later 
   assert.ok(w === null || w.coverage === 'failed');
 });
 
-test('later P9: the later wait reads for its whole bound, so a delayed bounce after a success is sealed; with no in-run send it does not wait', async t => {
+test('later: the later wait reads for its whole bound, so a delayed bounce after a success is sealed; with no in-run send it does not wait', async t => {
   const stub = await startStub(t);
   const o = await observe(t, laterFeedOf(stub));
   const w = await windowOf(o, stub, async () => { stub.accept([VIP], { messageId: 'msg_1' }); });
@@ -1028,7 +1028,7 @@ test('later P9: the later wait reads for its whole bound, so a delayed bounce af
   assert.deepEqual(await observe(t, feedOf(await startStub(t))).then(x => x.laterWait({ capMs: 1500 })), { waitedMs: 0 }, 'a feed without outcomes never waits');
 });
 
-test('later P22, P23: "outcome" is a key of outcome entries only, and an outcome never makes its message a duplicate', async t => {
+test('later: "outcome" is a key of outcome entries only, and an outcome never makes its message a duplicate', async t => {
   const stub = await startStub(t);
   const o = await observe(t, laterFeedOf(stub));
   const carrying = await windowOf(o, stub, async () => { stub.accept([VIP], { messageId: 'msg_1', fields: { outcome: 'succeeded' } }); });

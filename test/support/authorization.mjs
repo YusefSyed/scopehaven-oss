@@ -1,4 +1,4 @@
-// A synthetic authorization record (CMP-ROE-01) for tests that run a configured target through assess, the gate,
+// A synthetic authorization record for tests that run a configured target through assess, the gate,
 // the dashboard, a sequence or a conversation spec: it names the target, every endpoint the run contacts and every
 // credentialed actor, valid from a day ago for thirty days, so a test never expires with the calendar.
 import { writeFileSync } from 'node:fs';

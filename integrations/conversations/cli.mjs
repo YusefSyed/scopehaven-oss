@@ -33,7 +33,7 @@ export async function main(argv, { env = process.env, stdout = process.stdout } 
   if (!info.isFile() || info.size > 262144) throw new Error('The spec must be a regular file of at most 256 KiB (not a symlink).');
   const spec = validateConversationSpec(JSON.parse(await readFile(specPath, 'utf8')));
   if (saveDir && !runReady(spec)) throw new Error('This spec is report-only: add applicationId, build and contextId to save runs for comparison and the gate.');
-  // CMP-ROE-01: checked before any request; a refusal throws (exit 2) with its code.
+  // The authorization record is checked before any request; a refusal throws (exit 2) with its code.
   let authorization, granted;
   try { granted = await authorizeConfigured({ id: spec.id, applicationId: spec.applicationId, origin: spec.origin, actors: spec.actors }, recordPath && !recordPath.startsWith('--') ? resolve(recordPath) : undefined); authorization = granted.stamp; }
   catch (error) { if (error?.name === 'AuthorizationError') error.message = `authorization refused (${error.code}): ${error.message}; nothing was sent`; throw error; }

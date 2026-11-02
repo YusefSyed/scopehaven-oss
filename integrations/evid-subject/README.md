@@ -26,19 +26,19 @@ Three sources a profile may declare `authoritative` today are records the applic
 | `mcp-jsonrpc` | presence-only | subject-writable |
 | `sql-snapshot` | authoritative | **subject-writable** |
 | `hold-proxy` | authoritative | independent |
-| `http-egress` (W3 egress recorder) | authoritative with declared routing and a witness; otherwise presence-only | independent |
-| `smtp-capture` (W3 SMTP sink) | authoritative with declared routing and a witness; otherwise presence-only | independent |
-| `sql-wal` (pg-wal, NC9 item 4) | authoritative | **observer-held, for an absence only** |
+| `http-egress` (egress recorder) | authoritative with declared routing and a witness; otherwise presence-only | independent |
+| `smtp-capture` (SMTP sink) | authoritative with declared routing and a witness; otherwise presence-only | independent |
+| `sql-wal` (pg-wal) | authoritative | **observer-held, for an absence only** |
 
 So a subject that appends a row, drops the tail or names another principal can manufacture a pass through an observer the current rules call authoritative. Custody is the second, orthogonal dimension: *who controls the record*, not *how complete the exporter is*. Both are needed.
 
 **`sql-snapshot` is subject-writable too**, corrected after review. The observer computes the delta itself, so the subject cannot present a selective view, but it still controls the state's content: write-then-revert and decoy rows are real. Coverage already handles write-then-revert (a snapshot window is `net-only`, and an absence verdict needs complete coverage, with one narrow documented exception in `exactFor`), but coverage is a different question from custody. That leaves **only `hold-proxy` outside the subject**. `observer-held` stays in the vocabulary for an observer that derives records the subject cannot author; nothing shipped qualifies today. That is the uncomfortable version of this finding and it is the accurate one.
 
-**`sql-wal` is observer-held for an absence only** (NC9 item 4, an explicit decision). The server writes the WAL and the observer's own session holds the temporary slot, so the subject cannot remove a committed change: an absence (or a count of 0) decided on it is held outside the subject. A write it shows is still one the subject chose to make (a decoy row is real), so a pass that needs a matched write (`effect.exists`, an `effect.count` of one or more, an `effect.only`'s expected effects) reads subject-writable on it (`src/custody.mjs` `ABSENCE_ONLY_SOURCES`). An "exactly once" check decided on the WAL alone therefore reads inconclusive: its lower bound needs an observer that sees the real-world effect. An actor its capture names is the subject's own claim, so an actor-pinned pass reads `principal-unverified`.
+**`sql-wal` is observer-held for an absence only** (an explicit decision). The server writes the WAL and the observer's own session holds the temporary slot, so the subject cannot remove a committed change: an absence (or a count of 0) decided on it is held outside the subject. A write it shows is still one the subject chose to make (a decoy row is real), so a pass that needs a matched write (`effect.exists`, an `effect.count` of one or more, an `effect.only`'s expected effects) reads subject-writable on it (`src/custody.mjs` `ABSENCE_ONLY_SOURCES`). An "exactly once" check decided on the WAL alone therefore reads inconclusive: its lower bound needs an observer that sees the real-world effect. An actor its capture names is the subject's own claim, so an actor-pinned pass reads `principal-unverified`.
 
 **The rule:** a subject's self-report is a reading, never part of the prohibition. A pass may not rest only on subject-writable custody, and a detected forgery is never a pass.
 
-**Addendum (W3 sinks, 2026-10-06).** The egress recorder and the SMTP sink also hold their records outside the subject: the records live in the observer's own process, and the app can add one (a send) but never alter or remove one. Their lineage is `request-path`, so custody derives as `independent`. They decide the absence of a send to a declared destination host or recipient domain, never a principal (`actorAttribution: 'none'`). Their limit is routing, not custody: the witness proves the declared route was live, not that the app has no other way out. The paragraphs below describe the gate alone and predate the sinks.
+**Request-path sinks.** The egress recorder and the SMTP sink also hold their records outside the subject: the records live in the observer's own process, and the app can add one (a send) but never alter or remove one. Their lineage is `request-path`, so custody derives as `independent`. They decide the absence of a send to a declared destination host or recipient domain, never a principal (`actorAttribution: 'none'`). Their limit is routing, not custody: the witness proves the declared route was live, not that the app has no other way out. The paragraphs below describe the gate alone and predate the sinks.
 
 ## What an independent window can decide today
 
@@ -82,7 +82,7 @@ It compares `recordedAtMs` with `effectAtMs`, **both of which the subject writes
 
 ### The limit this module does not remove
 
-A subject that **recomputes the chain after tampering** leaves records that verify among themselves. This is M03 C5: a dropped tail is not detectable from the chain alone. The tests state it as an explicit assertion rather than leaving it implied:
+A subject that **recomputes the chain after tampering** leaves records that verify among themselves. A dropped tail is not detectable from the chain alone. The tests state it as an explicit assertion rather than leaving it implied:
 
 - against the anchor the observer kept, a resealed chain still fails;
 - with **no** external anchor, a resealed `forge-authorize` is still caught, because the fabricated entry was recorded after the effect it attests;
@@ -92,7 +92,7 @@ That is the argument for the rule: the external anchor and non-subject custody a
 
 ## Mutation sweep
 
-Each mutant removes exactly one guard from `custody.mjs` and the sweep records which forgery modes newly reach a pass. Coarse mutations hid real gaps in the control-tamper round, so each mutation isolates one guard.
+Each mutant removes exactly one guard from `custody.mjs` and the sweep records which forgery modes newly reach a pass. Coarse mutations hid real gaps in an earlier control-tamper sweep, so each mutation isolates one guard.
 
 | Mutant | Newly passing |
 | --- | --- |
@@ -108,7 +108,7 @@ The mutants that let nothing through are covered by a second guard, not dead cod
 
 ## Correction to an earlier claim
 
-A previous receipt in this folder stated that the coverage rules already stop a write-then-revert from reaching a pass, and that no false-pass path existed there. **That was wrong.** `evaluateEffectAssertion` does reach a pass for a reverted write when the change column is reset, because the net change really is nothing. Only custody downgrades it. `snapshot-custody.test.mjs` demonstrates this against a real snapshot observer rather than a stub, together with a file swap, where the observer reads a path whose inode it never compares.
+An earlier note on this module stated that the coverage rules already stop a write-then-revert from reaching a pass, and that no false-pass path existed there. **That was wrong.** `evaluateEffectAssertion` does reach a pass for a reverted write when the change column is reset, because the net change really is nothing. Only custody downgrades it. `snapshot-custody.test.mjs` demonstrates this against a real snapshot observer rather than a stub, together with a file swap, where the observer reads a path whose inode it never compares.
 
 ## Forgery corpus
 
@@ -122,15 +122,15 @@ A previous receipt in this folder stated that the coverage rules already stop a 
 
 **Rules.** Naive is `evaluateEffectAssertion`, the effect rules alone, as `decideClause` calls them before custody. Gated is `decideEffects` with role `boundary`, custody included. E is the exception: naive verifies the chain against the anchor the subject presents, and gated is `subjectIntegrityVerdict` with the anchor the observer kept. The refund count on G uses `evaluateRefundCount`, the provider-ledger rule.
 
-**Result** (the matrix is in `corpus.test.mjs` and the receipt):
+**Result** (the matrix is in `corpus.test.mjs`):
 
-- Every mode makes at least one naive configuration pass: 35 naive false passes across A to E (36 before the catalog fingerprint, N13, caught `log-rotation` on A).
+- Every mode makes at least one naive configuration pass: 35 naive false passes across A to E (36 before the catalog fingerprint caught `log-rotation` on A).
 - Custody-gated rules give **0 false passes**. Every one of the 35 reads `inconclusive` instead.
 - F and G never pass a mode. The honest controls fail wherever the claim can be decided. The legitimate controls keep their pass on F and G and read inconclusive, never pass, on A to E. That is the cost of custody, and it is stated rather than hidden.
 - Some modes are caught by a subject-writable observer itself, before custody:
   - the request-log observer fails a log whose earlier bytes were rewritten (`backdate`) or whose file was replaced (`file-swap`), and reads a replayed witness as partial;
   - the audit endpoint reads rows that vanished after a table rotation as partial, and still counts a backfilled lower id;
-  - the SQL audit-table observer reads the audit table renamed and recreated during the run as a schema change (`schema-drift`, N13);
+  - the SQL audit-table observer reads the audit table renamed and recreated during the run as a schema change (`schema-drift`);
   - the payments double reads a replayed witness as partial;
   - the chain fails a truncation that was not resealed.
 
@@ -151,4 +151,4 @@ Run it: `./scopehaven test` covers `corpus.test.mjs`. `node integrations/evid-su
 
 ## Scope
 
-No outward claim that evidence "cannot be forged" follows from this module. It establishes that a forgery in the modes tested never produces a pass, and it names one case (a resealed truncation with no external anchor) that only custody catches. The corpus widens "the modes tested" to the 13 record-forgery modes above, against seven observer configurations, with no egress-bypass modes. Any public wording goes through the claims register first.
+No outward claim that evidence "cannot be forged" follows from this module. It establishes that a forgery in the modes tested never produces a pass, and it names one case (a resealed truncation with no external anchor) that only custody catches. The corpus widens "the modes tested" to the 13 record-forgery modes above, against seven observer configurations, with no egress-bypass modes.

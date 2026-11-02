@@ -127,7 +127,7 @@ test('without the lifecycle declaration the same run cannot pass the refusals: t
   const { run } = await assess(t, {}, { edit: p => { delete p.lifecycle; return p; } });
   assert.equal(carol(run).reason, 'bracket-not-passed');
   // The points after the suspension refused carol's identity control and her surface control (401). A probe refused with her own
-  // credential is route-level (core batch v3 decisions 3 and 3a): every row of hers reads bracket-not-passed, the reason an identity
+  // credential is route-level (the surface- and identity-refusal rules): every row of hers reads bracket-not-passed, the reason an identity
   // refusal gives and the one identityReason ranks above surface-refused. The identity control and the checks whose own points
   // came before the suspension are included, since a credential refused once may have been refused between two accepting points.
   const points = [...carol(run).before, ...carol(run).between.flatMap(b => b.probes), ...carol(run).after];
@@ -215,9 +215,9 @@ test('a declared sign-in redirect is the post-change refusal, not a lost login',
 });
 
 // ---------------------------------------------------------------------------
-// actor-identity/5 (core batch v3): a change is attributed only when the changer's login was proven for the change check
-// (F9, a lead decision), a change check needs a changer with an identity control, and the reviewer's RV-1 probe from the
-// core batch v2 review (F6), shipped as an assertion. Injected transport and an injected empty authoritative sink: no socket.
+// actor-identity/5: a change is attributed only when the changer's login was proven for the change check, a change check
+// needs a changer with an identity control, and the validator refuses a lifecycle run whose changed actor has no surface
+// control. Injected transport and an injected empty authoritative sink: no socket.
 import { IDENTITY_REASONS, IDENTITY_UNPROVEN_DECISION } from '../src/contracts.mjs';
 const SINK_HOST = 'hooks.desk.example', SINK_SELECT = { source: 'http-egress', operation: 'send', name: SINK_HOST };
 const sinkConfig = witness => ({ id: 'sink', type: 'egress-recorder', port: 40999, routing: 'proxy', destinations: [{ host: SINK_HOST }], witness: { actorId: witness, method: 'GET', path: '/ping', host: 'witness.scopehaven.invalid' }, settleMs: 250, quietMs: 150 });
@@ -252,7 +252,7 @@ function changerApp(state) {
 }
 const recount = run => { run.counts = { pass: 0, fail: 0, inconclusive: 0, error: 0, not_applicable: 0 }; for (const r of run.results) run.counts[r.status]++; };
 
-test('F9: a change confirms the post-change refusals only when the changer\'s login was proven for the change check; otherwise they are the third state (changer-login-unproven)', async () => {
+test('a change confirms the post-change refusals only when the changer\'s login was proven for the change check; otherwise they are the third state (changer-login-unproven)', async () => {
   const proven = await runHttpAssessment(changerProfile(), { env: ENV, transport: changerApp({}), observerFactory: emptySink });
   assert.deepEqual([carol(proven).lifecycle.changeConfirmed, carol(proven).lifecycle.changerLoginProven, row(proven, 'REUSE').status], [true, true, 'pass']);
   validateHttpRunEvidence(proven, { expectedSuite: suiteOf(changerProfile(), ENV) });
@@ -279,7 +279,7 @@ test('F9: a change confirms the post-change refusals only when the changer\'s lo
   assert.throws(() => validateHttpRunEvidence(unflagged), /invalid-run-evidence/);
 });
 
-test('F9 (static): the change check must be sent by a credentialed actor with an identity control, so a change by an actor with no identity control never confirms one', () => {
+test('static: the change check must be sent by a credentialed actor with an identity control, so a change by an actor with no identity control never confirms one', () => {
   validateTargetFile({ schemaVersion: 1, targets: [changerProfile()] });
   const noIdentity = changerProfile(); noIdentity.checks = noIdentity.checks.filter(c => c.id !== 'ADMIN-ME'); noIdentity.requiredControlIds = noIdentity.requiredControlIds.filter(id => id !== 'ADMIN-ME');
   assert.throws(() => validateTargetFile({ schemaVersion: 1, targets: [noIdentity] }), /the change check must be sent by a credentialed actor with an identity control/);
@@ -287,7 +287,7 @@ test('F9 (static): the change check must be sent by a credentialed actor with an
   assert.throws(() => validateTargetFile({ schemaVersion: 1, targets: [anonymousAdmin] }), /the change check must be sent by a credentialed actor with an identity control/);
 });
 
-test('F6 (RV-1, core batch v2 review): the validator refuses a lifecycle run whose changed actor has no surface control, even when every other field is consistent', async () => {
+test('the validator refuses a lifecycle run whose changed actor has no surface control, even when every other field is consistent', async () => {
   const run = await runHttpAssessment(changerProfile(), { env: ENV, transport: changerApp({}), observerFactory: emptySink });
   assert.equal(row(run, 'REUSE').status, 'pass');
   validateHttpRunEvidence(run);
@@ -299,10 +299,10 @@ test('F6 (RV-1, core batch v2 review): the validator refuses a lifecycle run who
   assert.throws(() => validateHttpRunEvidence(forged), e => e.code === 'invalid-run-evidence', 'a post-change refusal without an earlier accepted surface is refused');
 });
 
-// Core batch v3 review, A-1: the two points covering the change check are ranked together, not by position, so a changer whose
+// The two points covering the change check are ranked together, not by position, so a changer whose
 // login failed at the later point (an identity probe that did not pass) is never attributed the change because the earlier point
 // failed only as surface-not-passed (a surface 500, login proven).
-test('A-1 (d): a change is attributed only when both points covering the change check proved the changer\'s login, whichever failed first', async () => {
+test('a change is attributed only when both points covering the change check proved the changer\'s login, whichever failed first', async () => {
   // The administrator gains a surface control before the change. SUSPEND is covered by the point after ADMIN-NOTES (its surface
   // probe, the third /admin-notes call, answers 500) and the closing point after SUSPEND (its identity probe answers 500: not a
   // refusal, so it binds only the checks that point covers, and only the ranking of the two points decides SUSPEND).
@@ -332,10 +332,10 @@ test('A-1 (d): a change is attributed only when both points covering the change 
   validateHttpRunEvidence(attributed);
 });
 
-// Decision 3b (DECISIONS-2026-10-09, round 3): the changer's identity probe at a point that does not cover the change check answers
+// The other-principal rule: the changer's identity probe at a point that does not cover the change check answers
 // a complete 2xx naming another principal, or null. identityRefused counts that as a refusal, so it withholds every row of the
 // administrator route-wide: the change is not attributed, and the post-change refusal is the third state (changer-login-unproven).
-test('Decision 3b (changer): a 2xx identity answer for another principal or none at any point of the changer leaves the change unattributed', async () => {
+test('other principal (changer): a 2xx identity answer for another principal or none at any point of the changer leaves the change unattributed', async () => {
   const withNotes = () => { const p = changerProfile(); p.checks.splice(3, 0, ctl('ADMIN-NOTES', 'admin', '/admin-notes')); p.requiredControlIds.push('ADMIN-NOTES'); return p; };
   // ADMIN-ME with the administrator's credential, in order: the control row (1), the opening point before ADMIN-NOTES (2), the
   // point after ADMIN-NOTES (3), the closing point after SUSPEND (4). SUSPEND is covered by points 3 and 4 only.

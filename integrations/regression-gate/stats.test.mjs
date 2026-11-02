@@ -7,11 +7,11 @@ import {
   COMPARISON_RULES, MAX_VIOLATION_UPPER,
 } from './stats.mjs';
 
-// SURPASS-STATS-01. Pure arithmetic: no network, no model call, no file I/O.
+// Small-sample statistics. Pure arithmetic: no network, no model call, no file I/O.
 // Every expected number is hand-computed inline, a closed form, a published
 // value, or an independent reference computed outside this module with exact
 // integer binomials (Python math.comb / fractions.Fraction) or math.lgamma; the
-// source is named beside each value. Default tolerance 5e-4 as in the packet.
+// source is named beside each value. Default tolerance 5e-4.
 
 const near = (actual, expected, tolerance = 5e-4, label = '') =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${label} expected ${expected} ± ${tolerance}, got ${actual}`);
@@ -45,7 +45,7 @@ test('normalQuantile matches known quantiles to 1e-9 in all three AS241 regions'
   near(normalQuantile(1e-12), -7.034483825301132, 1e-9, 'z_1e-12');
   near(normalQuantile(1e-20), -9.262340089798407, 1e-9, 'z_1e-20');
   // Deep tail, where the intermediate polynomial extrapolated would drift by
-  // 5e-8 (1e-50) to 5e-5 (1e-300); mutation round 1 showed 1e-12 and 1e-20 miss that.
+  // 5e-8 (1e-50) to 5e-5 (1e-300); a mutation sweep showed 1e-12 and 1e-20 miss that.
   near(normalQuantile(1e-50), -14.933337534788489, 1e-9, 'z_1e-50');
   near(normalQuantile(1e-100), -21.273453560965322, 1e-9, 'z_1e-100');
   near(normalQuantile(1e-300), -37.0470962993612, 1e-9, 'z_1e-300');
@@ -162,7 +162,7 @@ test('clopperPearson stays accurate at n = 10000', () => {
 });
 
 test('"ahead" thresholds: the largest rival count whose upper bound stays below our x = n lower bound', () => {
-  // Lead's table (IMPLEMENTATIONS.md M4): CP / Wilson. Both sides of each
+  // Expected thresholds, CP / Wilson. Both sides of each
   // comparison use the same method; recomputed here, not copied.
   const table = { 7: [1, 2], 10: [3, 4], 12: [5, 6], 20: [12, 13], 30: [22, 23] };
   const ahead = (n, interval) => {
@@ -236,7 +236,7 @@ test('mcnemarExact: exact conditional binomial on discordant pairs', () => {
   // 5 discordant all one way: 2 * 0.5^5 = 0.0625; 6: 2 * 0.5^6 = 0.03125.
   const five = mcnemarExact(5, 0);
   assert.deepEqual(Object.keys(five), ['b', 'c', 'discordant', 'pTwoSided', 'pOneSided', 'pOneSidedTowards', 'direction']);
-  // D12: the one-sided tail names the direction it tests.
+  // The one-sided tail names the direction it tests.
   assert.equal(five.pOneSidedTowards, five.direction);
   near(five.pTwoSided, 0.0625, 1e-12); near(five.pOneSided, 0.03125, 1e-12);
   assert.equal(five.discordant, 5); assert.equal(five.direction, 'baseline');
@@ -318,7 +318,7 @@ test('fisherExact edges and refusals', () => {
 
 const obs = (cluster, ...outcomes) => outcomes.map(success => ({ cluster, success }));
 
-test('clusterSummary: one cluster has no between-cluster spread, so the cluster SE is null, not 0 (D9)', () => {
+test('clusterSummary: one cluster has no between-cluster spread, so the cluster SE is null, not 0', () => {
   const once = obs('task-a', true, false, true, true, false);
   const tenTimes = Array.from({ length: 10 }, () => once.map(row => ({ ...row }))).flat();
   const before = clusterSummary(once), after = clusterSummary(tenTimes);
@@ -329,7 +329,7 @@ test('clusterSummary: one cluster has no between-cluster spread, so the cluster 
   assert.equal(before.clusterSE, null); assert.equal(before.singleCluster, true); assert.equal(before.designEffect, null);
 });
 
-test('clusterSummary: the cluster-robust SE of the pooled rate (eq. 4), for equal and unequal cluster sizes (M5)', () => {
+test('clusterSummary: the cluster-robust SE of the pooled rate (eq. 4), for equal and unequal cluster sizes', () => {
   // Equal sizes: clusters 1/1, 0/1 ... as three clusters of 2: means 1, 0, 0.5, pooled 0.5.
   const equal = [...obs('a', true, true), ...obs('b', false, false), ...obs('c', true, false)];
   const s = clusterSummary(equal);
@@ -339,7 +339,7 @@ test('clusterSummary: the cluster-robust SE of the pooled rate (eq. 4), for equa
   // Deviation sums 1, -1, 0: sqrt(3/2 * 2) / 6 = sqrt(3) / 6, which is the SD of the cluster means (0.5) over sqrt(3).
   near(s.clusterSE, Math.sqrt(3) / 6, 1e-15); near(s.clusterSE, 0.5 / Math.sqrt(3), 1e-15);
   near(s.designEffect, (3 / 36) / (0.25 / 6), 1e-12, 'design effect 2');
-  // Unequal sizes (the review's case): 100/100 and 0/1. Eq. 4 with C/(C-1): sqrt(2 * 2 * (100/101)^2) / 101.
+  // Unequal sizes: 100/100 and 0/1. Eq. 4 with C/(C-1): sqrt(2 * 2 * (100/101)^2) / 101.
   const unequal = clusterSummary([...Array.from({ length: 100 }, () => ({ cluster: 'big', success: true })), { cluster: 'small', success: false }]);
   near(unequal.point, 100 / 101, 1e-15, 'the pooled rate, not the mean of the two cluster means (0.5)');
   near(unequal.clusterSE, 0.019605920988138428, 1e-12, 'reference computed outside the module');
@@ -374,7 +374,7 @@ test('independentRate refuses pooled reruns; the per-cluster interval is the hon
   const reruns = Array.from({ length: 10 }, (_, i) => obs(`defect-${i}`, true, true, true, true, true)).flat();
   assert.throws(() => independentRate(reruns), error => error instanceof StatsError && error.code === 'pooled-reruns' &&
     /aggregate per cluster first/i.test(error.message) && /perCluster/.test(error.message) &&
-    // It suggests only the rules a comparison accepts (D3-5; D4's M-34).
+    // It suggests only the rules a comparison accepts.
     error.message.includes("'all' | 'majority'") && !error.message.includes("'any'"));
   assert.throws(() => independentRate(reruns, { method: 'clopper-pearson' }), error => error.code === 'pooled-reruns');
   near(wilson(50, 50).lower, 0.929, 5e-4, 'the anti-conservative pooled figure');
@@ -388,9 +388,9 @@ test('independentRate refuses pooled reruns; the per-cluster interval is the hon
   assert.deepEqual(independentRate(single, { method: 'clopper-pearson', sided: 'lower' }), clopperPearson(2, 3, { sided: 'lower' }));
   refuses(() => independentRate(single, { method: 'wald' }), 'invalid-method');
   refuses(() => independentRate(single, { sided: 'upper' }), 'invalid-sided');
-  // M4: two observations of one cluster are already a rerun.
+  // Two observations of one cluster are already a rerun.
   refuses(() => independentRate([...obs('a', true, true), ...obs('b', false)]), 'pooled-reruns');
-  // M4: the confidence is passed through, for both methods.
+  // The confidence is passed through, for both methods.
   assert.deepEqual(independentRate(single, { confidence: 0.9 }), wilson(2, 3, { confidence: 0.9 }));
   assert.notDeepEqual(independentRate(single, { confidence: 0.9 }), wilson(2, 3));
   assert.deepEqual(independentRate(single, { method: 'clopper-pearson', confidence: 0.9 }), clopperPearson(2, 3, { confidence: 0.9 }));
@@ -398,7 +398,7 @@ test('independentRate refuses pooled reruns; the per-cluster interval is the hon
   refuses(() => independentRate(single, { methd: 'wilson' }), 'unknown-option');
 });
 
-test('M4: Wilson endpoints are pinned only at 0 and n, and one-sided Clopper-Pearson reports the bound asked for', () => {
+test('Wilson endpoints are pinned only at 0 and n, and one-sided Clopper-Pearson reports the bound asked for', () => {
   // References computed outside the module (closed-form Wilson; exact binomial bisection).
   const one = wilson(1, 10), nine = wilson(9, 10);
   near(one.lower, 0.017876213095072868, 1e-12); near(one.upper, 0.4041500267952385, 1e-12);
@@ -406,11 +406,11 @@ test('M4: Wilson endpoints are pinned only at 0 and n, and one-sided Clopper-Pea
   const lower = clopperPearson(3, 10, { sided: 'lower' }), upper = clopperPearson(3, 10, { sided: 'upper' });
   near(lower.lower, 0.08726443391415031, 1e-10); assert.equal(lower.upper, 1);
   assert.equal(upper.lower, 0); near(upper.upper, 0.6066242161054134, 1e-10);
-  // The D8 citation: 4/5 one-sided 95% lower bound is 0.34259.
+  // A reference value: 4/5 one-sided 95% lower bound is 0.34259.
   near(clopperPearson(4, 5, { sided: 'lower' }).lower, 0.34259168199886125, 1e-10);
 });
 
-test('D12: options are objects with known keys only; a misspelled or null option is a StatsError', () => {
+test('options are objects with known keys only; a misspelled or null option is a StatsError', () => {
   refuses(() => wilson(1, 2, null), 'invalid-options');
   refuses(() => wilson(1, 2, { confidance: 0.9 }), 'unknown-option');
   refuses(() => clopperPearson(1, 2, { side: 'lower' }), 'unknown-option');
@@ -483,7 +483,7 @@ test('compareRepeated: a 3-scenario suite moving from 1/3 to 0/3 failing is unre
   assert.equal(paired.verdict, 'unresolved'); assert.equal(paired.test, 'mcnemar-exact'); assert.equal(paired.pTwoSided, 1);
 });
 
-test('H1: pooled reruns never reach "fixed": 3 tasks x 10 reruns from 0/30 to 30/30 is refused, or unresolved per task', () => {
+test('pooled reruns never reach "fixed": 3 tasks x 10 reruns from 0/30 to 30/30 is refused, or unresolved per task', () => {
   const base = repeat(arm('task-', [false, false, false]), 10), cand = repeat(arm('task-', [true, true, true]), 10);
   for (const design of ['independent', 'paired']) refuses(() => compareRepeated({ baseline: base, candidate: cand, design, control: WORKING }), 'pooled-reruns');
   const independent = compareRepeated({ baseline: base, candidate: cand, design: 'independent', rule: 'all', control: WORKING });
@@ -495,7 +495,7 @@ test('H1: pooled reruns never reach "fixed": 3 tasks x 10 reruns from 0/30 to 30
   const mixed = [...obs('m0', true, true, false), ...obs('m1', true, true, true), ...obs('m2', false, false, true), ...obs('m3', true, false, false)];
   const counts = rule => compareRepeated({ baseline: mixed, candidate: mixed, design: 'paired', rule, control: WORKING }).clusters.candidate.successes;
   assert.deepEqual([counts('all'), counts('majority')], [1, 2]);
-  // R3-M1: 'any' is not a comparison rule (perCluster still offers it for description).
+  // 'any' is not a comparison rule (perCluster still offers it for description).
   refuses(() => counts('any'), 'invalid-rule');
   // Unequal independent arms: the MDE is for the smaller arm's cluster count.
   near(compareRepeated({ baseline: arm('b', [true, false, false, false]), candidate: arm('c', Array(10).fill(true)), design: 'independent', control: WORKING }).mde, mde({ n: 4 }), 1e-15);
@@ -503,7 +503,7 @@ test('H1: pooled reruns never reach "fixed": 3 tasks x 10 reruns from 0/30 to 30
   refuses(() => mcnemarExact(MAX_EXACT_N, 1), 'too-large-for-exact');
 });
 
-test('H2 and M1: the control and the design are required, and a misspelled option is refused, never ignored', () => {
+test('the control and the design are required, and a misspelled option is refused, never ignored', () => {
   const base = arm('t', Array(10).fill(false)), cand = arm('t', Array(10).fill(true));
   refuses(() => compareRepeated({ baseline: base, candidate: cand, design: 'independent' }), 'control-required');
   refuses(() => compareRepeated({ baseline: base, candidate: cand, design: 'independent', controls: arm('c', [false]) }), 'unknown-option');
@@ -536,7 +536,7 @@ test('compareRepeated: fixed and regressed need the exact one-sided test below a
   assert.equal(compareRepeated({ ...pairedArms(6, 0, 4), design: 'paired', control: WORKING }).verdict, 'regressed');
   const five = compareRepeated({ ...pairedArms(0, 5, 5), design: 'paired', control: WORKING });
   assert.equal(five.verdict, 'unresolved'); near(five.pTwoSided, 0.0625, 1e-12);
-  // M1: the same clusters declared independent go to Fisher (one-sided 252/15504 = 0.0163 < 0.025): the caller must say which design it is.
+  // The same clusters declared independent go to Fisher (one-sided 252/15504 = 0.0163 < 0.025): the caller must say which design it is.
   const asIndependent = compareRepeated({ ...pairedArms(0, 5, 5), design: 'independent', control: WORKING });
   assert.equal(asIndependent.test, 'fisher-exact'); near(asIndependent.pTwoSided, 504 / 15504, 1e-12); assert.equal(asIndependent.verdict, 'fixed');
   // A stricter alpha leaves the same evidence unresolved.
@@ -544,18 +544,18 @@ test('compareRepeated: fixed and regressed need the exact one-sided test below a
   assert.ok(VERDICTS.includes(fixed.verdict) && VERDICTS.includes(five.verdict));
 });
 
-test('M2: "fixed" is the interval rule: Fisher two-sided p < alpha is not enough when the one-sided test misses alpha / 2', () => {
-  // The review's case: 0/24 to 3/15. Two-sided Fisher 0.0498 < 0.05, but one-sided P = C(15,3)/C(39,3) = 455/9139 = 0.0498 >= 0.025.
+test('"fixed" is the interval rule: Fisher two-sided p < alpha is not enough when the one-sided test misses alpha / 2', () => {
+  // The edge case: 0/24 to 3/15. Two-sided Fisher 0.0498 < 0.05, but one-sided P = C(15,3)/C(39,3) = 455/9139 = 0.0498 >= 0.025.
   const r = compareRepeated({ baseline: arm('b', Array(24).fill(false)), candidate: arm('c', [...Array(3).fill(true), ...Array(12).fill(false)]), design: 'independent', control: WORKING });
   near(r.pTwoSided, 0.049786628733997154, 1e-12); near(r.pOneSided, 455 / 9139, 1e-12);
   assert.equal(r.verdict, 'unresolved');
 });
 
-test('M3: a p exactly at the threshold in exact arithmetic never reads below it because of rounding', () => {
+test('a p exactly at the threshold in exact arithmetic never reads below it because of rounding', () => {
   // 0/1 to 19/19: exact one-sided p = 1/20. At alpha 0.1 (threshold alpha/2 = 0.05) it is not below.
   const r = compareRepeated({ baseline: arm('b', [false]), candidate: arm('c', Array(19).fill(true)), design: 'independent', alpha: 0.1, control: WORKING });
   near(r.pOneSided, 1 / 20, 1e-15); assert.equal(r.verdict, 'unresolved');
-  // Alpha is capped (D10).
+  // Alpha is capped.
   refuses(() => compareRepeated({ baseline: arm('b', [false]), candidate: arm('c', [true]), design: 'independent', alpha: 0.5, control: WORKING }), 'invalid-alpha');
 });
 
@@ -575,15 +575,15 @@ test('pairOverTrials: held needs every trial held and a control shown to work; d
   // A flaky control (4/5) lowers its bound below the floor: 0.34259 < 0.5, so nothing is held.
   const flaky = pairOverTrials({ forbidden: { successes: 5, n: 5 }, control: { successes: 4, n: 5 } });
   assert.equal(flaky.verdict, 'blocked-by-controls'); near(flaky.controlLower, 0.34259168199886125, 1e-10);
-  // M4: the default floor is 0.5: a 4/4 control (0.05^(1/4) = 0.4729) does not reach it; a floor of 0.45 does.
+  // The default floor is 0.5: a 4/4 control (0.05^(1/4) = 0.4729) does not reach it; a floor of 0.45 does.
   const fourOfFour = pairOverTrials({ forbidden: { successes: 5, n: 5 }, control: { successes: 4, n: 4 } });
   assert.deepEqual([fourOfFour.verdict, fourOfFour.controlFloor], ['blocked-by-controls', 0.5]); near(fourOfFour.controlLower, 0.4728708045015879, 1e-12);
   assert.equal(pairOverTrials({ forbidden: { successes: 5, n: 5 }, control: { successes: 4, n: 4 }, controlFloor: 0.45 }).verdict, 'held');
-  // M4: confidence moves both bounds: at 90%, 5/5 gives 0.1^(1/5) = 0.6310 and a violation bound of 0.3690.
+  // Confidence moves both bounds: at 90%, 5/5 gives 0.1^(1/5) = 0.6310 and a violation bound of 0.3690.
   const ninety = pairOverTrials({ forbidden: { successes: 5, n: 5 }, control: { successes: 5, n: 5 }, confidence: 0.9, controlFloor: 0.6 });
   near(ninety.controlLower, 0.6309573444801932, 1e-12); near(ninety.violationUpper, 0.36904265551980675, 1e-12); assert.equal(ninety.verdict, 'held');
   assert.equal(pairOverTrials({ forbidden: { successes: 5, n: 5 }, control: { successes: 5, n: 5 }, controlFloor: 0.6 }).verdict, 'blocked-by-controls', 'at 95% the same control misses 0.6');
-  // D11: too few trials to bound the violation rate read insufficient, never held: 1/1 leaves 0.95 open, 3/3 leaves 0.63.
+  // Too few trials to bound the violation rate read insufficient, never held: 1/1 leaves 0.95 open, 3/3 leaves 0.63.
   for (const n of [1, 3]) assert.equal(pairOverTrials({ forbidden: { successes: n, n }, control: { successes: 10, n: 10 } }).verdict, 'insufficient', `${n}/${n}`);
   // At the lowest confidence a decision takes (0.8), 3/3 leaves 1 - 0.2^(1/3) = 0.415 open and holds.
   const lowest = pairOverTrials({ forbidden: { successes: 3, n: 3 }, control: { successes: 10, n: 10 }, confidence: 0.8 });
@@ -603,12 +603,12 @@ test('compareRepeated with a control: an always-refuse candidate is blocked by i
   assert.equal(refusing.verdict, 'blocked-by-controls'); assert.deepEqual([refusing.control.lower, refusing.control.floor], [0, 0.5]);
   const working = compareRepeated({ ...arms, control: WORKING });
   assert.equal(working.verdict, 'fixed'); near(working.control.lower, 0.05 ** (1 / 10), 1e-9);
-  // M4: the control bound is taken at 1 - alpha: at alpha 0.1 a 5/5 control reaches a 0.6 floor (0.1^(1/5) = 0.631); at 0.05 it does not (0.549).
+  // The control bound is taken at 1 - alpha: at alpha 0.1 a 5/5 control reaches a 0.6 floor (0.1^(1/5) = 0.631); at 0.05 it does not (0.549).
   const five = arm('c', Array(5).fill(true));
   const at10 = compareRepeated({ ...arms, control: five, controlFloor: 0.6, alpha: 0.1 });
   assert.equal(at10.verdict, 'fixed'); near(at10.control.lower, 0.6309573444801932, 1e-12); assert.equal(at10.control.confidence, 0.9);
   assert.equal(compareRepeated({ ...arms, control: five, controlFloor: 0.6 }).verdict, 'blocked-by-controls');
-  // M4: the floor is applied as given: a control just under it is blocked, just over it is not.
+  // The floor is applied as given: a control just under it is blocked, just over it is not.
   const flaky = arm('c', [true, true, true, true, false]);
   assert.equal(compareRepeated({ ...arms, control: flaky }).verdict, 'blocked-by-controls', '4/5 reaches 0.34259 at 95%');
   assert.equal(compareRepeated({ ...arms, control: flaky, controlFloor: 0.34 }).verdict, 'fixed');
@@ -619,23 +619,23 @@ test('compareRepeated with a control: an always-refuse candidate is blocked by i
   assert.equal(compareRepeated({ ...arms, control: five, controlFloor: compareRepeated({ ...arms, control: five }).control.lower }).verdict, 'fixed');
   // The MDE is taken at the comparison's alpha.
   near(compareRepeated({ ...arms, control: WORKING, alpha: 0.1 }).mde, mde({ n: 10, alpha: 0.1 }), 1e-15);
-  // R3-M1: control reruns are aggregated with 'all', whatever the arms' rule: a control cluster works
+  // Control reruns are aggregated with 'all', whatever the arms' rule: a control cluster works
   // only when every one of its reruns did. Two working clusters of two reruns reach 0.05^(1/2) = 0.224.
   const twoByTwo = compareRepeated({ ...arms, control: repeat(arm('c', [true, true]), 2) });
   assert.deepEqual([twoByTwo.verdict, twoByTwo.control.successes, twoByTwo.control.n, twoByTwo.control.rule], ['blocked-by-controls', 2, 2, 'all']);
   assert.equal(compareRepeated({ ...arms, control: repeat(WORKING, 3) }).verdict, 'fixed');
 });
 
-test('R3-H1: unequal rerun counts are refused; the review\'s N1 (a worse candidate read as fixed) and the 10-vs-1 case', () => {
-  // N1: 20 tasks; the baseline reruns each 10 times at 9 of 10, the candidate runs each once, 14 of 20 succeeding (worse per trial).
+test('unequal rerun counts are refused: a worse candidate read as fixed, and the 10-vs-1 case', () => {
+  // A worse candidate: 20 tasks; the baseline reruns each 10 times at 9 of 10, the candidate runs each once, 14 of 20 succeeding (worse per trial).
   const ids = Array.from({ length: 20 }, (_, i) => `task-${i}`);
   const base = ids.flatMap(id => [...obs(id, ...Array(9).fill(true)), ...obs(id, false)]);
   const cand = ids.map((id, i) => ({ cluster: id, success: i < 14 }));
   for (const design of ['paired', 'independent']) for (const rule of ['all', 'majority']) refuses(() => compareRepeated({ baseline: base, candidate: cand, design, rule, control: WORKING }), 'unequal-reruns');
-  // R4-M1 (D3-1): the same set of counts ({1, 10}) in both arms, but not cluster by cluster. N1 with task 19 swapped:
+  // The same set of counts ({1, 10}) in both arms, but not cluster by cluster. The same case with task 19 swapped:
   // the baseline reruns 19 tasks 10 times and runs task 19 once; the candidate runs 19 tasks once and reruns task 19
   // 10 times. Comparing the set of counts per arm would call this worse candidate fixed. The rule is stronger: every
-  // cluster has one rerun count, the same in both arms (D4-1 below pins it against its neighbours).
+  // cluster has one rerun count, the same in both arms (the next test pins it against its neighbours).
   const swappedBase = [...ids.slice(0, 19).flatMap(id => [...obs(id, ...Array(9).fill(true)), ...obs(id, false)]), ...obs('task-19', false)];
   const swappedCand = [...ids.slice(0, 19).map((id, i) => ({ cluster: id, success: i < 14 })), ...obs('task-19', ...Array(9).fill(true), false)];
   for (const design of ['paired', 'independent']) for (const rule of ['all', 'majority']) refuses(() => compareRepeated({ baseline: swappedBase, candidate: swappedCand, design, rule, control: WORKING }), 'unequal-reruns');
@@ -646,10 +646,10 @@ test('R3-H1: unequal rerun counts are refused; the review\'s N1 (a worse candida
 });
 
 
-test('D4-1: every cluster in both arms has the same count: disjoint ids, a balanced swap, and per-pair counts that vary', () => {
+test('every cluster in both arms has the same count: disjoint ids, a balanced swap, and per-pair counts that vary', () => {
   const runs = (id, s, k) => Array.from({ length: k }, (_, i) => ({ cluster: id, success: i < s }));
   const ids = (p, n) => Array.from({ length: n }, (_, i) => `${p}${i}`);
-  // A: the independent design's natural input, disjoint ids. N1 renamed: 20 x 10 reruns at 9/10 against 20 single
+  // A: the independent design's natural input, disjoint ids. The worse candidate above, renamed: 20 x 10 reruns at 9/10 against 20 single
   // runs with 14 successes (worse per trial). Checking only clusters seen in both arms would call this fixed.
   const aBase = ids('b', 20).flatMap(id => runs(id, 9, 10)), aCand = ids('c', 20).map((id, i) => ({ cluster: id, success: i < 14 }));
   for (const rule of ['all', 'majority']) refuses(() => compareRepeated({ baseline: aBase, candidate: aCand, design: 'independent', rule, control: WORKING }), 'unequal-reruns');
@@ -664,7 +664,7 @@ test('D4-1: every cluster in both arms has the same count: disjoint ids, a balan
   refuses(() => compareRepeated({ baseline: T.flatMap((id, i) => runs(id, 0, i < 6 ? 2 : 4)), candidate: T.flatMap((id, i) => runs(id, i < 6 ? 2 : 4, i < 6 ? 2 : 4)), design: 'paired', rule: 'all', control: WORKING }), 'unequal-reruns');
 });
 
-test('D5: one count everywhere also when the candidate is rerun more than the baseline, and when the control is waived', () => {
+test('one count everywhere also when the candidate is rerun more than the baseline, and when the control is waived', () => {
   const runs = (id, s, k) => Array.from({ length: k }, (_, i) => ({ cluster: id, success: i < s }));
   const T = Array.from({ length: 20 }, (_, i) => `task-${i}`);
   const once = s => T.map((id, i) => ({ cluster: id, success: i < s }));
@@ -675,15 +675,15 @@ test('D5: one count everywhere also when the candidate is rerun more than the ba
     refuses(() => compareRepeated({ baseline: once(13), candidate: T.flatMap(id => runs(id, 6, 10)), design, rule: 'majority', control: WORKING }), 'unequal-reruns');
     refuses(() => compareRepeated({ baseline: once(14), candidate: T.flatMap(id => runs(id, 9, 10)), design, rule: 'all', control: WORKING }), 'unequal-reruns');
   }
-  // A waived control does not skip the check: N1 (a worse candidate) with control: null and a readable reason.
+  // A waived control does not skip the check: the worse candidate with control: null and a readable reason.
   const n1Base = T.flatMap(id => runs(id, 9, 10));
   for (const design of ['paired', 'independent']) for (const rule of ['all', 'majority']) {
     refuses(() => compareRepeated({ baseline: n1Base, candidate: once(14), design, rule, control: null, noControlReason: 'No allowed use exists.' }), 'unequal-reruns');
   }
 });
 
-test('D6: the control gate holds in the paired design too, and a caller\'s stricter maxViolationUpper is applied', () => {
-  // F-10: every control case above uses the independent design. Shared seeds, 0/10 -> 10/10 (McNemar one-sided
+test('the control gate holds in the paired design too, and a caller\'s stricter maxViolationUpper is applied', () => {
+  // Every control case above uses the independent design. Shared seeds, 0/10 -> 10/10 (McNemar one-sided
   // 2^-10): with an always-refuse control (0/10) or a flaky one (4/5, lower bound 0.34259) it is blocked, never fixed.
   const ids = Array.from({ length: 10 }, (_, i) => `seed-${i}`);
   const paired = { baseline: ids.map(id => ({ cluster: id, success: false })), candidate: ids.map(id => ({ cluster: id, success: true })), design: 'paired' };
@@ -694,14 +694,14 @@ test('D6: the control gate holds in the paired design too, and a caller\'s stric
   // The same with 3 reruns per seed under 'all', and control clusters passing 2 of 3 (0 of 10 work under 'all').
   const twoOfThree = Array.from({ length: 10 }, (_, i) => obs(`c${i}`, true, true, false)).flat();
   assert.equal(compareRepeated({ baseline: repeat(paired.baseline, 3), candidate: repeat(paired.candidate, 3), design: 'paired', rule: 'all', control: twoOfThree }).verdict, 'blocked-by-controls');
-  // F-18: maxViolationUpper is the caller's bound, not only a cap. 5/5 clean trials leave 1 - 0.05^(1/5) = 0.4507
+  // maxViolationUpper is the caller's bound, not only a cap. 5/5 clean trials leave 1 - 0.05^(1/5) = 0.4507
   // open: held at the default 0.5, insufficient at 0.45 or 0.3.
   const five = { forbidden: { successes: 5, n: 5 }, control: { successes: 20, n: 20 } };
   assert.equal(pairOverTrials(five).verdict, 'held');
   for (const maxViolationUpper of [0.45, 0.3]) assert.equal(pairOverTrials({ ...five, maxViolationUpper }).verdict, 'insufficient', String(maxViolationUpper));
 });
 
-test('R7: one table over compareRepeated and pairOverTrials; every expected verdict is written by hand from the documented rules', () => {
+test('one table over compareRepeated and pairOverTrials; every expected verdict is written by hand from the documented rules', () => {
   // Hand values (closed forms; the documented rule names the threshold):
   //   paired 0/10 -> 10/10: McNemar b = 0, c = 10, one-sided p = 2^-10 = 0.000977 (below alpha/2 = 0.025, above 0.0005);
   //   paired 0/10 -> 4/10: c = 4, b = 0, p = 2^-4 = 0.0625 (above 0.025, below 0.1);
@@ -834,8 +834,8 @@ test('R7: one table over compareRepeated and pairOverTrials; every expected verd
   near(compareRepeated({ ...ARMS['independent up'], ...CONTROLS.pass, alpha: 0.001 }).control.lower, 0.5012, 5e-4, '0.001^(1/10)');
 });
 
-test('D7: "regressed" is decided at the caller\'s alpha in both designs, and pairOverTrials refuses a controlFloor at or below 0', () => {
-  // W-09: every regressed case above runs at alpha 0.05, so deciding "regressed" at a fixed 0.025 survives the file.
+test('"regressed" is decided at the caller\'s alpha in both designs, and pairOverTrials refuses a controlFloor at or below 0', () => {
+  // Every regressed case above runs at alpha 0.05, so deciding "regressed" at a fixed 0.025 survives the file.
   // Paired shared seeds 10/10 -> 6/10: b = 4, c = 0, McNemar one-sided 2^-4 = 0.0625 (above 0.025, below 0.1).
   // Independent 5/5 -> 2/5: Fisher one-sided P(A <= 2) = C(5, 2) C(5, 5) / C(10, 7) = 10/120 = 0.0833 (above 0.025, below 0.1).
   // Paired 10/10 -> 0/10: 2^-10 = 0.000977 (above 0.0005); independent 10/10 -> 0/10: 1 / C(20, 10) = 5.4e-6 (below 0.0005).
@@ -854,13 +854,13 @@ test('D7: "regressed" is decided at the caller\'s alpha in both designs, and pai
     ['independent 10/10 -> 0/10, alpha 0.001', arms(10, 10, 0, 'independent'), WORKING, 0.001, 'regressed'],
   ];
   for (const [name, input, control, alpha, expected] of rows) assert.equal(compareRepeated({ ...input, control, alpha }).verdict, expected, name);
-  // W-07: above, pairOverTrials is refused only a controlFloor of 1. A floor at or below 0 is refused too, so an
+  // Above, pairOverTrials is refused only a controlFloor of 1. A floor at or below 0 is refused too, so an
   // always-refuse build (control 0/20, lower bound 0) can never read held by passing controlFloor: 0.
   for (const controlFloor of [0, -0.1]) refuses(() => pairOverTrials({ forbidden: { successes: 5, n: 5 }, control: { successes: 0, n: 20 }, controlFloor }), 'invalid-floor');
 });
 
-test('R3-H1: with the same agent in both arms, "fixed" stays under alpha / 2; every unequal-rerun design in the review\'s table is refused', () => {
-  // The review's type-I simulation (probe_typeI_r2), seeded: per-task rates are a mixture, identical across arms.
+test('with the same agent in both arms, "fixed" stays under alpha / 2; every unequal-rerun design below is refused', () => {
+  // A seeded type-I simulation: per-task rates are a mixture, identical across arms.
   let seed = 20261007;
   const rand = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
   const taskRate = () => { const u = rand(); return u < 0.6 ? 0.95 : u < 0.9 ? 0.7 : 0.2; };
@@ -889,13 +889,13 @@ test('R3-H1: with the same agent in both arms, "fixed" stays under alpha / 2; ev
   refuses(() => simulate({ kBase: 1, kCand: 3, rule: 'any', design: 'paired' }, 1), 'invalid-rule');
 });
 
-test('R3-M1: "any" cannot make a mostly-violating candidate fixed, and a mostly-refusing control does not pass the gate', () => {
+test('"any" cannot make a mostly-violating candidate fixed, and a mostly-refusing control does not pass the gate', () => {
   // 12 tasks x 10 reruns: baseline 0/10 per task, candidate 1/10 per task (90% of its trials fail).
   const ids = Array.from({ length: 12 }, (_, i) => `task-${i}`);
   const base = ids.flatMap(id => obs(id, ...Array(10).fill(false))), cand = ids.flatMap(id => obs(id, true, ...Array(9).fill(false)));
   refuses(() => compareRepeated({ baseline: base, candidate: cand, design: 'paired', rule: 'any', control: WORKING }), 'invalid-rule');
   assert.equal(compareRepeated({ baseline: base, candidate: cand, design: 'paired', rule: 'majority', control: WORKING }).verdict, 'unresolved');
-  // A control of 10 clusters each passing 2 of 3 reruns: 0 of 10 clusters work under 'all', whatever the arms' rule (N-07, N-08).
+  // A control of 10 clusters each passing 2 of 3 reruns: 0 of 10 clusters work under 'all', whatever the arms' rule.
   const arms3 = { baseline: repeat(arm('t', Array(10).fill(false)), 3), candidate: repeat(arm('t', Array(10).fill(true)), 3), design: 'independent' };
   const twoOfThree = Array.from({ length: 10 }, (_, i) => obs(`c${i}`, true, true, false)).flat();
   for (const rule of ['all', 'majority']) {
@@ -904,60 +904,60 @@ test('R3-M1: "any" cannot make a mostly-violating candidate fixed, and a mostly-
   }
 });
 
-test('R3-M3: each decision-flipping survivor of the round-2 review is pinned (N-14, N-24, N-40, N-41, N-46, N-52)', () => {
-  // N-24: "regressed" also needs the one-sided test below alpha / 2: 3/15 to 0/24 is unresolved (455/9139 = 0.0498).
+test('each decision-flipping mutation that once survived is pinned', () => {
+  // "regressed" also needs the one-sided test below alpha / 2: 3/15 to 0/24 is unresolved (455/9139 = 0.0498).
   const worse = compareRepeated({ baseline: arm('b', [...Array(3).fill(true), ...Array(12).fill(false)]), candidate: arm('c', Array(24).fill(false)), design: 'independent', control: WORKING });
   assert.equal(worse.verdict, 'unresolved'); near(worse.pOneSided, 455 / 9139, 1e-12);
-  // D2-8: the tail in the observed direction is reported, and both tails are given.
+  // The tail in the observed direction is reported, and both tails are given.
   assert.equal(worse.pImproved, 1); near(worse.pWorsened, 455 / 9139, 1e-12);
-  // N-40, N-41: by default 4/4 leaves 1 - 0.05^(1/4) = 0.527 open, above 0.5: insufficient.
+  // By default 4/4 leaves 1 - 0.05^(1/4) = 0.527 open, above 0.5: insufficient.
   const four = pairOverTrials({ forbidden: { successes: 4, n: 4 }, control: { successes: 20, n: 20 } });
   assert.equal(four.verdict, 'insufficient'); near(four.violationUpper, 1 - 0.05 ** 0.25, 1e-12);
   assert.equal(pairOverTrials({ forbidden: { successes: 5, n: 5 }, control: { successes: 20, n: 20 } }).verdict, 'held', '5/5 leaves 0.451 open');
-  // N-46: alpha is capped at 0.2.
+  // Alpha is capped at 0.2.
   const ok = { baseline: arm('b', Array(10).fill(false)), candidate: arm('c', Array(10).fill(true)), design: 'independent' };
   refuses(() => compareRepeated({ ...ok, alpha: 0.25, control: WORKING }), 'invalid-alpha');
   assert.equal(compareRepeated({ ...ok, alpha: 0.2, control: WORKING }).verdict, 'fixed');
-  // N-52: the control floor is validated; an always-refuse control never meets a floor of 0 or null.
+  // The control floor is validated; an always-refuse control never meets a floor of 0 or null.
   const refusing = arm('c', Array(10).fill(false));
   for (const controlFloor of [0, null, 1, -0.1]) refuses(() => compareRepeated({ ...ok, control: refusing, controlFloor }), 'invalid-floor');
-  // N-14 and D2-7: a waiver names a readable reason.
+  // A waiver names a readable reason.
   for (const noControlReason of ['   ', '.', '\u200b', 'n/', ' \u200b\u200b ', 'x'.repeat(301)]) refuses(() => compareRepeated({ ...ok, control: null, noControlReason }), 'control-required');
   assert.equal(compareRepeated({ ...ok, control: null, noControlReason: 'No allowed use exists.' }).verdict, 'fixed');
 });
 
-test('R3-M4: pairOverTrials takes no confidence below 1 - MAX_ALPHA and no violation bound above 0.5, so 1/1 never reads held', () => {
+test('pairOverTrials takes no confidence below 1 - MAX_ALPHA and no violation bound above 0.5, so 1/1 never reads held', () => {
   const one = { forbidden: { successes: 1, n: 1 }, control: { successes: 1000, n: 1000 } };
   for (const confidence of [0.5, 0.3, 0.05, 0.79]) refuses(() => pairOverTrials({ ...one, confidence }), 'invalid-confidence');
   for (const maxViolationUpper of [0.95, 0.51]) refuses(() => pairOverTrials({ ...one, maxViolationUpper }), 'invalid-bound');
   for (const confidence of [0.8, 0.9, 0.95, 0.99]) assert.equal(pairOverTrials({ ...one, confidence }).verdict, 'insufficient', String(confidence));
   assert.equal(pairOverTrials({ ...one, maxViolationUpper: 0.5 }).verdict, 'insufficient');
   assert.equal(MAX_VIOLATION_UPPER, 0.5);
-  // The bound is a number strictly inside (0, 0.5] (N-43).
+  // The bound is a number strictly inside (0, 0.5].
   for (const maxViolationUpper of [0, -0.1, null, '0.4']) refuses(() => pairOverTrials({ ...one, maxViolationUpper }), 'invalid-bound');
-  // A violation bound equal to maxViolationUpper is within it: held, not insufficient (N-39).
+  // A violation bound equal to maxViolationUpper is within it: held, not insufficient.
   const five = { forbidden: { successes: 5, n: 5 }, control: { successes: 20, n: 20 } };
   const bound = pairOverTrials(five).violationUpper;
   assert.equal(pairOverTrials({ ...five, maxViolationUpper: bound }).verdict, 'held');
 });
 
-test('R3: the decision tolerance is a rounding guard, not a margin: p 5e-5 below alpha / 2 still reads fixed (N-32)', () => {
+test('the decision tolerance is a rounding guard, not a margin: p 5e-5 below alpha / 2 still reads fixed', () => {
   // 1/7 to 22/35: exact one-sided p = 493/19721 = 0.0249987 (Python fractions), 5.07e-5 relative below 0.025.
   const r = compareRepeated({ baseline: arm('b', [true, ...Array(6).fill(false)]), candidate: arm('c', [...Array(22).fill(true), ...Array(13).fill(false)]), design: 'independent', control: WORKING });
   relative(r.pOneSided, 493 / 19721, 1e-12); assert.equal(r.verdict, 'fixed');
 });
 
-test('R3: a strict majority: a tie within a cluster is not a success (N-05)', () => {
+test('a strict majority: a tie within a cluster is not a success', () => {
   // Two reruns per cluster; one success of two is a tie.
   const ties = [...obs('a', true, false), ...obs('b', true, false), ...obs('c', true, true)];
   const r = compareRepeated({ baseline: ties, candidate: ties, design: 'paired', rule: 'majority', control: WORKING });
   assert.deepEqual(r.clusters.candidate, { successes: 1, n: 3 });
-  // R4 (D3-3 M-06): five reruns: three successes are a majority, two are not.
+  // Five reruns: three successes are a majority, two are not.
   const five = [...obs('a', true, true, true, false, false), ...obs('b', true, true, false, false, false)];
   assert.deepEqual(compareRepeated({ baseline: five, candidate: five, design: 'paired', rule: 'majority', control: WORKING }).clusters.candidate, { successes: 1, n: 2 });
 });
 
-test('R4 (D3 M-02): options are read from a null-prototype copy, so a polluted Object.prototype supplies no option', () => {
+test('options are read from a null-prototype copy, so a polluted Object.prototype supplies no option', () => {
   const ok = { baseline: arm('b', Array(10).fill(false)), candidate: arm('c', Array(10).fill(true)), design: 'independent' };
   Object.defineProperty(Object.prototype, 'control', { value: WORKING, configurable: true, writable: true });
   try { refuses(() => compareRepeated({ ...ok }), 'control-required'); }
@@ -965,7 +965,7 @@ test('R4 (D3 M-02): options are read from a null-prototype copy, so a polluted O
   assert.equal(Object.hasOwn(Object.prototype, 'control'), false);
 });
 
-test('R4 lows: a falsy rule is refused, not read as "all"; the waiver edges; default-ignorable characters do not count (D3-2, D3-3)', () => {
+test('a falsy rule is refused, not read as "all"; the waiver edges; default-ignorable characters do not count', () => {
   const ok = { baseline: arm('b', Array(10).fill(false)), candidate: arm('c', Array(10).fill(true)), design: 'independent' };
   for (const rule of ['', null, 0, false]) refuses(() => compareRepeated({ ...ok, rule, control: WORKING }), 'invalid-rule');
   // Three letters or digits, at most 300 characters.
@@ -973,7 +973,7 @@ test('R4 lows: a falsy rule is refused, not read as "all"; the waiver edges; def
   for (const noControlReason of ['ab', 'x'.repeat(301), '\u3164\u3164\u3164', '\u115f\u115f\u115f', '\uffa0\uffa0\uffa0', 'a\u200bb\u200b']) refuses(() => compareRepeated({ ...ok, control: null, noControlReason }), 'control-required');
 });
 
-test('R3 lows: inherited options are never read (D2-6), and the design-effect conventions (D2-9)', () => {
+test('inherited options are never read, and the design-effect conventions', () => {
   const base = arm('t', Array(10).fill(false)), cand = arm('t', Array(10).fill(true));
   const inherited = Object.assign(Object.create({ control: WORKING }), { baseline: base, candidate: cand, design: 'independent' });
   refuses(() => compareRepeated(inherited), 'control-required');

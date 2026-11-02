@@ -267,7 +267,7 @@ test('witness names follow the C2SP cosigner-name rule, the same in both verifie
   assert.deepEqual(good.map(V.cosignerName), good.map(() => true));
   assert.deepEqual(bad.map(V.cosignerName), bad.map(() => false));
   for (const name of bad) assert.throws(() => W.generateWitnessKey(name), /cosigner|witness name/);
-  // The exported signing helper checks its inputs too (review N1), not only the guarded entry points.
+  // The exported signing helper checks its inputs too, not only the guarded entry points.
   const signer = W.generateWitnessKey('witness.example/alpha'), args = { name: 'witness.example/alpha', privateKey: signer.privatePem, origin: 'scopehaven-ledger/x', treeSize: 1, rootHash: 'ab'.repeat(32), time: 1 };
   assert.match(W.cosign(args), /^\u2014 witness\.example\/alpha /);
   for (const name of ['a b', 'a\u00a0b', 'é'.repeat(128), '']) assert.throws(() => W.cosign({ ...args, name }), /witness name/, JSON.stringify(name));

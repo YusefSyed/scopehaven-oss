@@ -1,4 +1,4 @@
-// Repeated trials for the regression gate (`gate --trials N`, NC1 item 1). The gate runs an HTTP contract target N times
+// Repeated trials for the regression gate (`gate --trials N`). The gate runs an HTTP contract target N times
 // under one lock and one authorization window, saves every run, and reads a pass^k column per check over those N runs
 // with the pass-k module (../pass-k/passk.mjs, read only: its estimator, trial identity and validators). Each check gets
 // a reading against the declared floor: PASS only when every trial passed (and, on a forwarded or remote target, every

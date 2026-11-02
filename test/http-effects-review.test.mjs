@@ -1,4 +1,4 @@
-// Core wiring review round 2 (CORE-WIRING-REVIEW.json): one test per finding.
+// Core effect wiring: one test per guarded case.
 // Genuine runs through runHttpAssessment against a loopback app; tamper cases
 // edit saved evidence and reseal it the way a forger would.
 import test from 'node:test';
@@ -81,7 +81,7 @@ function resealEffects(r) {
   r.evidenceDigest = digest({ evidence: r.trace[0].data, effects: r.trace[1].data, assertions: r.assertions });
 }
 
-test('review high 1 (REFUND): presence-only telemetry alone shows the effect happened but never makes backend evidence observed', async t => {
+test('REFUND: presence-only telemetry alone shows the effect happened but never makes backend evidence observed', async t => {
   const app = await probeApp(t, { mode: 'none' });
   const refund = (id, path, select) => ({ id, title: 'Refund is really issued', category: 'allowed-use', severity: 'high', actorId: 'member', method: 'POST', path, body: {}, evidenceRequirement: 'backend',
     assertions: [{ kind: 'status.equals', expected: 200 }], effects: [{ kind: 'effect.exists', select }] });
@@ -109,7 +109,7 @@ test('review high 1 (REFUND): presence-only telemetry alone shows the effect hap
   assert.equal(gate.exitCode, 1); assert.ok(gate.reasons.includes('inconclusive-evidence'));
 });
 
-test('review high 2 (EDIT-OTHER): an effect committed 300 ms after a 403 is caught inside a declared settle; without one, absence reads partial', async t => {
+test('EDIT-OTHER: an effect committed 300 ms after a 403 is caught inside a declared settle; without one, absence reads partial', async t => {
   const app = await probeApp(t, { mode: 'late' });
   const settled = await runHttpAssessment(profile(app, [audit(app, { settleMs: 1000 })], [editOther, next]), { env });
   const caught = row(settled, 'EDIT-OTHER');
@@ -144,7 +144,7 @@ test('review high 2 (EDIT-OTHER): an effect committed 300 ms after a 403 is caug
   await new Promise(r => setTimeout(r, 400));
 });
 
-test('review low (E12, E14, E6, E8): sealed windows are bound to the declared observers, by instance, source, kind, settle and reason', async t => {
+test('sealed windows are bound to the declared observers, by instance, source, kind, settle and reason', async t => {
   const app = await probeApp(t, { mode: 'none' });
   const p = profile(app, [audit(app, { settleMs: 250 }), audit(app, { id: 'gone', path: join(app.dbPath, '..', 'missing.db'), settleMs: 250 })], [editOther]);
   const run = await runHttpAssessment(p, { env });
@@ -156,22 +156,22 @@ test('review low (E12, E14, E6, E8): sealed windows are bound to the declared ob
   const suite = createRegistry({ profiles: [p], env }).exportSuite('probe');
   assert.deepEqual(suite.observers, run.observers);
   const forge = edit => { const copy = structuredClone(run); edit(copy, row(copy, 'EDIT-OTHER')); return copy; };
-  // E14: drop the failed observer's window and reseal: the verdict would become a pass.
+  // Drop the failed observer's window and reseal: the verdict would become a pass.
   const dropped = forge((c, r) => { r.trace[1].data.windows = r.trace[1].data.windows.filter(w => w.instanceId !== 'sqlite-audit-gone'); resealEffects(r); recount(c); });
   // Without custody the drop would read pass; custody holds it at inconclusive, and the observer binding refuses it.
   assert.deepEqual([row(dropped, 'EDIT-OTHER').status, assertion(row(dropped, 'EDIT-OTHER'), 'Observed effect 1').custodyReason], ['inconclusive', 'subject-writable-custody']);
   assert.throws(() => validateHttpRunEvidence(dropped), /invalid-run-evidence/);
-  // E12: also drop the observer from run.observers; consistent without the suite, refused with it.
+  // Also drop the observer from run.observers; consistent without the suite, refused with it.
   const undeclared = forge((c, r) => { r.trace[1].data.windows = r.trace[1].data.windows.filter(w => w.instanceId !== 'sqlite-audit-gone'); resealEffects(r); recount(c); c.observers = c.observers.slice(0, 1); });
   assert.throws(() => validateHttpRunEvidence(undeclared, { expectedSuite: suite }), /unexpected-suite-evidence/);
   assert.equal(summarizeGate({ candidate: undeclared, expectedSuite: suite }).exitCode, 2);
-  // A window no declared observer could produce, a relabelled kind (E6), a free-text reason (E8), a changed settle.
+  // A window no declared observer could produce, a relabelled kind, a free-text reason, a changed settle.
   for (const edit of [w => { w.source = 'http-audit-log'; w.lineage.independence = 'application-store'; }, w => { w.lineage.observer = 'hold-gate'; },
     w => { w.reason = 'Trust me, this observer was fine'; }, w => { w.settleMs = 5000; }, w => { w.instanceId = 'sqlite-audit-other'; }])
     assert.throws(() => validateHttpRunEvidence(forge((c, r) => { edit(r.trace[1].data.windows[1]); resealEffects(r); recount(c); })), /invalid-run-evidence/);
 });
 
-test('review low (E13b): compareRuns refuses a pair whose declared effects, evidence requirements or observers differ', async t => {
+test('compareRuns refuses a pair whose declared effects, evidence requirements or observers differ', async t => {
   const app = await probeApp(t, { mode: 'late' });
   const lying = await runHttpAssessment(profile(app, [audit(app, { settleMs: 1000 })], [editOther]), { env });
   assert.equal(row(lying, 'EDIT-OTHER').status, 'fail');
@@ -194,7 +194,7 @@ test('review low (E13b): compareRuns refuses a pair whose declared effects, evid
   await new Promise(r => setTimeout(r, 400));
 });
 
-test('review low (E15, E16): target context is bound to the target-config digest and limitations, and to the exported suite', async t => {
+test('target context is bound to the target-config digest and limitations, and to the exported suite', async t => {
   const app = await probeApp(t, { mode: 'none' });
   const p = profile(app, [], [], { targetContext: 'operator-forwarded', targetLabel: 'Acme staging' });
   const forwarded = await runHttpAssessment(p, { env });
@@ -207,19 +207,19 @@ test('review low (E15, E16): target context is bound to the target-config digest
     if (limitations) c.limitations = c.limitations.filter(l => l !== FORWARDER_LIMITATION);
     if (hash) c.targetConfigHash = targetConfigDigest({ profileHash: c.profileHash, build: c.build, targetContext: context, targetLabel: label });
     return c; };
-  // E15: forwarded to local-app. Refused unless every field is rewritten; the fully consistent forge is refused by the suite.
+  // Forwarded to local-app. Refused unless every field is rewritten; the fully consistent forge is refused by the suite.
   assert.throws(() => validateHttpRunEvidence(relabel('local-app', null)), /invalid-run-evidence/);
   assert.throws(() => validateHttpRunEvidence(relabel('local-app', null, { hash: true })), /invalid-run-evidence/, 'limitations still name the forwarder');
   const consistent = relabel('local-app', null, { hash: true, limitations: true });
   validateHttpRunEvidence(consistent);
   assert.throws(() => validateHttpRunEvidence(consistent, { expectedSuite: suite }), /unexpected-suite-evidence/);
   assert.equal(summarizeGate({ candidate: consistent, expectedSuite: suite }).exitCode, 2);
-  // E16: renamed target.
+  // A renamed target.
   assert.throws(() => validateHttpRunEvidence(relabel('operator-forwarded', 'Acme production')), /invalid-run-evidence/);
   assert.throws(() => validateHttpRunEvidence(relabel('operator-forwarded', 'Acme production', { hash: true }), { expectedSuite: suite }), /unexpected-suite-evidence/);
 });
 
-test('review low: v3 exports say "response contracts plus authoritative backend observation"; v1/v2 gate summaries carry no target context', async t => {
+test('v3 exports say "response contracts plus authoritative backend observation"; v1/v2 gate summaries carry no target context', async t => {
   const app = await probeApp(t, { mode: 'none' });
   const run = await runHttpAssessment(profile(app, [audit(app, { settleMs: 250 })], [editOther]), { env });
   const gate = summarizeGate({ candidate: run, baseline: run });
@@ -245,7 +245,7 @@ test('review low: v3 exports say "response contracts plus authoritative backend 
   assert.equal(v1Gate.current.evidenceScope, 'response-only');
 });
 
-test('review low: the factory derives instance ids, refuses duplicate ids and never takes lockFallback from a configuration', () => {
+test('the factory derives instance ids, refuses duplicate ids and never takes lockFallback from a configuration', () => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-factory-'));
   try {
     const db = join(dir, 'a.db'); new DatabaseSync(db).close();
@@ -259,7 +259,7 @@ test('review low: the factory derives instance ids, refuses duplicate ids and ne
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('review S4: a commit later than settleMs can land in the next check\'s window; pinning a resource keeps effect.exists honest', async t => {
+test('a commit later than settleMs can land in the next check\'s window; pinning a resource keeps effect.exists honest', async t => {
   const app = await probeApp(t, { mode: 'none' });
   // LATE-EDIT answers 403 and commits note.update for notes/other 800 ms later; the settle is only 500 ms.
   const lateEdit = { ...editOther, id: 'LATE-EDIT', path: '/late-edit' };

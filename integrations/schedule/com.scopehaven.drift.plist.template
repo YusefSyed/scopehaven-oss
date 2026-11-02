@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- CMP-SCHEDULE-01: a local weekly drift re-run on the built-in synthetic target. Replace
+<!-- A local weekly drift re-run on the built-in synthetic target. Replace
      __SCOPEHAVEN_ROOT__ (the scopehaven folder) and __DATA_DIR__ (a private directory, created with
      mkdir -m 700 first), save as ~/Library/LaunchAgents/com.scopehaven.drift.plist, then load it with
      launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.scopehaven.drift.plist

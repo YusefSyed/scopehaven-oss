@@ -68,7 +68,7 @@ test('a content change without the change column voids the assertion for the win
   const w = await collectWindow(o, from, await o.mark());
   assert.equal(w.exact[0].violated, true);
   assert.equal(evaluateEffectAssertion(noUpdate('knowledge/fin'), [w]).verdict, 'missing');
-  // A violated table reports none of its changes (review R3 H1): the update reads missing, never a decided fail or pass.
+  // A violated table reports none of its changes: the update reads missing, never a decided fail or pass.
   assert.equal(w.events.length, 0);
   assert.equal(evaluateEffectAssertion(noUpdate('knowledge/hb'), [w]).verdict, 'missing');
 });
@@ -82,7 +82,7 @@ test('scope: inserts, deletes, other tables and non-update selectors stay net-on
   assert.equal(evaluateEffectAssertion({ kind: 'effect.none', select: { source: 'sql-snapshot', name: 'knowledge' } }, [w]).verdict, 'missing');
 });
 
-test('validation (review P12/L1/L2): audit file, positive skew, commit lag and unit are required', t => {
+test('validation: audit file, positive skew, commit lag and unit are required', t => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-changecol-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const path = join(dir, 'x.db'), audit = auditFile(dir);
   const cc = extra => ({ column: 'updated_at', unit: 'seconds', audit, ...extra });
@@ -95,8 +95,8 @@ test('validation (review P12/L1/L2): audit file, positive skew, commit lag and u
   assert.throws(() => validateWindow({ source: 'hold-proxy', instanceId: 'g', scope, coverage: 'complete', events: [], exact: [] }), /exact/);
 });
 
-// ---- review round (H1-H3, M1, L3) ------------------------------------------------
-test('review H2 (P1a/P1b): insert then update inside the window never passes the update check', async t => {
+// ---- changes inside one window, exact counts and key uniqueness -------------------
+test('insert then update inside the window never passes the update check', async t => {
   const { db, update, o } = setup(t);
   const from = await o.mark();
   db.prepare('INSERT INTO knowledge VALUES (?, ?, ?, ?)').run('new', 'x', 'draft', nowSec());
@@ -107,7 +107,7 @@ test('review H2 (P1a/P1b): insert then update inside the window never passes the
   assert.equal(evaluateEffectAssertion(noUpdate('knowledge/fin'), [w]).verdict, 'pass'); // untouched rows stay exact
 });
 
-for (const wal of [true, false]) test(`review H1 (P2${wal ? '' : '/P13 rollback journal'}): update then delete inside the window never passes`, async t => {
+for (const wal of [true, false]) test(`${wal ? 'WAL' : 'rollback journal'}: update then delete inside the window never passes`, async t => {
   const { db, update, o } = setup(t, { wal });
   const from = await o.mark();
   update('fin', 'tampered');
@@ -117,7 +117,7 @@ for (const wal of [true, false]) test(`review H1 (P2${wal ? '' : '/P13 rollback 
   assert.equal(evaluateEffectAssertion(noUpdate(null), [w]).verdict, 'missing');
 });
 
-test('review H3 (P3): a change column never makes an exact count (two updates are not one)', async t => {
+test('a change column never makes an exact count (two updates are not one)', async t => {
   const { update, o } = setup(t);
   const from = await o.mark(); update('fin', 'one'); update('fin', 'two');
   const w = await collectWindow(o, from, await o.mark());
@@ -126,7 +126,7 @@ test('review H3 (P3): a change column never makes an exact count (two updates ar
   assert.equal(evaluateEffectAssertion({ ...count, expected: 0 }, [w]).verdict, 'missing');
 });
 
-test('review M1 (P5): a stamp taken before the window but committed inside it, then reverted, stays ambiguous with the commit lag declared', async t => {
+test('a stamp taken before the window but committed inside it, then reverted, stays ambiguous with the commit lag declared', async t => {
   const { path, update, o } = setup(t, { lag: 3000 });
   while (Date.now() % 1000 > 100) await sleep(5);
   const S = nowSec();
@@ -139,19 +139,19 @@ test('review M1 (P5): a stamp taken before the window but committed inside it, t
   assert.equal(evaluateEffectAssertion(noUpdate('knowledge/fin'), [w]).verdict, 'missing');
 });
 
-test('review L3 (P10): a key column that is not unique makes the table non-exact', async t => {
+test('a key column that is not unique makes the table non-exact', async t => {
   const { db, o } = setup(t, { keyCol: 'owner' });
   db.prepare('INSERT INTO knowledge VALUES (?, ?, ?, ?)').run('fin2', 'finance', 'q3', 1700000000);
   const from = await o.mark();
   db.prepare("UPDATE knowledge SET description = 'tampered', updated_at = ? WHERE id = 'fin'").run(nowSec());
   const w = await collectWindow(o, from, await o.mark());
-  // Rows that cannot be matched across the snapshots decide nothing (review R3 H1): the window fails, with no events.
+  // Rows that cannot be matched across the snapshots decide nothing: the window fails, with no events.
   assert.deepEqual([w.coverage, w.reason, w.events.length], ['failed', 'duplicate-key', 0]);
   assert.equal(evaluateEffectAssertion(noUpdate('knowledge/finance'), [w]).verdict, 'observer-failure');
   assert.equal(evaluateEffectAssertion({ kind: 'effect.exists', select: noUpdate('knowledge/finance').select }, [w]).verdict, 'observer-failure');
 });
 
-test('pg review H2(d) applied here too: a watched row absent at either snapshot (a selector typo) is never exact', async t => {
+test('as for pg-snapshot: a watched row absent at either snapshot (a selector typo) is never exact', async t => {
   const { update, o } = setup(t);
   const from = await o.mark();
   update('fin', 'changed in the window', nowSec() - 5);
@@ -160,7 +160,7 @@ test('pg review H2(d) applied here too: a watched row absent at either snapshot 
   assert.ok(!w.exact[0].presentResources.includes('knowledge/fni'));
 });
 
-// Review round 2, H-A on the change-column observer: prefix and table-wide selectors are never exact.
+// On the change-column observer, prefix and table-wide selectors are never exact.
 const prefixNone = value => ({ kind: 'effect.none', select: { source: 'sql-snapshot', name: 'knowledge', operation: 'update', resource: { prefix: value } } });
 test('change-column: a prefix or table-wide selector never passes over changes it could not see (A/B/C)', async t => {
   const { db, update, o } = setup(t);
@@ -176,8 +176,8 @@ test('change-column: a prefix or table-wide selector never passes over changes i
   assert.notEqual(evaluateEffectAssertion(prefixNone('knowledge/tmp'), [b]).verdict, 'pass', 'C: prefix over a transient row');
 });
 
-// Review round 3 (R4) on the SQLite observer: H1 (unmatched rows report nothing), M1 (forward windows), M2 (presentResources required).
-test('R4 sqlite: a non-unique key fails the window with no events, even on a table without a change column', async t => {
+// On the SQLite observer: unmatched rows report nothing, a window must move forward, and presentResources is required.
+test('sqlite: a non-unique key fails the window with no events, even on a table without a change column', async t => {
   const { db, o } = setup(t, { keyCol: 'owner' });
   db.prepare('INSERT INTO knowledge_file VALUES (?, ?)').run(1, 'fin');
   db.prepare('INSERT INTO knowledge VALUES (?, ?, ?, ?)').run('fin2', 'finance', 'q3', 1700000000);
@@ -189,13 +189,13 @@ test('R4 sqlite: a non-unique key fails the window with no events, even on a tab
   assert.notEqual(decisions[0].verdict, 'pass'); assert.equal(backendObserved(decisions), false);
 });
 
-test('R4 sqlite: a zero-length or reversed window fails', async t => {
+test('sqlite: a zero-length or reversed window fails', async t => {
   const { update, o } = setup(t);
   const a = await o.mark(); update('fin', 'tampered'); const b = await o.mark();
   for (const [from, to] of [[b, b], [b, a]]) assert.deepEqual((({ coverage, reason }) => [coverage, reason])(await collectWindow(o, from, to)), ['failed', 'window-not-forward']);
 });
 
-test('R4 M2: a change-column entry without presentResources (the main-era shape) is refused, including on recompute', async t => {
+test('a change-column entry without presentResources (the earlier shape) is refused, including on recompute', async t => {
   const { db, o } = setup(t);
   const from = await o.mark();
   db.prepare('INSERT INTO knowledge VALUES (?, ?, ?, ?)').run('tmp', 'x', 'x', nowSec() - 3600);

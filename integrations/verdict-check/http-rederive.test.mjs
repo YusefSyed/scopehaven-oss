@@ -1,4 +1,4 @@
-// HTTP contract runs re-derived from a signed evidence pack (N6-E1; recheck rehearsal 2026-10-29, gaps 2, 4, 5 and 7).
+// HTTP contract runs re-derived from a signed evidence pack.
 // Three synthetic apps shaped like the ADV-OOB-2 arm the rehearsal packed: a retail app (json.equals and json.exists passes,
 // json.noForeignValues rows and effect rows), a ledger (json.equals and json.notContains passes) and a mail sink whose reader's
 // login is not proven (every row inconclusive) with one json.equals failure. Each runs through the real connector with an
@@ -144,7 +144,7 @@ test('the runs are what the apps answer: every pass and inconclusive, the one si
   assert.deepEqual(Object.keys(MODES.outcome.sink.results[3].observed.predicates[1]).sort(), ['kind', 'outcome', 'present', 'type']);
 });
 
-// Security review F12 (2026-10-30): digests are keyed with a per-run secret, so a guessable value is not found by trying
+// Digests are keyed with a per-run secret, so a guessable value is not found by trying
 // candidates. The dictionary holds every amount from 1000.00 to 1100.00 (both refunds among them), the booleans and null.
 const DICTIONARY = [...Array.from({ length: 10001 }, (_, i) => (1000 + i / 100).toFixed(2)), true, false, null];
 const PLACE = { checkId: 'S-PROP-W8855135-REFUND-CLAIM', index: 2 }, KEY = 'a5'.repeat(32);

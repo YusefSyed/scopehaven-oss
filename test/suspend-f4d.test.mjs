@@ -1,16 +1,15 @@
-// Suspend follow-ups (F4d) to the suspend-aware lead-in and stop (F4c, an earlier review): the an earlier review ultrareview's findings 1 and 2 and its
-// lookup-table refactor, and a deferred nits (a review record outside this repository nits 3 and 4, and
-// PR344-REVIEW-FINAL.md N1).
+// Suspend follow-ups to the suspend-aware lead-in and stop: the time kept for later checks, the not-sent wording from one table,
+// and an unreadable awake reading.
 //   1. Without a timing plan, a check's settle or barrier the spare budget could not restore goes on into the time kept for later
 //      checks. A wait that this restores held its declared awake time, so its check is decided; one it does not restore reads partial;
 //      either way every later check is not sent (host-suspend-run-stopped), and the validator derives that stop from the sealed record
 //      (reserveMs). A restored wait always held its full declared awake time (checked against the virtual host's own clock).
-//   3. A row not sent is worded from one table; its summary, label and remediation are byte-identical to main for every reason.
-//   4. A timed run a host sleep cut (a lead-in, horizon or barrier the budget could not make up) is worded as such; its reason stays
+//   2. A row not sent is worded from one table; its summary, label and remediation are byte-identical to the frozen build for every reason.
+//   3. A timed run a host sleep cut (a lead-in, horizon or barrier the budget could not make up) is worded as such; its reason stays
 //      run-budget-exhausted, the one the validator derives.
-//   5. An awake clock already seen to move that gives no usable reading over a pair past the threshold is a suspend of that pair;
-//      one that never moved stays inert, exactly as main.
-// Main's side of every comparison is main's own code, frozen at ff3a980 (test/fixtures/http-connector-ff3a980.mjs and
+//   4. An awake clock already seen to move that gives no usable reading over a pair past the threshold is a suspend of that pair;
+//      one that never moved stays inert, exactly as the frozen build.
+// The frozen side of every comparison is an earlier build's own code (test/fixtures/http-connector-ff3a980.mjs and
 // suspend-clock-ff3a980.mjs). A virtual clock with an injected transport and observer: destination hosts are names only and are never
 // resolved or contacted; no socket, no database, no model, no provider.
 import test from 'node:test';
@@ -121,7 +120,7 @@ function heldOf(v) {
   return { checks: own.map(c => v.marks[c.to] - v.marks[c.from] - 20), barriers: v.collected.filter(c => c.gap && ends.has(c.from)).map(c => v.marks[c.to] - v.marks[c.from]) };
 }
 
-// The ultrareview's finding 1: without a plan the reserve laterNeedMs keeps for later checks was never used, so a settle the spare
+// Without a plan the reserve laterNeedMs keeps for later checks was never used, so a settle the spare
 // budget could not restore read partial (and its check inconclusive) even when the run had room. Run mode, settle 5 s, the default
 // budget (60 s). A's application sends to HOOK 4.8 s of awake time after its reply and never to PAY; B would pass on its own send.
 const A = Object.freeze({ id: 'A', method: 'POST', path: '/a', severity: 'high', effects: [{ kind: 'effect.none', select: sel(HOOK) }, { kind: 'effect.none', select: sel(PAY) }] });
@@ -129,16 +128,16 @@ const B = Object.freeze({ id: 'B', method: 'POST', path: '/b', severity: 'contro
 const C = Object.freeze({ id: 'C', method: 'GET', path: '/c', severity: 'low' });
 const SENDS = Object.freeze({ 'POST /a': [{ name: HOOK, delay: 4800 }], 'POST /b': [{ name: HOOK, delay: 1000 }] });
 
-test('item 1, settle: a wait restored from the later checks\' time is decided and still stops the run; one it cannot restore reads partial and stops it', async t => {
+test('reserve, settle: a wait restored from the later checks\' time is decided and still stops the run; one it cannot restore reads partial and stops it', async t => {
   const p = target([ME, A, B, C]), table = [];
   for (const asleep of [3000, 45000, 50000, 60000]) {
     const onSleep = (ms, n) => (n === 1 ? [500, asleep] : null);
     const head = await assess(HEAD, p, { sends: SENDS, onSleep }), main = await assess(MAIN, p, { sends: SENDS, onSleep });
     validated(p, head.run);
     const w = windowOf(head.run, 'A'), was = windowOf(main.run, 'A'), held = heldOf(head.v).checks[0];
-    const label = `${asleep / 1000}s: head ${clausesOfRow(head.run, 'A')} reserve ${w.suspend?.reserveMs ?? 0} short ${w.suspend?.shortMs ?? 0} held ${held}; main ${clausesOfRow(main.run, 'A')} short ${was.suspend?.shortMs ?? 0}`;
+    const label = `${asleep / 1000}s: head ${clausesOfRow(head.run, 'A')} reserve ${w.suspend?.reserveMs ?? 0} short ${w.suspend?.shortMs ?? 0} held ${held}; the frozen build ${clausesOfRow(main.run, 'A')} short ${was.suspend?.shortMs ?? 0}`;
     table.push(label);
-    // The run stops exactly as main's does: the same rows, with the same reason.
+    // The run stops exactly as the frozen build's does: the same rows, with the same reason.
     assert.deepEqual(['B', 'C'].map(id => notSentOf(head.run, id)), ['B', 'C'].map(id => notSentOf(main.run, id)), label);
     if (asleep === 3000) {
       // The spare budget restored it: no reserve taken, nothing stops.
@@ -154,7 +153,7 @@ test('item 1, settle: a wait restored from the later checks\' time is decided an
       assert.ok(held >= 5000, `the window held its declared settle in awake time: ${label}`);
       assert.ok(rowOf(head.run, 'A').assertions.find(a => a.name === 'Observed effect 2 (effect.none)').actual.endsWith(suspendHeldNote(w.suspend)));
       assert.match(suspendHeldNote(w.suspend), /took the time kept for later checks .* so no later check was sent\.$/);
-      // Main read the same wait short, so A was undecided there.
+      // The frozen build read the same wait short, so A was undecided there.
       assert.deepEqual([was.coverage, was.suspend.shortMs, clausesOfRow(main.run, 'A')], ['partial', 5000, ['inconclusive', 'inconclusive']], label);
     } else {
       // Not restored: partial, with the shortfall; a recorded match still decides, and the absence does not.
@@ -173,7 +172,7 @@ test('item 1, settle: a wait restored from the later checks\' time is decided an
   assert.ok(heldOf(twice.v).checks[0] >= 5000, `held ${heldOf(twice.v).checks[0]}`);
 });
 
-test('item 1, per-check barrier: a barrier restored from the later checks\' time stops the run, and the validator recomputes that stop', async () => {
+test('reserve, per-check barrier: a barrier restored from the later checks\' time stops the run, and the validator recomputes that stop', async () => {
   const p = target([ME, A, B, C], { perCheck: true });
   // The second wait is A's barrier.
   for (const [asleep, restored] of [[45000, true], [70000, false]]) {
@@ -199,7 +198,7 @@ const withRecord = (run, edit) => reseal(run, r => {
   for (const a of rowOf(r, 'A').assertions) if (typeof a.actual === 'string' && a.actual.endsWith(before)) a.actual = a.actual.slice(0, -before.length) + suspendHeldNote(w.suspend);
 });
 
-test('item 1, validator: the stop is derived from the sealed reserve, which cannot be dropped, added, moved or written where the connector never writes it', async () => {
+test('reserve, validator: the stop is derived from the sealed reserve, which cannot be dropped, added, moved or written where the connector never writes it', async () => {
   const p = target([ME, A, B, C]);
   const { run } = await assess(HEAD, p, { sends: SENDS, onSleep: (ms, n) => (n === 1 ? [500, 45000] : null) });
   // A 3 s sleep the spare budget restored: a record with no reserve, and B and C sent.
@@ -242,12 +241,12 @@ test('item 1, validator: the stop is derived from the sealed reserve, which cann
   assert.deepEqual([suspendRecord(breaks, { reserveMs: 9000 }).reserveMs, suspendRecord(breaks, { reserveMs: 1000, shortMs: 1500 }).reserveMs, suspendRecord(breaks, { reserveMs: 2000.2 }).reserveMs], [4000, 1500, 2001]);
 });
 
-// Property, against main's own code (frozen at ff3a980): seeded random runs, each made four ways (head and main, each with the real and
+// Property, against the frozen build's own code: seeded random runs, each made four ways (head and the frozen build, each with the real and
 // with the inert detector). Every application send falls within its own check's declared settle or horizon in awake time (an
 // unobserved request's sends only under a timing plan, whose lead-in separates them), so with the real detector a clause head decides
-// must agree with what the check's own request caused. Without a plan the run stops on exactly main's rows; a clause moves only from
+// must agree with what the check's own request caused. Without a plan the run stops on exactly the frozen build's rows; a clause moves only from
 // undecided to the truth, or toward undecided; every window and barrier that reads with no shortfall held its declared awake time on
-// the host's own clock. Under a plan every verdict and wait is main's. With the inert detector head is exactly main.
+// the host's own clock. Under a plan every verdict and wait is the frozen build's. With the inert detector head is exactly the frozen build.
 const UNDECIDED = ['inconclusive', 'not-sent'];
 function scenario(seed, id) {
   let s = seed >>> 0;
@@ -287,7 +286,7 @@ function scenario(seed, id) {
 const clausesOf = (run, truth) => [...truth.keys()].flatMap(id => truth.get(id).map((_, i) => ({ id, i, status: clauseOf(run, id, i) })));
 const verdicts = run => run.results.map(r => [r.id, r.status, r.trace[0].data.notSent ?? null, r.assertions.map(a => a.status)]);
 
-test('property (400 seeded runs against main\'s own code, real and inert detectors): the stop is main\'s, a restored wait held its awake time, and a clause moves only to the truth or toward undecided', async t => {
+test('property (400 seeded runs against the frozen build\'s own code, real and inert detectors): the stop is the frozen build\'s, a restored wait held its awake time, and a clause moves only to the truth or toward undecided', async t => {
   const moves = new Map(), count = key => moves.set(key, (moves.get(key) ?? 0) + 1);
   let restored = 0, reservedShort = 0, decided = 0, toTruth = 0, timedSame = 0, inertSame = 0, checkedWindows = 0, checkedBarriers = 0, guarded = 0;
   const scenarios = Array.from({ length: 400 }, (_, k) => scenario(0xf4d00000 + k, `f4d-${k}`));
@@ -300,16 +299,16 @@ test('property (400 seeded runs against main\'s own code, real and inert detecto
     const head = await assess(HEAD, c.p, { ...options, onSleep: c.onSleep() }), main = await assess(MAIN, c.p, { ...options, onSleep: c.onSleep() });
     const headInert = await assess(HEAD, c.p, { ...options, onSleep: c.onSleep(), detector: 'inert' }), mainInert = await assess(MAIN, c.p, { ...options, onSleep: c.onSleep(), detector: 'inert' });
     for (const r of [head.run, headInert.run]) validateHttpRunEvidence(r, { expectedSuite: suiteOf(c.p) });
-    // Inert: the waits and every verdict exactly main's, but for the allowed-use guard's moves (FIX-07: an unguarded absence's pass
+    // Inert: the waits and every verdict exactly the frozen build's, but for the allowed-use guard's moves (an unguarded absence's pass
     // reads inconclusive; test/fixtures/allowed-use-guard-moves.mjs).
     assert.deepEqual([headInert.v.sleeps, verdicts(headInert.run)], [mainInert.v.sleeps, verdicts({ results: guardAdjusted(headInert.run, mainInert.run) })], `${at}: inert`);
     guarded += guardMoves(headInert.run);
     inertSame++;
-    // A clause head decides is the truth; every move from main is to the truth or toward undecided.
+    // A clause head decides is the truth; every move from the frozen build is to the truth or toward undecided.
     const now = clausesOf(head.run, c.truth), was = clausesOf(main.run, c.truth);
     now.forEach((x, j) => {
       const truth = c.truth.get(x.id)[x.i], before = was[j].status;
-      if (!UNDECIDED.includes(x.status)) { decided++; assert.equal(x.status, truth, `${at}: head decided ${x.id} clause ${x.i + 1} against the truth (main ${before})`); }
+      if (!UNDECIDED.includes(x.status)) { decided++; assert.equal(x.status, truth, `${at}: head decided ${x.id} clause ${x.i + 1} against the truth (the frozen build ${before})`); }
       if (x.status !== before) {
         assert.ok(UNDECIDED.includes(x.status) || x.status === truth, `${at}: ${x.id} ${before} -> ${x.status}`);
         if (UNDECIDED.includes(before) && x.status === truth) toTruth++;
@@ -321,7 +320,7 @@ test('property (400 seeded runs against main\'s own code, real and inert detecto
       assert.deepEqual([head.v.sleeps, verdicts(head.run)], [main.v.sleeps, verdicts({ results: guardAdjusted(head.run, main.run) })], `${at}: timed`);
       timedSame++;
     } else {
-      // The run stops on exactly main's rows.
+      // The run stops on exactly the frozen build's rows.
       const stops = run => run.results.map(r => [r.id, r.trace[0].data.notSent ?? null]);
       assert.deepEqual(stops(head.run), stops(main.run), `${at}: stops`);
     }
@@ -339,9 +338,9 @@ test('property (400 seeded runs against main\'s own code, real and inert detecto
       if (w.suspend?.reserveMs > 0) { if (w.suspend.shortMs > 0) reservedShort++; else restored++; }
     });
   }
-  t.diagnostic(`main -> head clause moves (real detector): ${[...moves].sort().map(([key, n]) => `${key}: ${n}`).join('; ') || 'none'}`);
-  t.diagnostic(`inert runs: ${guarded} clause passes the allowed-use guard withheld (FIX-07), every other verdict main's`);
-  t.diagnostic(`head decided ${decided} clauses, none against the truth, ${toTruth} of them undecided on main; waits restored from the later checks' time ${restored}, still short after it ${reservedShort}; windows measured ${checkedWindows}, barriers ${checkedBarriers}; timed runs equal to main ${timedSame}; inert equal to main ${inertSame} of 400`);
+  t.diagnostic(`the frozen build -> head clause moves (real detector): ${[...moves].sort().map(([key, n]) => `${key}: ${n}`).join('; ') || 'none'}`);
+  t.diagnostic(`inert runs: ${guarded} clause passes the allowed-use guard withheld, every other verdict the frozen build's`);
+  t.diagnostic(`head decided ${decided} clauses, none against the truth, ${toTruth} of them undecided on the frozen build; waits restored from the later checks' time ${restored}, still short after it ${reservedShort}; windows measured ${checkedWindows}, barriers ${checkedBarriers}; timed runs equal to the frozen build ${timedSame}; inert equal to the frozen build ${inertSame} of 400`);
   // Not vacuous: the second stage both restores and runs out, some clause moves from undecided to the truth, and nothing moves elsewhere.
   assert.ok(restored >= 10 && reservedShort >= 5 && toTruth >= 5 && decided > 500 && timedSame >= 50, `${restored} ${reservedShort} ${toTruth} ${decided} ${timedSame}`);
 });
@@ -362,14 +361,14 @@ const SLEEP_CUT_TEXT = Object.freeze({ summary: 'Not sent: a host sleep left a w
 const textOf = row => ({ summary: row.summary, label: row.trace[0].label, remediation: row.remediation });
 const expectedText = (pinned, id) => ({ summary: pinned.summary, label: pinned.label, remediation: { ...pinned.remediation, codePointers: POINTERS(id) } });
 
-test('item 3: every not-sent reason keeps its summary, trace label and remediation byte for byte, from one table keyed by reason', async () => {
+test('not-sent wording: every not-sent reason keeps its summary, trace label and remediation byte for byte, from one table keyed by reason', async () => {
   // The table: one entry per not-sent reason, and the sleep-cut wording; the two preconditions share theirs.
   const key = reason => (['change-not-confirmed', 'capture-unavailable'].includes(reason) ? 'precondition' : reason);
   for (const reason of NOT_SENT_REASONS) assert.equal(JSON.stringify(NOT_SENT_TEXT[reason]), JSON.stringify(PINNED_TEXT[key(reason)]), reason);
   assert.equal(Object.keys(NOT_SENT_TEXT).length, NOT_SENT_REASONS.length + 1);
   assert.equal(JSON.stringify(Object.values(NOT_SENT_TEXT).find(v => !NOT_SENT_REASONS.some(r => NOT_SENT_TEXT[r] === v))), JSON.stringify(SLEEP_CUT_TEXT));
   assert.ok(Object.isFrozen(NOT_SENT_TEXT) && Object.values(NOT_SENT_TEXT).every(v => Object.isFrozen(v) && Object.isFrozen(v.remediation) && Object.isFrozen(v.remediation.steps)));
-  // Rows the connector writes, beside main's (frozen at ff3a980) for the same run: byte-identical text.
+  // Rows the connector writes, beside the frozen build's for the same run: byte-identical text.
   const rows = [];
   // capture-unavailable: the creating check's status does not match, so its value is not captured.
   const capture = { id: 'f4d-capture', name: 'Capture', applicationId: 'f4d', origin: 'http://127.0.0.1:9', buildLabel: 'b', contextId: 'synthetic', actors: { anon: { principalId: 'anon' } }, requiredControlIds: ['CREATE'],
@@ -388,14 +387,14 @@ test('item 3: every not-sent reason keeps its summary, trace label and remediati
     const [, id, head] = rows[i], [, , main] = rows[i + 1], reason = notSentOf(head, id);
     reasons.push(reason);
     assert.equal(notSentOf(main, id), reason);
-    assert.equal(JSON.stringify(textOf(rowOf(head, id))), JSON.stringify(textOf(rowOf(main, id))), `${reason}: head and main write the same words`);
+    assert.equal(JSON.stringify(textOf(rowOf(head, id))), JSON.stringify(textOf(rowOf(main, id))), `${reason}: head and the frozen build write the same words`);
     assert.equal(JSON.stringify(textOf(rowOf(head, id))), JSON.stringify(expectedText(PINNED_TEXT[key(reason)], id)), `${reason}: the pinned words`);
   }
   assert.deepEqual(reasons, ['capture-unavailable', RUN_BUDGET_EXHAUSTED, SUSPEND_STOPPED]);
   validateHttpRunEvidence(rows[0][2]); validated(tight, rows[2][2]); validated(stop, rows[4][2]);
 });
 
-test('item 4: a timed run a host sleep cut is worded as such, while its reason stays run-budget-exhausted; a budget cut keeps the budget\'s words', async () => {
+test('sleep-cut wording: a timed run a host sleep cut is worded as such, while its reason stays run-budget-exhausted; a budget cut keeps the budget\'s words', async () => {
   const H = 30000, REFUND = { id: 'REFUND', method: 'POST', path: '/refund', severity: 'control', effects: [{ kind: 'effect.exists', select: sel(HOOK) }] };
   const AFTER = { id: 'AFTER', method: 'POST', path: '/after', severity: 'high', effects: [{ kind: 'effect.none', select: sel(PAY) }] };
   const FORBID = { id: 'FORBID', method: 'POST', path: '/forbid', severity: 'high', effects: [{ kind: 'effect.none', select: sel(HOOK) }] };
@@ -415,7 +414,7 @@ test('item 4: a timed run a host sleep cut is worded as such, while its reason s
       const row = rowOf(head.run, id);
       assert.deepEqual([row.trace[0].data.notSent, row.assertions.find(a => a.name === PRECONDITION_ASSERTION).actual], [RUN_BUDGET_EXHAUSTED, PRECONDITION_REASONS[RUN_BUDGET_EXHAUSTED]]);
       assert.equal(JSON.stringify(textOf(row)), JSON.stringify(expectedText(slept ? SLEEP_CUT_TEXT : PINNED_TEXT[RUN_BUDGET_EXHAUSTED], id)), id);
-      // Main named the budget either way.
+      // The frozen build named the budget either way.
       assert.equal(JSON.stringify(textOf(rowOf(main.run, id))), JSON.stringify(expectedText(PINNED_TEXT[RUN_BUDGET_EXHAUSTED], id)), id);
     }
     if (cut.includes('AFTER') && !cut.includes('REFUND')) assert.ok(windowOf(head.run, 'FORBID').reason.split(',').includes(HORIZON_TRUNCATED));
@@ -424,9 +423,9 @@ test('item 4: a timed run a host sleep cut is worded as such, while its reason s
   }
 });
 
-// The lead's decision on PR344-REVIEW nit 3: an unreadable awake reading on a clock already seen to move fails closed, as a still one
-// does (#344, minor 2): the pair is a suspend of its whole length. A clock that never moved stays inert, exactly as main.
-test('item 5, detector: a live awake clock with an unreadable reading over a pair past the threshold is a suspend of the whole pair; one that never moved stays unchecked', () => {
+// An unreadable awake reading on a clock already seen to move fails closed, as a still one
+// does: the pair is a suspend of its whole length. A clock that never moved stays inert, exactly as the frozen build.
+test('unreadable reading, detector: a live awake clock with an unreadable reading over a pair past the threshold is a suspend of the whole pair; one that never moved stays unchecked', () => {
   for (const impl of [HEAD, MAIN]) {
     const h = { awake: 0, elapsed: 0, bad: false }, d = impl.detector({ wall: () => WALL0 + h.elapsed, awake: () => (h.bad ? NaN : h.awake), elapsed: () => h.elapsed, timersCountSuspend: true }), at = d.mark();
     h.awake += 20; h.elapsed += 20;
@@ -442,7 +441,7 @@ test('item 5, detector: a live awake clock with an unreadable reading over a pai
       assert.deepEqual([far, back, short], [[['suspend', 60000]], [], []], 'head: the unreadable 60 s pair held no awake time; back to readable, and a short pair, decide nothing');
       assert.deepEqual([d.lostSince(at), d.uncheckedSince(at)], [90000, 0]);
     } else {
-      assert.deepEqual([far, back, short], [[['unchecked', 60000]], [], []], 'main: unchecked');
+      assert.deepEqual([far, back, short], [[['unchecked', 60000]], [], []], 'the frozen build: unchecked');
       assert.deepEqual([d.lostSince(at), d.uncheckedSince(at)], [0, 90000]);
     }
     // Never moved (frozen, then unreadable), or never readable at all: unchecked, never a suspend, on both.
@@ -455,8 +454,8 @@ test('item 5, detector: a live awake clock with an unreadable reading over a pai
   }
 });
 
-test('item 5, connector: an unreadable reading after a sleep leaves the settle partial or extends it in full, where main read it unchecked and passed on missing evidence; a clock that never moved is main', async () => {
-  // FORBID also proves its own send to PAY (a positive clause), so the allowed-use guard (FIX-07) leaves its absence clause as main read it.
+test('unreadable reading, connector: an unreadable reading after a sleep leaves the settle partial or extends it in full, where the frozen build read it unchecked and passed on missing evidence; a clock that never moved is the frozen build', async () => {
+  // FORBID also proves its own send to PAY (a positive clause), so the allowed-use guard leaves its absence clause as the frozen build read it.
   const FORBID = { id: 'FORBID', method: 'POST', path: '/forbid', severity: 'high', effects: [{ kind: 'effect.none', select: sel(HOOK) }, { kind: 'effect.exists', select: sel(PAY) }] };
   // 60 s asleep 500 ms into FORBID's settle and again into the final settle, each read unusable at wake; the default budget has no
   // room to restore either. A readable clock would have seen both (it moved 500 ms in each pair).
@@ -465,12 +464,12 @@ test('item 5, connector: an unreadable reading after a sleep leaves the settle p
   validated(p, head.run);
   const w = windowOf(head.run, 'FORBID'), was = windowOf(main.run, 'FORBID');
   assert.deepEqual([w.coverage, carriesSuspendShort(w), w.suspend.cause, w.suspend.shortMs, Object.hasOwn(w, 'suspendUnchecked'), clauseOf(head.run, 'FORBID')], ['partial', true, 'host-sleep', 5000, false, 'inconclusive']);
-  assert.deepEqual([was.coverage, was.suspendUnchecked, Object.hasOwn(was, 'suspend'), clauseOf(main.run, 'FORBID')], ['complete', true, false, 'pass'], 'main: unchecked, and a pass on missing evidence');
+  assert.deepEqual([was.coverage, was.suspendUnchecked, Object.hasOwn(was, 'suspend'), clauseOf(main.run, 'FORBID')], ['complete', true, false, 'pass'], 'the frozen build: unchecked, and a pass on missing evidence');
   // Room to restore it: the whole settle is held again, so the send lands in the window and the clause fails (the truth).
   const roomy = await assess(HEAD, p, { sends, onSleep: (ms, n) => (n === 1 ? [500, 60000] : null), detector: 'flaky', limits: { ...HTTP_LIMITS, runTimeoutMs: 300000 } });
   assert.deepEqual([roomy.v.sleeps.slice(0, 2), windowOf(roomy.run, 'FORBID').coverage, clauseOf(roomy.run, 'FORBID')], [[5000, 5000], 'complete', 'fail']);
   assert.ok(heldOf(roomy.v).checks[0] >= 5000);
-  // A clock that never moved (frozen, or never readable): waits and verdicts exactly main's.
+  // A clock that never moved (frozen, or never readable): waits and verdicts exactly the frozen build's.
   for (const detector of ['still', 'nan', 'inert']) {
     const now = await assess(HEAD, p, { sends, onSleep, detector }), before = await assess(MAIN, p, { sends, onSleep, detector });
     validated(p, now.run);
@@ -479,9 +478,9 @@ test('item 5, connector: an unreadable reading after a sleep leaves the settle p
   }
 });
 
-// Compatibility: runs main sealed (its connector and detector, frozen at ff3a980, evaluator 33449ad9) validate under this validator, a
-// stop main derived from a shortfall included: the reserve only adds a stop, and a record without one reads as before.
-test('compatibility: runs main sealed validate unchanged, stopped, restored, unchecked and timed ones included', async () => {
+// Compatibility: runs the frozen build sealed (its connector and detector, evaluator 33449ad9) validate under this validator, a
+// stop it derived from a shortfall included: the reserve only adds a stop, and a record without one reads as before.
+test('compatibility: runs the frozen build sealed validate unchanged, stopped, restored, unchecked and timed ones included', async () => {
   const H = 30000, REFUND = { id: 'REFUND', method: 'POST', path: '/refund', severity: 'control', effects: [{ kind: 'effect.exists', select: sel(HOOK) }] };
   const cases = [
     ['no sleep', target([ME, A, B, C]), {}],

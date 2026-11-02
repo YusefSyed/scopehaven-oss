@@ -3,9 +3,9 @@
 //
 // An execution's condition fired only when the run shows, in order: the target request held, the access change
 // answered one of the declared statuses, the "suspended" mark, then the release. A condition that did not fire makes
-// the execution inconclusive whatever its rows say (the get-ahead plan's section 6 rule): an absence after an access
+// the execution inconclusive whatever its rows say: an absence after an access
 // change that never happened, or that happened after the action, shows nothing. A pass also needs the execution's
-// allowed-use twin (FIX-07): with access restored, the same turn applied each action the baseline applied, in the
+// allowed-use twin: with access restored, the same turn applied each action the baseline applied, in the
 // same run. Without a twin that passed, an absence could come from an application that has stopped acting.
 //
 // A failure counts only from an applied action whose request the gate forwarded (or held) after the "suspended" mark.

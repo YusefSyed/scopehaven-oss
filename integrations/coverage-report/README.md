@@ -26,7 +26,7 @@ Forbidden coverage without allowed coverage is how a fix that blocks everything 
    - **Which tenant owns each fixture object** (`objects`).
 2. **A stated policy contract** (`scopehaven-coverage-contract/1`): who may do what. Each rule names one operation, the roles allowed (or `anyone`), and the roles allowed only under a condition. Cross-tenant access is denied.
 
-   Intent comes from a stated contract, never from the implementation under test (recall plan R9). The report carries that warning in two cases:
+   Intent comes from a stated contract, never from the implementation under test. The report carries that warning in two cases:
    - a contract whose `basis` is `app-declaration`;
    - checks drafted by policy import (category `Declared policy`). Policy import also never drafts a check for a cell the declarations leave undeclared.
 3. **A validated target profile:** its actors (with `role` and `tenantId`), checks, `requiredControlIds` and observers.
@@ -117,7 +117,7 @@ Exit codes:
 
 **Shipped example profiles.** `examples/` holds an inventory and a stated contract for the synthetic two-company support app that `docs/profiles/*.example.json` describe. The test computes the allowed side for all four example profiles, which is the in-sample clause. That app has no code in this repository, so its inventory lists the operations those profiles address.
 
-**Clean helpdesk practice app,** round 2. This is the owned helpdesk practice app 0.4.0 clean, with its v2 profile (32 checks, 10 required controls) and the registry's exported suite.
+**Clean helpdesk practice app.** This is the owned helpdesk practice app 0.4.0 clean, with its v2 profile (32 checks, 10 required controls) and the registry's exported suite.
 - **Sources.** The inventory comes from the app's router registrations, static handler and tool manifest, with query and body references read from each route handler. The contract comes from the builder's written receipt. Inputs and receipts are kept outside this repository.
 - **Reconciliation:** 32 drafted of 32 suite checks. No row has a severity.
 - **Allowed side:** 10 of 166 legitimate cells have a twin (8 of 86 by role, operation and surface).

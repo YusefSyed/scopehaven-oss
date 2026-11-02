@@ -9,7 +9,7 @@
 //     tenants and roles, which roles have a user in each tenant, its datastores and which tenant
 //     owns each fixture object. Route tables, schemas and tool manifests belong here: inventory.
 //   - a stated policy contract (scopehaven-coverage-contract/1): who may do what. Intent comes from a
-//     stated contract, never from the implementation under test (recall plan R9); a contract whose
+//     stated contract, never from the implementation under test; a contract whose
 //     basis is the application's own declarations, and checks drafted by policy import, are reported
 //     with that warning.
 //   - a validated target profile (its actors, checks, requiredControlIds and observers), and
@@ -27,21 +27,21 @@ export const COVERAGE_SCHEMA = 'scopehaven-coverage-report/1';
 // that can fall behind it. A sequence can send more.
 export const CONNECTOR_METHODS = HTTP_CHECK_METHODS;
 export const MARKS = Object.freeze(['drafted', 'stated-only', 'unstated', 'needs-actor', 'not-judgeable', 'unreachable']);
-// C8's held-out bar: an application with more than this fraction of its reachable cells not judgeable fails. The report
+// The held-out bar: an application with more than this fraction of its reachable cells not judgeable fails. The report
 // computes the fraction for whatever application it is given; whether that application is in the holdout pool is not known here.
 export const NOT_JUDGEABLE_BAR = 0.5;
 // compareRuns' stable identity keys (src/runner.mjs). A test pins this list against compareRuns' own reasons.
 export const COMPARISON_KEYS = Object.freeze(['schemaVersion', 'applicationId', 'suiteId', 'suiteHash', 'policyHash', 'fixtureHash', 'fixtureVersion', 'adapterVersion',
   'evaluatorHash', 'runtimeMode', 'evidenceOrigin', 'profileHash', 'assertionSchemaVersion', 'contextId']);
 export const COVERAGE_NOTE = 'Coverage, not findings: a drafted cell has a check, not a verdict, and no row carries a severity. A finding count, when a run is given, comes from that run\'s own grading and is printed beside the not-judgeable count, never added to it.';
-export const R9_WARNING = 'The stated intent is read from the application\'s own declarations (recall plan R9): a defect the declaration shares cannot show up as a miss.';
+export const DECLARED_INTENT_WARNING = 'The stated intent is read from the application\'s own declarations: a defect the declaration shares cannot show up as a miss.';
 // What the report reads and does: it observes nothing itself.
 export const COVERAGE_SCOPE = 'Scope: computed only from the given inventory, contract, profile and, when given, exported suite and stored runs; it sends no request and observes nothing, so it says which cells have a check, not what the application does.';
 // Run row statuses a stored HTTP run can carry (src/http-connector.mjs counts).
 export const RUN_STATUSES = Object.freeze(['pass', 'fail', 'inconclusive', 'error', 'not_applicable']);
 // Stored runs whose rows this report can read: only those the shared HTTP validator recomputes.
 export const RUN_ORIGINS = Object.freeze(['local-http-response']);
-export const POLICY_IMPORT_WARNING = 'These checks were drafted by policy import from the application\'s own declarations (recall plan R9): a defect the declaration shares cannot show up as a miss, and a cell the declarations leave undeclared never became a check (policy import: "undeclared never becomes deny").';
+export const POLICY_IMPORT_WARNING = 'These checks were drafted by policy import from the application\'s own declarations: a defect the declaration shares cannot show up as a miss, and a cell the declarations leave undeclared never became a check (policy import: "undeclared never becomes deny").';
 
 const ANONYMOUS = 'anonymous';
 // An operation anyone may call without a session has one cell per caller class, not one per role and tenant.
@@ -285,7 +285,7 @@ export function coverageReport({ inventory, contract, target, suiteCheckIds = nu
   const policyImported = target.checks.filter(c => c.category === 'Declared policy').map(c => c.id);
   return {
     schema: COVERAGE_SCHEMA, applicationId: inv.applicationId, targetId: target.id ?? null,
-    contractBasis: contract.basis, ...(contract.basis === 'app-declaration' ? { warning: R9_WARNING } : {}),
+    contractBasis: contract.basis, ...(contract.basis === 'app-declaration' ? { warning: DECLARED_INTENT_WARNING } : {}),
     ...(policyImported.length ? { policyImport: { checks: policyImported, warning: POLICY_IMPORT_WARNING } } : {}),
     reconciliation, outsideInventory, marks, reasons,
     notJudgeable: { cells: marks['not-judgeable'], needsActor: marks['needs-actor'], reachable: reachable.length, bar: NOT_JUDGEABLE_BAR,

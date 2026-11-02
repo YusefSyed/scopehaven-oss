@@ -1,4 +1,4 @@
-// pg-wal as a profile observer (NC9 item 4), end to end on a local Supabase stack: a refund app over the stack's PostgREST, assessed by
+// pg-wal as a profile observer, end to end on a local Supabase stack: a refund app over the stack's PostgREST, assessed by
 // runHttpAssessment with a pg-wal observer (its own REPLICATION role) on the orders table. The check is database-only: reading an order
 // refunds nothing. The fixed twin's read writes nothing, so the prohibition passes on the WAL (custody observer-held), beside the
 // allowed-use twin whose refund the observer is shown to see; the defective twin's read refunds the order too, and the prohibition fails.

@@ -1,4 +1,4 @@
-// App-log admissions, PR-1c-2 (APP-LOG-1C-DESIGN.md items c and d): countBy clauses read on lines the application writes once per
+// App-log admissions: countBy clauses read on lines the application writes once per
 // application, and an effect.only allow that is a background job's alone (allowBackground), with the job named by its own
 // principal and the check's own lines told apart by their correlation token. Admissions still only ever add fails; at the custody
 // tier allowBackground is exactly the shape-only allow it expands to. Pure tests over synthetic lines and windows: no socket, no
@@ -53,7 +53,7 @@ const jobLine = () => entry({ event: 'message.sent', actor: 'system', params: { 
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // (d) allowBackground: the custody tier reads the shape-only allow; admissions never let it excuse the check's own actor.
-test('d: allowBackground expands into the shape-only allow at load, is recorded on the app log, and validating again changes nothing', () => {
+test('allowBackground expands into the shape-only allow at load, is recorded on the app log, and validating again changes nothing', () => {
   const clause = PROFILE.checks[1].effects[0];
   assert.equal(Object.hasOwn(clause, 'allowBackground'), false, 'every custody path sees plain allow entries');
   assert.deepEqual(clause.allow[1], { operation: 'send', name: MAIL, resource: 'POST /v1/messages' }, 'the source select without its actor pin');
@@ -65,7 +65,7 @@ test('d: allowBackground expands into the shape-only allow at load, is recorded 
   assert.deepEqual(RECORDS()[0].reads.backgroundAllows, [{ check: 'STATUS', effect: 0, allow: 1, source: 'digest' }]);
 });
 
-test('d: refused at load: an unknown source, a clause that is not effect.only, and under admission an unpinned or unmapped source or no fields.trace', () => {
+test('refused at load: an unknown source, a clause that is not effect.only, and under admission an unpinned or unmapped source or no fields.trace', () => {
   refused(TARGET({ effects: [ONLY({ allowBackground: ['nightly'] })] }), /"allowBackground" \(effect\.only only\) lists/, 'unknown id');
   refused(TARGET({ effects: [{ kind: 'effect.none', select: { source: 'http-egress', operation: 'send', name: MAIL }, allowBackground: ['digest'] }] }), /"allowBackground" \(effect\.only only\)/, 'effect.none');
   refused(TARGET({ effects: [ONLY({ allowBackground: ['digest', 'digest'] })] }), /distinct/, 'a repeat');
@@ -78,14 +78,14 @@ test('d: refused at load: an unknown source, a clause that is not effect.only, a
   refused(TARGET({ log: LOG({ logActors: { 'member-1': 'u-1', 'svc-other': 'x' } }) }), /principals of declared actors .* or the actor pin of a declared background source/, 'a principal nobody declares');
 });
 
-test('d: the reader keeps the trace token of the value the app received, and only a well-formed one', () => {
+test('the reader keeps the trace token of the value the app received, and only a well-formed one', () => {
   assert.equal(message('ticket_update').correlation.settlementToken, tok(T1));
   assert.equal(message('ticket_update', { trace: T1.toUpperCase() }).correlation.settlementToken, undefined, 'not re-cased');
   assert.equal(message('ticket_update', { trace: 'not-a-uuid' }).correlation.settlementToken, undefined);
   assert.equal(message('ticket_update', { trace: undefined }).correlation.settlementToken, undefined);
 });
 
-test('d: the background allow never excuses the check\'s own line; the plain allow still does; told only in a window that names the job, with the own token', () => {
+test('the background allow never excuses the check\'s own line; the plain allow still does; told only in a window that names the job, with the own token', () => {
   const clause = stored();
   assert.equal(admit([clause], [message('refund_confirmation')], { token: tok(T1) })[0].entries, 1, 'the own forbidden send, with the own token');
   assert.deepEqual(admit([clause], [message('ticket_update')], { token: tok(T1) }), [null], 'the plain template allow excuses it');
@@ -108,7 +108,7 @@ test('d: the background allow never excuses the check\'s own line; the plain all
   assert.deepEqual(admit([stored(explicit.checks[1].effects[0])], [message('refund_confirmation')], { token: tok(T1) }, explicit), [null]);
 });
 
-test('d: each row\'s context carries its own token and every other row\'s', () => {
+test('each row\'s context carries its own token and every other row\'s', () => {
   const row = (id, requestId) => ({ id, principal: 'member-1', requestId, decisions: [], windows: [] });
   const [a, b, c] = admissionRows([row('A', T1), row('B', T2), row('C', 'not-a-uuid')], { background: PROFILE.attribution.background });
   assert.deepEqual([a.token, a.foreign], [tok(T1), [tok(T2)]]);
@@ -116,7 +116,7 @@ test('d: each row\'s context carries its own token and every other row\'s', () =
   assert.deepEqual([c.token, c.foreign], [null, [tok(T1), tok(T2)]]);
 });
 
-test('d: a token says which request context wrote a line, not which request caused it: the late-line rule still holds; another check\'s token is that check\'s', () => {
+test('a token says which request context wrote a line, not which request caused it: the late-line rule still holds; another check\'s token is that check\'s', () => {
   const none = { kind: 'effect.none', select: { source: 'http-egress', operation: 'send', name: MAIL, fields: [{ pointer: '/template', equals: 'refund_confirmation' }] }, verdict: 'inconclusive', matched: 0, basis: 'b', custody: 'independent', authoritative: true };
   const earlier = [{ source: 'http-egress', operation: 'send', name: MAIL }];
   assert.deepEqual(admit([none], [message('refund_confirmation')], { token: tok(T1), earlier }), [null], 'its own token, but it fits an earlier check\'s selector');
@@ -126,7 +126,7 @@ test('d: a token says which request context wrote a line, not which request caus
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // (c) countBy on lines written once per application.
-test('c: "lines" is per-application or absent; a key is kept as a run-local digest, never the key', () => {
+test('"lines" is per-application or absent; a key is kept as a run-local digest, never the key', () => {
   refused(TARGET({ log: LOG({ rules: [{ ...LOG().rules[0], lines: 'per-attempt' }] }) }), /"lines" is "per-application"/);
   const a = message('ticket_update', { key: 'k-1' }), b = message('ticket_update', { key: 'k-1' }), c = message('ticket_update', { key: 'k-2' });
   assert.match(a.correlation.requestId, /^key:[0-9a-f]{16}$/);
@@ -141,7 +141,7 @@ test('c: "lines" is per-application or absent; a key is kept as a run-local dige
   assert.deepEqual(RECORDS()[0].reads.perApplication, [MAIL]);
 });
 
-test('c: countBy counts applications on per-application lines: one key is one application; a non-opted line or a duplicated window reads nothing', () => {
+test('countBy counts applications on per-application lines: one key is one application; a non-opted line or a duplicated window reads nothing', () => {
   const count = expected => ({ kind: 'effect.count', countBy: 'idempotency-key', select: { source: 'http-egress', operation: 'send', name: MAIL }, expected, verdict: 'inconclusive', matched: 0, basis: 'b', custody: 'independent', authoritative: true });
   const keyed = key => message('ticket_update', { key });
   assert.deepEqual(admit([count(1)], [keyed('k-1'), keyed('k-1')]), [null], 'a retry logged twice under one key');
@@ -187,7 +187,7 @@ test('records: reads carry perApplication, trace and backgroundAllows, held to t
   assert.throws(() => bindAppLogWindows([ok1], untraced), /effect-trace/, 'a token where the log declares no trace');
 });
 
-test('d: the marks are the clause\'s last allow entries, in order; a hand-written mark on an author\'s allow is refused', () => {
+test('the marks are the clause\'s last allow entries, in order; a hand-written mark on an author\'s allow is refused', () => {
   const shape = { operation: 'send', name: MAIL, resource: 'POST /v1/messages' };
   // Hand-written in the normalized form, at the tail: accepted (it is what normalization writes).
   valid(TARGET({ effects: [{ kind: 'effect.only', allow: [ONLY().allow[0], shape] }], log: LOG({ backgroundAllows: [{ check: 'STATUS', effect: 0, allow: 1, source: 'digest' }] }) }));

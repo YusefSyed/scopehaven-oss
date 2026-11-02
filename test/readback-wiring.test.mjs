@@ -1,7 +1,7 @@
 // Postgres read-back in HTTP checks (src/http-readback.mjs), end to end through runHttpAssessment and the shared validator,
 // against the scripted fake Postgres's typed model (no real database). The app mimics a reply route whose send helper
-// answers a reused request id as sent without sending (an owned app's confirmed said-did defect, owned-matrix
-// BC-A1-SAID-DID): the reply says sent, and no outbound message row is written. Synthetic data, loopback only.
+// answers a reused request id as sent without sending (an owned app's confirmed said-did
+// defect): the reply says sent, and no outbound message row is written. Synthetic data, loopback only.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -171,15 +171,16 @@ test('profiles: readBack names a declared read-back table; a declaration the obs
   assert.throws(() => load({ ...pgObserver(5432), tables: [{ table: 'messages', key: 'id', readBack: { columns: ['id'] } }] }, [SAME_ID()]), /invalid readBack on messages/);
 });
 
-// No readBack, no change: a run recorded and sealed at main 42a10d62 by main's own connector validates here, with and without
-// the suite main exported, and this head exports the same suite for its profile. Only the evaluator identity moved.
-test('a run recorded at main before read-back validates unchanged, and this head exports the same suite for its profile', () => {
+// No readBack, no change: a run recorded and sealed by an earlier build's own connector validates here, with and without
+// the suite that build exported, and this head exports the same suite for its profile. Only the evaluator identity moved.
+test('a run recorded by an earlier build before read-back validates unchanged, and this head exports the same suite for its profile', () => {
   const { recordedAt, profile: recordedProfile, suite, run } = structuredClone(recordedAtMain);
   assert.equal(recordedAt, '42a10d62');
   validateHttpRunEvidence(run);
   validateHttpRunEvidence(run, { expectedSuite: suite });
-  // FIX-08 moved the collector records (egress-recorder/13, and every collector's files' digest, since factory.mjs is in each list): the
-  // suite comes out as main's with this build's records in their place, and nothing else differs.
+  // Passing each recorder the other recorders' destinations moved the collector records (egress-recorder/13, and every collector's
+  // files' digest, since factory.mjs is in each list): the suite comes out as that build's with this build's records in their place,
+  // and nothing else differs.
   const exported = createRegistry({ profiles: [recordedProfile], env: { SCOPEHAVEN_TARGET_BOB: 'x', SCOPEHAVEN_TARGET_DB_READER: 'u:p' } }).exportSuite(recordedProfile.id);
   assert.ok(exported.observers.every(o => o.collector === undefined || digest(o.collector) === digest(COLLECTOR_RECORDS[o.type])));
   assert.equal(digest({ ...exported, observers: exported.observers.map((o, i) => o.collector === undefined ? o : { ...o, collector: suite.observers[i]?.collector }) }), digest(suite));

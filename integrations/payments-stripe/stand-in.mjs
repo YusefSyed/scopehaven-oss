@@ -1,7 +1,7 @@
-// A stateful Stripe API v1 stand-in on loopback (N14 stage 1). Stripe's own mock server, stripe-mock (MIT), is stateless: it
+// A stateful Stripe API v1 stand-in on loopback (stage 1). Stripe's own mock server, stripe-mock (MIT), is stateless: it
 // answers from fixed fixtures and keeps nothing a request created, so a refunds list from it can never show two refunds. This
 // stand-in keeps state for the small subset the refund demos use and follows Stripe's documented semantics for it (pages read
-// 2026-10-24, listed in a review record outside this repository). It is not Stripe: no fees, balances, disputes,
+// 2026-10-24). It is not Stripe: no fees, balances, disputes,
 // payment intents, webhooks, rate limits or key expiry, and every refund succeeds at once (Stripe's ordinary test cards do the same).
 //
 // Endpoints (form-encoded bodies, JSON replies, a Request-Id header on every reply):

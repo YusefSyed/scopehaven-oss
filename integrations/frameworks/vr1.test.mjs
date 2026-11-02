@@ -1,4 +1,4 @@
-// The verified retest over framework records (VR1, NC1 item 5): compareRuns on two framework-mode runs (run-record.mjs).
+// The verified retest over framework records: compareRuns on two framework-mode runs (run-record.mjs).
 // node:test, no Python and no network. The LangGraph reset-after-commit acceptance records (the real template, re-judged):
 // the defect, its fix (the template's fixed-update variant, the same scripted persona) and a vacuous fix that must not read
 // FIXED_VERIFIED. The Mastra acceptance records hold no application-side fix (only other personas), so the billing shape's
@@ -109,7 +109,7 @@ test('a changed request, scenario, commit or measuring side is another test: the
   const changed = compareRuns(defect, run(structuredClone(fixedRecord), asked));
   assert.equal(changed.compatible, false); assert.ok(changed.reasons.includes('suiteHash differs or is missing.'));
   assert.equal(retestVerdict(changed), 'INCONCLUSIVE');
-  // Another template commit is another suite until the suite identity can flag a migration between runs (LQ N13).
+  // Another template commit is another suite until the suite identity can flag a migration between runs.
   const moved = structuredClone(scenario); moved.template.commit = 'a'.repeat(40);
   const commit = rebuilt(fixedRecord, moved, record => { record.adapter.checkout.commit = moved.template.commit; record.scenarioDigest = null; });
   assert.ok(compareRuns(defect, commit).reasons.includes('suiteHash differs or is missing.'));

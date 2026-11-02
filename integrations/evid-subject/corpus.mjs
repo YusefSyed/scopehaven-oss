@@ -1,4 +1,4 @@
-// SURPASS-FORGE-01: runs the forgery corpus (./forging-subject.mjs) against every
+// Runs the forgery corpus (./forging-subject.mjs) against every
 // observer configuration and reports the naive-rule versus custody-gated matrix.
 //
 // Owned synthetic stores and loopback services only: a SQLite file, a JSON-lines

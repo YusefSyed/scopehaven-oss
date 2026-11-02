@@ -1,9 +1,10 @@
-// In-doubt resolution R1, the request feed (IDR-4), through the core, the clause rules, the run-end stage and the shared validator. Checked:
-// inert equals main (no feed declared: every decision and sealed byte equals main frozen at c8f8bd3; a feed declared but no record, or every
-// record failed: every verdict equals main's); missing or weaker evidence never yields a pass, and never moves an attempt between confirmed
-// and refuted; no in-doubt pass; a re-decided verdict is never more lenient than main reading each derived fate as a proven reply; the
-// connector's side equals the validator's recompute; tampering with a sealed read is refused on recompute (and, across rows, by the run-level
-// check); a lifecycle change check takes no late record (PR348-REVIEW minor 3); the timing plan reserves the read (minor 6).
+// In-doubt resolution by the request feed, through the core, the clause rules, the run-end stage and the shared validator. Checked:
+// inert equals the frozen evaluator (no feed declared: every decision and sealed byte equals a frozen earlier evaluator's; a feed
+// declared but no record, or every record failed: every verdict equals the frozen evaluator's); missing or weaker evidence never yields
+// a pass, and never moves an attempt between confirmed and refuted; no in-doubt pass; a re-decided verdict is never more lenient than
+// the frozen evaluator reading each derived fate as a proven reply; the connector's side equals the validator's recompute; tampering
+// with a sealed read is refused on recompute (and, across rows, by the run-level check); a lifecycle change check takes no late record;
+// the timing plan reserves the read.
 // Owned synthetic data only. No socket is opened: observers, clocks and transports are injected (test/in-doubt-r1-e2e.test.mjs runs loopback).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -29,7 +30,7 @@ const RUNS = 3000;
 const json = value => JSON.parse(JSON.stringify(value));
 const isPass = d => d.verdict === 'pass';
 
-// The connector's side for one R1 case: decided at seal time, then the run-end stage with the recorder's records. A fresh window each call.
+// The connector's side for one request-feed case: decided at seal time, then the run-end stage with the recorder's records. A fresh window each call.
 function connectorSide(c, records, { feed = C.FEED } = {}) {
   const b = C.buildCase(c, { feed }), opts = { role: c.role, claims: [], readings: [] };
   const before = decideEffects(c.effects, [b.window], opts);
@@ -40,24 +41,24 @@ function connectorSide(c, records, { feed = C.FEED } = {}) {
 const validatorSide = (c, trace, record = C.recordFor({ signing: c.signing })) => recomputeEffectTrace(json(trace), undefined, [record], { role: c.role });
 
 // ----------------------------------------------------------------------------------------------------------------------------------
-test('1. inert equals main (c8f8bd3): with no request feed declared, every decision and sealed byte equals main\'s, at seal time and after the stage, whatever an observer returns', t => {
+test('1. inert equals the frozen evaluator: with no request feed declared, every decision and sealed byte equals the frozen evaluator\'s, at seal time and after the stage, whatever an observer returns', t => {
   const BOTH = { scoped: [admitScoped, main.events.admitScoped], inDoubt: [admitInDoubt, main.inDoubt.admitInDoubt] };
   const n = { idr2: 0, r1: 0, decisions: 0, recomputed: 0 };
-  // IDR-2's seeded cases (keyed groups, unfollowed, partial, scoped and host-suspend-short windows), with R1 reads added for every send.
+  // The re-decide stage's seeded cases (keyed groups, unfollowed, partial, scoped and host-suspend-short windows), with request-feed reads added for every send.
   for (let i = 0, g = C2.rng(4242); i < RUNS; i++) {
     const c = C2.randomCase(g, { later: C2.pick(g, ['r1', 'rx']) }), w = C2.buildWindow(c, { mark: BOTH }), windows = [w], opts = { role: c.role, claims: c.claims, readings: c.readings };
     const supplied = [...c.supplied, ...c.events.map(s => ({ observer: C2.INST, seq: s.seq, records: [{ resolver: 'r1', read: C.read({ entries: [C.entry()] }) }] }))];
     let live = decideEffects(c.effects, windows, opts), was = main.effects.decideEffects(c.effects, windows, opts);
     assert.deepEqual(live, was, 'at seal time');
     if (c.kind === 'unfollowed') { markUnfollowed(w); main.events.markUnfollowed(w); live = decideEffects(c.effects, windows, opts); was = main.effects.decideEffects(c.effects, windows, opts); assert.deepEqual(live, was); }
-    assert.deepEqual(redecideResolved([{ effects: c.effects, claims: c.claims, readings: c.readings, role: c.role, windows }], supplied), [null], 'R1 applies to nothing without a feed');
+    assert.deepEqual(redecideResolved([{ effects: c.effects, claims: c.claims, readings: c.readings, role: c.role, windows }], supplied), [null], 'r1 applies to nothing without a feed');
     assert.deepEqual(decideEffects(c.effects, windows, opts), was, 'after the stage');
     const sealed = effectTrace(live, windows, C2.META), sealedMain = main.effects.effectTrace(was, windows, C2.META);
     assert.equal(digest(sealed.data), digest(sealedMain.data), 'the sealed trace');
     if (!w.scoped) { assert.deepEqual(recomputeEffectTrace(json(sealed), undefined, [C2.recordOf(c)], { role: c.role }).rows, main.effects.recomputeEffectTrace(json(sealed), undefined, [C2.recordOf(c)], { role: c.role }).rows); n.recomputed++; }
     n.idr2++; n.decisions += live.length;
   }
-  // R1's cases with no feed declared: the recorder writes no arrival and its scope no feed, so it is main's window exactly.
+  // The feed's own cases with none declared: the recorder writes no arrival and its scope no feed, so it is the frozen evaluator's window exactly.
   for (let i = 0, g = C.rng(4343); i < RUNS; i++) {
     const c = C.randomCase(g), b = C.buildCase(c, { feed: null, admit: [main.inDoubt.admitInDoubt] }), opts = { role: c.role, claims: [], readings: [] };
     const live = decideEffects(c.effects, [b.window], opts), was = main.effects.decideEffects(c.effects, [b.window], opts);
@@ -73,7 +74,7 @@ test('1. inert equals main (c8f8bd3): with no request feed declared, every decis
   assert.ok(n.decisions > 25000 && n.recomputed > 4000, JSON.stringify(n));
 });
 
-test('2. with a feed declared but every record absent or failed (the feed unread, unclear or cut), every verdict equals main\'s', t => {
+test('2. with a feed declared but every record absent or failed (the feed unread, unclear or cut), every verdict equals the frozen evaluator\'s', t => {
   let compared = 0;
   for (let i = 0, g = C.rng(5151); i < RUNS; i++) {
     const c = C.randomCase(g), opts = { role: c.role, claims: [], readings: [] };
@@ -85,7 +86,7 @@ test('2. with a feed declared but every record absent or failed (the feed unread
       compared += side.decisions.length;
     }
   }
-  t.diagnostic(`verdicts compared with main: ${compared}`);
+  t.diagnostic(`verdicts compared with the frozen evaluator: ${compared}`);
   assert.ok(compared > 30000);
 });
 
@@ -144,21 +145,21 @@ test('4. property: no in-doubt pass. An exists pass rests on a proven or confirm
   assert.ok(passes > 1500);
 });
 
-test('5. property: every re-decided pass and fail is one main (c8f8bd3) gives reading each derived fate as a proven reply; every further application R1 refutes is one main\'s own key collapse counts with the application, the receiver\'s dedupe window included', t => {
+test('5. property: every re-decided pass and fail is one the frozen evaluator gives reading each derived fate as a proven reply; every further application the feed refutes is one the frozen evaluator\'s own key collapse counts with the application, the receiver\'s dedupe window included', t => {
   let compared = 0, equal = 0, passes = 0, fails = 0, keyed = 0, groups = 0, signingGroups = 0, late = 0;
   for (let i = 0, g = C.rng(4711); i < RUNS; i++) {
     const c = C.randomCase(g), side = connectorSide(c, b => b.records);
     late += side.events.filter(e => boundRecords(e).some(r => r.reason === 'key-identity-differs')).length;
     if (!side.changed) continue;
-    // Each attempt as R1 left it: confirmed, refuted as a further application (its read lists an applied word: the provider applied the key
-    // once and this send is not that application), refuted by absence or by R0, or in doubt.
+    // Each attempt as the feed left it: confirmed, refuted as a further application (its read lists an applied word: the provider applied the key
+    // once and this send is not that application), refuted by absence or by the transport record, or in doubt.
     const kindOf = new Map(side.events.map((e, k) => {
       const f = side.fates[k], read = sealedRecordsOf(e).find(r => r.resolver === 'r1')?.read;
       return [e.seq, f === 'refuted' && attemptBasis(e).by === 'r1' && read?.entries.some(x => x.state === 'applied') ? 'further' : f];
     }));
     // Oracle A: confirmed reads a proven 201, any refutation a proven declared 409, in doubt an unproven unknown (no transport record, so
-    // main's R0 adds nothing). Oracle B: a further application reads a proven 201 too, a replay of the application, so main's own key
-    // collapse (its identity and the signing dedupe window) decides whether it is one application with it.
+    // the frozen evaluator's r0 adds nothing). Oracle B: a further application reads a proven 201 too, a replay of the application, so
+    // the frozen evaluator's own key collapse (its identity and the signing dedupe window) decides whether it is one application with it.
     const upOf = further => e => { const f = kindOf.get(e.seq), { transport: _t, ...up } = e.upstream, target = up.target;
       return f === 'applied' || (f === 'further' && further) ? { outcome: 'applied', status: 201, proven: true, target } : f === 'refuted' || f === 'further' ? { outcome: 'rejected', status: 409, proven: true, target }
         : f === 'in-doubt' ? { outcome: 'unknown', status: null, proven: false, target } : up; };
@@ -171,17 +172,17 @@ test('5. property: every re-decided pass and fail is one main (c8f8bd3) gives re
       if (d.verdict === 'pass') { assert.equal(wantA[k].verdict, 'pass', `a pass the derived fates do not give: ${JSON.stringify(c)}`); passes++; }
       if (d.verdict === 'fail') { assert.equal(wantA[k].verdict, 'fail', `a fail the derived fates do not give: ${JSON.stringify(c)}`); fails++; }
       if (d.verdict === wantA[k].verdict) equal++;
-      // A keyed clause reads its key groups through main's collapse in oracle B: never more lenient there either.
-      if (c.effects[k]?.countBy !== undefined && ['pass', 'fail'].includes(d.verdict)) { assert.equal(wantB[k].verdict, d.verdict, `a keyed verdict main's collapse does not give: ${JSON.stringify(c)}`); keyed++; }
+      // A keyed clause reads its key groups through the frozen evaluator's collapse in oracle B: never more lenient there either.
+      if (c.effects[k]?.countBy !== undefined && ['pass', 'fail'].includes(d.verdict)) { assert.equal(wantB[k].verdict, d.verdict, `a keyed verdict the frozen evaluator's collapse does not give: ${JSON.stringify(c)}`); keyed++; }
     });
-    // Every group with a further application: main's countApplications over oracle B counts the group as exactly one application.
+    // Every group with a further application: the frozen evaluator's countApplications over oracle B counts the group as exactly one application.
     for (const fold of new Set(oracleB.events.filter(e => kindOf.get(e.seq) === 'further').map(e => e.idempotency.fold))) {
       const members = oracleB.events.filter(e => e.name === C.CRM && e.idempotency?.fold === fold);
-      assert.deepEqual((({ low, high }) => ({ low, high }))(main.idem.countApplications(oracleB.window, C.CRM, members)), { low: 1, high: 1 }, `R1 collapsed what main's key collapse counts apart: ${JSON.stringify(c)}`);
+      assert.deepEqual((({ low, high }) => ({ low, high }))(main.idem.countApplications(oracleB.window, C.CRM, members)), { low: 1, high: 1 }, `the feed collapsed what the frozen evaluator's key collapse counts apart: ${JSON.stringify(c)}`);
       groups++; if (c.signing) signingGroups++;
     }
   }
-  t.diagnostic(`derived-fate oracle: compared ${compared}, equal ${equal}, passes ${passes}, fails ${fails}, keyed against main's collapse ${keyed}; further-application groups ${groups} (${signingGroups} on a signing host) each one application under main's collapse; ${late} attempts left in doubt because the collapse reads their group apart`);
+  t.diagnostic(`derived-fate oracle: compared ${compared}, equal ${equal}, passes ${passes}, fails ${fails}, keyed against the frozen evaluator's collapse ${keyed}; further-application groups ${groups} (${signingGroups} on a signing host) each one application under the frozen evaluator's collapse; ${late} attempts left in doubt because the collapse reads their group apart`);
   assert.ok(passes > 300 && fails > 300 && keyed > 300 && groups > 100 && signingGroups > 20 && late > 50, `${passes} ${fails} ${keyed} ${groups} ${signingGroups} ${late}`);
 });
 
@@ -266,7 +267,7 @@ test('8. end to end: a confirmation and a refutation are decided again before se
   const run = await runOf(p, C.r1RecorderFactory(batches, { reads: readsFor(ok) }));
   const t1 = rowOf(run), t2 = rowOf(run, 'TASK2');
   assert.deepEqual([verdictsOf(t1), t1.status, t1.backendEvidence], [['pass', 'pass', 'pass'], 'pass', 'observed'], 'confirmed: exists, exactly one, one keyed application');
-  // Refuted under the watermark: the agent-write exists fails; exactly zero is decided as zero applications, then held by main's
+  // Refuted under the watermark: the agent-write exists fails; exactly zero is decided as zero applications, then held by the
   // positive-match pairing (an absence pinned to an outcome needs an allowed-use twin, which this profile does not declare).
   assert.deepEqual([verdictsOf(t2), t2.status, t2.trace[1].data.effects[0].resolution.operation, typeof t2.trace[1].data.effects[0].pairing], [['inconclusive', 'fail'], 'fail', 'refuted', 'string']);
   assert.deepEqual(t1.trace[1].data.resolutions.map(x => x.records.map(r => Object.keys(r))), [[['resolver', 'read']]], 'sealed as the read, never a result');
@@ -311,7 +312,7 @@ test('9. end to end parity: seeded runs through the connector validate with thei
   assert.ok(changed > 80 && compared > 400, `${changed} ${compared}`);
 });
 
-test('10. PR348-REVIEW minor 3: a lifecycle change check takes no late record, so its post-change gate and the validator agree; a record forged onto it is refused', async () => {
+test('10. a lifecycle change check takes no late record, so its post-change gate and the validator agree; a record forged onto it is refused', async () => {
   const ENV = { SCOPEHAVEN_TARGET_A: 'tok-admin', SCOPEHAVEN_TARGET_C: 'tok-carol' }, WHO = { 'tok-admin': 'admin', 'tok-carol': 'carol' };
   const control = (id, actorId, method, path, extra = {}) => ({ id, title: id, category: 'Allowed use', severity: 'control', actorId, method, path, evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 200 }], ...extra });
   const me = (id, actorId) => control(id, actorId, 'GET', '/me', { assertions: [{ kind: 'status.equals', expected: 200 }, { kind: 'json.equals', pointer: '/user', expected: actorId }] });
@@ -342,7 +343,7 @@ test('10. PR348-REVIEW minor 3: a lifecycle change check takes no late record, s
   assert.throws(() => validateHttpRunEvidence(forged), error => error.code === 'invalid-run-evidence');
 });
 
-test('11. the ruling (PR348-REVIEW-FINAL) under R1: on a sleep-partial window a refutation decides no pass and no operation, as R0; a confirmation decides presence exactly as a proven applied reply does on main', () => {
+test('11. the sleep-partial rule under the request feed: on a sleep-partial window a refutation decides no pass and no operation, as the transport record\'s does; a confirmation decides presence exactly as a proven applied reply does in the frozen evaluator', () => {
   const SHORT = { cause: 'host-sleep', count: 1, ms: 70000, from: '2026-10-16T00:00:01.000Z', to: '2026-10-16T00:01:11.000Z', shortMs: 150 };
   const ok = C.read({ headMono: 1100 + C.SETTLE, headWall: C.OFFSET + 1100 + C.SETTLE, watermark: C.OFFSET + 1100 + C.SETTLE + C.SKEW });
   const sleepy = (events, admit = admitInDoubt, feed = C.FEED) => admit(applySuspendShort({ source: 'http-egress', instanceId: C.INST, scope: C.scopeOf(feed), coverage: 'complete', reason: null, events, suspend: SHORT }));
@@ -351,27 +352,27 @@ test('11. the ruling (PR348-REVIEW-FINAL) under R1: on a sleep-partial window a 
     const e = C.send({ seq: 1 }), w = sleepy([e]);
     assert.deepEqual([w.coverage, w.reason.split(',').includes('host-suspend-wait-short')], ['partial', true]);
     const decisions = redecideResolved([{ effects: clauses, claims: [], readings: [], role: 'boundary', windows: [w] }], [C.supplied(e, { ...ok, entries })])[0];
-    assert.equal(fateOf(e), entries.length ? 'applied' : 'refuted', 'R1 decided the attempt');
+    assert.equal(fateOf(e), entries.length ? 'applied' : 'refuted', 'r1 decided the attempt');
     assert.ok(decisions.every(d => d.resolution.operation === operations), JSON.stringify(decisions.map(d => d.resolution.operation)));
     if (want) { assert.deepEqual(decisions.map(d => d.verdict), want, 'a refutation: no pass, no operation'); continue; }
-    // A confirmation: every verdict is main's on the same sleep-partial window with that attempt a proven 201.
+    // A confirmation: every verdict is the frozen evaluator's on the same sleep-partial window with that attempt a proven 201.
     const proven = C.send({ seq: 1, outcome: 'applied', feedHost: false }), mw = sleepy([proven], w2 => main.inDoubt.admitInDoubt(admitInDoubt(w2)), null);
     assert.deepEqual(decisions.map(d => d.verdict), main.effects.decideEffects(clauses, [mw], { role: 'boundary' }).map(d => d.verdict));
     assert.equal(decisions[0].verdict, 'pass', 'presence decides on any coverage');
   }
 });
 
-test('12. PR348-REVIEW minor 6: the timing plan reserves one resolver read for a declared request feed, and only then', () => {
+test('12. the timing plan reserves one resolver read for a declared request feed, and only then', () => {
   const p = C.profileOf([[C.EXISTS]]), timed = { ...p, timing: { effectHorizonMs: 1000, runBudgetMs: 600000 } };
   const terms = plannedTimingTerms(timed, { controlPlan: identityControlPlan(timed) });
   assert.equal(terms.resolvers, REQUEST_FEED_READ_MS);
   const plainTimed = { ...C.profileOf([[C.EXISTS]], { feed: null }), timing: { effectHorizonMs: 1000, runBudgetMs: 600000 } };
-  assert.equal(Object.hasOwn(plannedTimingTerms(plainTimed, { controlPlan: identityControlPlan(plainTimed) }), 'resolvers'), false, 'no feed: the plan is main\'s');
+  assert.equal(Object.hasOwn(plannedTimingTerms(plainTimed, { controlPlan: identityControlPlan(plainTimed) }), 'resolvers'), false, 'no feed: the plan is unchanged');
   assert.deepEqual(declaredObserverRecord([C.declaration({ feed: null })])[0], C.RECORD_PLAIN);
 });
 
-test('13. PR363-REVIEW major 1: on a feed host that declares signing, same-key same-body retries arriving past the receiver\'s dedupeSeconds are separate applications to the key collapse, so R1 leaves them in doubt; within the window it decides as before', () => {
-  // The reviewer's probe: crm.example declares signing (stripe, dedupeSeconds 1) and the feed; the loader accepts it.
+test('13. on a feed host that declares signing, same-key same-body retries arriving past the receiver\'s dedupeSeconds are separate applications to the key collapse, so the feed leaves them in doubt; within the window it decides as before', () => {
+  // crm.example declares signing (stripe, dedupeSeconds 1) and the feed; the loader accepts it.
   validateEgressConfig(C.declaration({ signing: true }), { member: { principalId: 'member-1' } });
   const clauses = [C.KEYED_COUNT(1), C.count(1), C.KEYED_ONLY([{ select: C.CLOSE_SEL, count: 1 }])];
   const decide = ({ arrivals, seconds, entries }) => {
@@ -387,8 +388,8 @@ test('13. PR363-REVIEW major 1: on a feed host that declares signing, same-key s
   // object inside the interval. The receiver no longer held the key for the second, so it may have applied it again: in doubt, no pass.
   const past = decide({ arrivals: [1000, 11000], seconds: [C.SEC0 + 1, C.SEC0 + 11], entries: [C.entry({ at: C.OFFSET + 1050 }), C.entry({ at: C.OFFSET + 11050 })] });
   assert.deepEqual(past, { before: ['missing', 'missing', 'missing'], after: ['missing', 'missing', 'missing'], fates: ['in-doubt', 'in-doubt'], reasons: [['key-identity-differs'], ['key-identity-differs']] });
-  // Main's own collapse reads the pair the same way: with both proven applied it counts two applications (count(1) fails, the keyed clauses
-  // read missing), so a pass here would be one main never gives.
+  // The frozen evaluator's own collapse reads the pair the same way: with both proven applied it counts two applications (count(1) fails,
+  // the keyed clauses read missing), so a pass here would be one it never gives.
   const proven = [1000, 11000].map((arrived, i) => C.signedSend({ seq: 10 + i, firstSeq: 10, outcome: 'applied', arrived, ended: arrived + 100, signingAt: C.SEC0 + 1 + 10 * i, feedHost: false }));
   const mw = C.windowOf(proven, { feed: null, signing: true }); main.inDoubt.admitInDoubt(mw);
   assert.deepEqual(main.effects.decideEffects(clauses, [mw], { role: 'boundary' }).map(d => d.verdict), ['missing', 'fail', 'missing']);

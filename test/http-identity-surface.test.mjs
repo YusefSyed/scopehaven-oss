@@ -1,6 +1,6 @@
 // actor-identity/4 (src/contracts.mjs): the identity proof must hold on the protected surface it vouches
-// for (HTTP-IDENTITY-ROUTE-MISMATCH), and a credentialed 401 is an authentication failure unless the actor
-// declares that the app answers denials with 401 (HTTP-401-REFUSAL-AMBIGUITY). Injected transport only:
+// for, and a credentialed 401 is an authentication failure unless the actor
+// declares that the app answers denials with 401. Injected transport only:
 // no socket, no model, no provider.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -100,10 +100,10 @@ test('a credentialed 401 is an authentication failure, not a refusal, unless the
   assert.throws(() => validateTargetFile({ schemaVersion: 1, targets: [bad] }), /"refusesWith401" is true on an actor with a "credentialEnv"/);
 });
 
-// Core batch v2, the 403 identity-route rule (lead decision, A3): a refusal counts only after the same actor's earlier
+// The 403 identity-route rule: a refusal counts only after the same actor's earlier
 // complete 2xx on a protected route. Without a surface control the login was proven only on the identity route, so a
 // 403 (or a 404, or any answer outside 2xx) on a boundary row reads inconclusive, whether the app refused the request
-// or rejected the credential. This replaces v1's pinned limit, where the expired credential's 403 passed.
+// or rejected the credential. This replaces the earlier pinned limit, where the expired credential's 403 passed.
 test('403 rule: without a surface control, a refusal on a boundary row reads inconclusive (surface-unproven); with one it counts', async () => {
   for (const [why, state, expect] of [['a credential the protected routes reject (403)', { surface: 'expired-from-start', expiredStatus: 403 }, [403]],
     ['an app that refuses the request (403)', { surface: 'ok', denial: 403 }, [403]], ['an app that hides the record (404)', { surface: 'ok', denial: 404 }, [404]]]) {
@@ -140,8 +140,8 @@ test('403 rule is versioned: an actor-identity/3 run keeps its earlier rule, whe
   assert.throws(() => validateHttpRunEvidence(forged), /invalid-run-evidence/);
 });
 
-// Core batch v2, R1 (review of v1): every surface probe in a bracket must pass in full, its status and every
-// predicate. v1 counted a surface bracket as held unless it was refused, so a 500, a 404, a failing 200 or an
+// Every surface probe in a bracket must pass in full, its status and every
+// predicate. The earlier rule counted a surface bracket as held unless it was refused, so a 500, a 404, a failing 200 or an
 // inconclusive 200 left the actor established and its boundary 403 passing.
 function bracketApp(closing) {
   const calls = { own: 0 };
@@ -156,7 +156,7 @@ function bracketApp(closing) {
   };
 }
 const surfaceProfile = () => { const p = profile(); p.checks.find(c => c.id === 'OWN').assertions.push({ kind: 'json.exists', pointer: '/items', expected: true }); return p; };
-test('R1: a surface bracket that does not pass in full (500, 404, failing 200, inconclusive 200) leaves the actor not established', async () => {
+test('a surface bracket that does not pass in full (500, 404, failing 200, inconclusive 200) leaves the actor not established', async () => {
   for (const [why, closing, outcome] of [['500', () => ({ status: 500, complete: true, jsonParsed: true, json: {}, bytes: 2 }), 'fail'],
     ['404', () => ({ status: 404, complete: true, jsonParsed: true, json: {}, bytes: 2 }), 'fail'],
     ['failing 200', () => ({ status: 200, complete: true, jsonParsed: true, json: { error: 'session expired' }, bytes: 2 }), 'fail'],
@@ -182,7 +182,7 @@ test('R1: a surface bracket that does not pass in full (500, 404, failing 200, i
   assert.deepEqual([member(refused).reason, member(refused).loginProven], ['surface-refused', false]);
 });
 
-test('R1 (pure): identityReason withholds a required surface bracket that is 500, 404, a failing 200 or an inconclusive 200, after the credential probes', () => {
+test('identityReason (pure) withholds a required surface bracket that is 500, 404, a failing 200 or an inconclusive 200, after the credential probes', () => {
   const identity = { controlId: 'identity', httpStatus: 200, outcome: 'pass' }, refusal = { controlId: 'identity', httpStatus: 401, outcome: 'fail', requestAttempted: true };
   const base = { identityControls: ['identity'], identityControlsPassed: true, requiredPassed: true, anonymous: [refusal], invalid: [refusal], cross: [], refusalStatuses: [401, 403], surfaceControls: ['surface'] };
   for (const [httpStatus, outcome] of [[500, 'fail'], [404, 'fail'], [200, 'fail'], [200, 'inconclusive']]) {
@@ -198,7 +198,7 @@ test('R1 (pure): identityReason withholds a required surface bracket that is 500
   assert.equal(LOGIN_PROVEN_REASONS.includes('surface-not-passed'), true);
 });
 
-test('P1-3: the validator recomputes the surface control list: an extra, a missing or a reordered id is refused', async () => {
+test('the validator recomputes the surface control list: an extra, a missing or a reordered id is refused', async () => {
   const p = profile(), run = await assess(p, { surface: 'ok' });
   assert.doesNotThrow(() => validateHttpRunEvidence(run));
   const second = control('OWN-2', '/own'); p.checks.splice(2, 0, second); p.requiredControlIds.push('OWN-2');
@@ -210,7 +210,7 @@ test('P1-3: the validator recomputes the surface control list: an extra, a missi
   }
 });
 
-test('A04: an exported suite binds the identity rule version on its own (only identitySchema differs)', async () => {
+test('an exported suite binds the identity rule version on its own (only identitySchema differs)', async () => {
   const p = profile(), run = await assess(p, { surface: 'ok' }), suite = suiteOf(p);
   validateHttpRunEvidence(run, { expectedSuite: suite });
   assert.throws(() => validateHttpRunEvidence(run, { expectedSuite: { ...suite, identitySchema: 'actor-identity/3' } }), e => e.code === 'unexpected-suite-evidence');
@@ -240,8 +240,8 @@ test('the rules are versioned: actor-identity/3 evidence keeps the earlier rules
 });
 
 // ---------------------------------------------------------------------------
-// actor-identity/5: identity provenance per check (pool item pool-identity-provenance-per-check, core batch v3).
-// EH-1 measured that one unprovable login invalidated every check of its actor, because identity was proven per actor by
+// actor-identity/5: identity provenance per check.
+// One unprovable login used to invalidate every check of its actor, because identity was proven per actor by
 // a bracket re-sent after the actor's last check. Now the identity and surface controls are re-sent at a probe point after
 // every bracketed check, each check is bound to the two points covering it, and a boundary row whose own refusal was
 // observed while its identity or allowed use was not established for it is the distinct state "prohibition observed,
@@ -285,7 +285,7 @@ test('per-check identity: an identity failure invalidates only the checks its pr
   // /own calls: p0 (1), OWN (2), p1 after OWN (3), p2 after F1 (4), p3 after F2 (5), p4 after F3 (6). /me calls: WHOAMI (1),
   // then the identity probe of p0 (2), p1 (3), p2 (4), p3 (5) and p4 (6). The identity probe of the point after F2 answers 500:
   // it did not pass, and it is not a refusal. (A probe refused with the actor's own credential, identity or surface, withholds
-  // every row of the actor instead: Decisions 3 and 3a, tested below.)
+  // every row of the actor instead: the surface- and identity-refusal rules, tested below.)
   const run = await pointAssess({ me: { 5: 500 } }), m = member(run);
   assert.equal(run.identityEvidence.schema, 'actor-identity/6');
   assert.deepEqual(m.between.map(b => [b.afterCheckId, b.probes.map(p => [p.controlId, p.httpStatus, p.kind])]), [['OWN', [['WHOAMI', 200, 'between'], ['OWN', 200, 'between']]], ['F1', [['WHOAMI', 200, 'between'], ['OWN', 200, 'between']]], ['F2', [['WHOAMI', 500, 'between'], ['OWN', 200, 'between']]]]);
@@ -308,7 +308,7 @@ test('per-check identity: an identity failure invalidates only the checks its pr
   assert.deepEqual(opening.results.map(r => [r.id, r.status]), [['WHOAMI', 'pass'], ['OWN', 'inconclusive'], ['F1', 'pass'], ['F2', 'pass'], ['F3', 'pass']]);
   assert.deepEqual([row(opening, 'OWN').decision, identityOf(row(opening, 'OWN')), member(opening).reason], ['inconclusive', IDENTITY_REASONS['bracket-not-passed'], 'bracket-not-passed']);
   validateHttpRunEvidence(opening);
-  // Decision 3 (core batch v3 decisions): the opening point's surface probe refused instead. The refusal withholds every row of the
+  // The surface-refusal rule: the opening point's surface probe refused instead. The refusal withholds every row of the
   // actor, the identity control and the checks whose own points accepted included (this case read point-level before).
   const refused = await pointAssess({ failAt: 1 });
   assert.deepEqual(refused.results.map(r => [r.id, r.status, r.decision, identityOf(r)]), [['WHOAMI', 'inconclusive', 'inconclusive', IDENTITY_REASONS['surface-refused']], ['OWN', 'inconclusive', 'inconclusive', IDENTITY_REASONS['surface-refused']],
@@ -387,7 +387,7 @@ test('the validator binds the third state: it cannot be edited into a pass, hidd
   const clean = await pointAssess({}); validateHttpRunEvidence(clean);
   assert.throws(() => validateHttpRunEvidence((() => { const c = structuredClone(clean); member(c).between.pop(); return c; })()), e => e.code === 'invalid-run-evidence');
   // Pure: the point and the covering points. The probes carry requestAttempted, transportOutcome and predicates as a stored
-  // probe does, since identityRefusedAnywhere reads them through identityRefused (Decision 3b); the identity predicate passes.
+  // probe does, since identityRefusedAnywhere reads them through identityRefused (the other-principal rule); the identity predicate passes.
   const pass = { controlId: 'WHOAMI', requestAttempted: true, transportOutcome: 'complete', httpStatus: 200, outcome: 'pass', predicates: [{ kind: 'json.equals', outcome: 'pass', identity: true }] };
   const surfacePass = { controlId: 'OWN', requestAttempted: true, transportOutcome: 'complete', httpStatus: 200, outcome: 'pass', predicates: [] };
   assert.equal(pointReason([pass, surfacePass], ['OWN'], [401, 403]), null);
@@ -398,9 +398,9 @@ test('the validator binds the third state: it cannot be edited into a pass, hidd
   const entry = { before: ['b'], between: [{ afterCheckId: 'OWN', probes: ['p1'] }, { afterCheckId: 'F1', probes: ['p2'] }], after: ['a'] };
   assert.deepEqual([coveringPoints(entry, ['OWN', 'F1', 'F2'], 'OWN'), coveringPoints(entry, ['OWN', 'F1', 'F2'], 'F1'), coveringPoints(entry, ['OWN', 'F1', 'F2'], 'F2'), coveringPoints(entry, ['OWN', 'F1', 'F2'], 'WHOAMI')], [[['b'], ['p1']], [['p1'], ['p2']], [['p2'], ['a']], null]);
   assert.deepEqual([rowDecision({ severity: 'high', status: 'pass' }, 'surface-refused'), rowDecision({ severity: 'control', status: 'pass' }, 'surface-refused'), rowDecision({ severity: 'high', status: 'pass' }, null), rowDecision({ severity: 'high', status: 'fail' }, 'surface-refused')], [IDENTITY_UNPROVEN_DECISION, 'pass', 'pass', 'fail']);
-  // A-1 (pure): a check's two covering points are ranked together with the actor-level precedence, so a surface 500 at the earlier
+  // Pure: a check's two covering points are ranked together with the actor-level precedence, so a surface 500 at the earlier
   // point (surface-not-passed, login proven) never hides an identity probe that did not pass or did not finish at the later one.
-  // The identity probe answers 500 here, not a refusal: a refused one is route-level (Decision 3a, below) whatever the ranking.
+  // The identity probe answers 500 here, not a refusal: a refused one is route-level (the identity-refusal rule, below) whatever the ranking.
   const s500 = { ...surfacePass, httpStatus: 500, outcome: 'fail' }, id401 = { ...pass, httpStatus: 401, outcome: 'fail' }, id500 = { ...pass, httpStatus: 500, outcome: 'fail' }, idError = { ...pass, httpStatus: null, outcome: 'error' };
   const entryOf = (before, between, after) => ({ before, between, after, surfaceControlIds: ['OWN'], refusalStatuses: [401, 403], refusesWith401: false, established: false });
   for (const [later, reason] of [[id500, 'bracket-not-passed'], [idError, 'identity-probe-incomplete'], [pass, 'surface-not-passed']]) {
@@ -411,11 +411,11 @@ test('the validator binds the third state: it cannot be edited into a pass, hidd
     // Either order: the reason does not depend on which point comes first.
     assert.equal(rowIdentityReason({ credentialed: true, required: false, control: false, entry: e, httpStatus: 403, controlFailed: false, rules: 5, route: 'established', points: [points[1], points[0]] }), reason, `${reason} reversed`);
   }
-  // Decision 3 (pure): a refused surface probe at any point, read from the probes (not the actor-level reason).
+  // The surface-refusal rule (pure): a refused surface probe at any point, read from the probes (not the actor-level reason).
   const s403 = { ...surfacePass, httpStatus: 403, outcome: 'fail' };
   assert.deepEqual([surfaceRefusedAnywhere(entryOf([pass, surfacePass], [{ afterCheckId: 'OWN', probes: [pass, s403] }], [pass, surfacePass])), surfaceRefusedAnywhere(entryOf([pass, s403], [], [pass, surfacePass])),
     surfaceRefusedAnywhere(entryOf([pass, surfacePass], [], [id401, s403])), surfaceRefusedAnywhere(entryOf([pass, surfacePass], [{ afterCheckId: 'OWN', probes: [id401, s500] }], [pass, surfacePass]))], [true, true, true, false]);
-  // Decision 3a (pure): an identity probe that answered a refusal status at any point (before, between or after), read from the
+  // The identity-refusal rule (pure): an identity probe that answered a refusal status at any point (before, between or after), read from the
   // probes; an identity 500, an unfinished identity probe or a refused surface probe is not one, nor is an undeclared redirect.
   const id403 = { ...pass, httpStatus: 403, outcome: 'fail' }, id302 = { ...pass, httpStatus: 302, outcome: 'fail' };
   assert.deepEqual([identityRefusedAnywhere(entryOf([id401, surfacePass], [], [pass, surfacePass])), identityRefusedAnywhere(entryOf([pass, surfacePass], [{ afterCheckId: 'OWN', probes: [id401, surfacePass] }], [pass, surfacePass])),
@@ -428,7 +428,7 @@ test('the validator binds the third state: it cannot be edited into a pass, hidd
   assert.deepEqual(coveringPoints(bothRefused, bracketed, 'F2'), [[pass, surfacePass], [pass, surfacePass]], 'F2\'s own two points accepted in full');
   assert.deepEqual([judgeBoth(false, false, coveringPoints(bothRefused, bracketed, 'F2')), judgeBoth(true, true, null), judgeBoth(true, true, coveringPoints(bothRefused, bracketed, 'OWN'))], ['bracket-not-passed', 'bracket-not-passed', 'bracket-not-passed']);
   assert.equal(identityReason({ identityControls: ['WHOAMI'], identityControlsPassed: true, requiredPassed: true, before: bothRefused.before, between: bothRefused.between.flatMap(p => p.probes), after: bothRefused.after, anonymous: [], invalid: [], cross: [], refusalStatuses: [401, 403], surfaceControls: ['OWN'] }), 'bracket-not-passed', 'the actor-level order the row reason follows');
-  // Decision 3b (pure): an identity probe is refused as identityRefused judges it, so a complete 2xx whose identity predicate
+  // The other-principal rule (pure): an identity probe is refused as identityRefused judges it, so a complete 2xx whose identity predicate
   // fails (it names another principal, or null) is refused at any point too; a 2xx that did not finish, one whose identity
   // predicate is inconclusive, or a 2xx naming the actor is not. A surface probe still needs a refusal status.
   const failing = { ...pass, outcome: 'fail', predicates: [{ kind: 'json.equals', outcome: 'fail', identity: true }] };
@@ -452,7 +452,7 @@ const dropRouteSegments = run => {
 };
 const recountRun = run => { run.counts = { pass: 0, fail: 0, inconclusive: 0, error: 0, not_applicable: 0 }; for (const r of run.results) run.counts[r.status]++; };
 
-test('F1 (core batch v2 review): the identity rule set is part of the comparison signature, so a run relabelled from one schema to another never compares', async () => {
+test('the identity rule set is part of the comparison signature, so a run relabelled from one schema to another never compares', async () => {
   const p = profile(), current = await assess(p, { surface: 'ok' }), leaky = await assess(p, { surface: 'ok', denial: 200 });
   assert.deepEqual([row(leaky, 'FOREIGN').status, row(current, 'FOREIGN').status], ['fail', 'pass']);
   assert.equal(compareRuns(leaky, current).compatible, true);
@@ -461,7 +461,7 @@ test('F1 (core batch v2 review): the identity rule set is part of the comparison
   const laundered = compareRuns(leaky, relabelled);
   assert.equal(laundered.compatible, false); assert.ok(laundered.reasons.includes('Actors, login modes or identity controls differ between the runs.'));
   assert.deepEqual([laundered.summary.fixed, laundered.rows.find(r => r.id === 'FOREIGN').transition, laundered.restorationLabel], [0, 'incompatible', 'Unverified changes']);
-  // The reviewer's A6 laundering, under these rules: a consistent relabel to the earlier schema (its fields dropped and the
+  // Laundering by relabel, under these rules: a consistent relabel to the earlier schema (its fields dropped and the
   // 403 row resealed as a pass) validates alone, but can never be labelled restored against a baseline under the current rules.
   const bare = await assess(profile({ surface: false }), { denial: 403 });
   assert.equal(row(bare, 'FOREIGN').status, 'inconclusive');
@@ -477,13 +477,13 @@ test('F1 (core batch v2 review): the identity rule set is part of the comparison
 });
 
 // ---------------------------------------------------------------------------
-// Core batch v3 review fixes (cb3-review-probes-2026-10-09, DECISIONS-2026-10-09). Injected transport only.
-// A-1: the two points covering a check are ranked together with the actor-level precedence, not by position, so a login-level
+// Point ranking and route-level refusals. Injected transport only.
+// The two points covering a check are ranked together with the actor-level precedence, not by position, so a login-level
 // failure at the later point (an identity probe that did not pass, or did not finish) is never hidden behind a surface probe
 // that failed for another reason (a 500, surface-not-passed, login proven) at the earlier point.
-test('A-1 (a): a required control covered by a surface 500 and then a login-level failure is withheld, never a pass', async () => {
+test('a required control covered by a surface 500 and then a login-level failure is withheld, never a pass', async () => {
   // OWN is covered by p0 (its surface probe, /own call 1, answers 500) and p1 (its identity probe, /me call 3, answers 500 or does
-  // not finish). Neither is a refusal: a refused identity probe withholds every row (Decision 3a), which would hide the ranking.
+  // not finish). Neither is a refusal: a refused identity probe withholds every row (the identity-refusal rule), which would hide the ranking.
   for (const [why, me, reason] of [['identity probe failed (500)', 500, 'bracket-not-passed'], ['identity probe unfinished', 'error', 'identity-probe-incomplete']]) {
     const run = await pointAssess({ own: { 1: 500 }, me: { 3: me } });
     assert.deepEqual([member(run).reason, member(run).loginProven], [reason, false], why);
@@ -503,7 +503,7 @@ test('A-1 (a): a required control covered by a surface 500 and then a login-leve
   assert.deepEqual([member(proven).reason, row(proven, 'OWN').status, identityOf(row(proven, 'OWN'))], ['surface-not-passed', 'pass', undefined]);
 });
 
-test('A-1 (b): a failing baseline row covered by a surface 500 and then a login-level failure is unverified, so compare credits no restored contract', async () => {
+test('a failing baseline row covered by a surface 500 and then a login-level failure is unverified, so compare credits no restored contract', async () => {
   // [WHOAMI, OWN, F1]: F1 is covered by p1 (its surface probe, /own call 3, answers 500) and the closing point (its identity probe,
   // /me call 4, answers 500: not a refusal, so the failure stays point-level and only the ranking decides F1).
   const short = () => ({ ...pointProfile(), checks: pointProfile().checks.slice(0, 3) });
@@ -520,7 +520,7 @@ test('A-1 (b): a failing baseline row covered by a surface 500 and then a login-
   assert.deepEqual([identityOf(row(notEstablished, 'F1')), compareRuns(notEstablished, clean).rows.find(r => r.id === 'F1').transition], [IDENTITY_REASONS['surface-not-passed'], 'contract-restored']);
 });
 
-test('A-1 (c): the creator of a captured value is judged on both points covering the capturing check, so a dependent row never passes on a hidden login failure', async () => {
+test('the creator of a captured value is judged on both points covering the capturing check, so a dependent row never passes on a hidden login failure', async () => {
   const envAB = { SCOPEHAVEN_TARGET_ALICE: 'tok-alice', SCOPEHAVEN_TARGET_BOB: 'tok-bob' };
   const as = (c, actorId) => ({ ...c, actorId });
   const creator = () => ({ id: 'creator-points', name: 'Creator points', applicationId: 'creator-points', origin: 'http://127.0.0.1:9', buildLabel: 'b', contextId: 'synthetic',
@@ -554,10 +554,10 @@ test('A-1 (c): the creator of a captured value is judged on both points covering
   assert.deepEqual([proven.identityEvidence.actors.find(a => a.actorId === 'alice').reason, row(proven, 'ALICE-CREATE').status, row(proven, 'BOB-USE').status], ['surface-not-passed', 'pass', 'pass']);
 });
 
-// A-1, the mirrored orientation (round-1 verification): the login-level failure at the EARLIER covering point and the surface 500
+// The mirrored orientation: the login-level failure at the EARLIER covering point and the surface 500
 // at the later one. A merge that read the later point first (pointReason(points[1]) ?? pointReason(points[0])) would return the
 // later point's surface-not-passed (login proven) and give the required control back its pass.
-test('A-1 (mirrored): a required control covered by a login-level failure and then a surface 500 is withheld, never a pass', async () => {
+test('the mirrored order: a required control covered by a login-level failure and then a surface 500 is withheld, never a pass', async () => {
   // OWN is covered by p0 (its identity probe, /me call 2, answers 500 or does not finish: not a refusal) and p1 (its surface probe,
   // /own call 3, answers 500).
   for (const [why, me, reason] of [['identity probe failed (500)', 500, 'bracket-not-passed'], ['identity probe unfinished', 'error', 'identity-probe-incomplete']]) {
@@ -577,10 +577,10 @@ test('A-1 (mirrored): a required control covered by a login-level failure and th
   }
 });
 
-// Decision 3 (DECISIONS-2026-10-09, route-level surface-refused): a credential that flaps (an intermittent session store, a rate
+// The surface-refusal rule (route-level surface-refused): a credential that flaps (an intermittent session store, a rate
 // limiter) can be refused for a check between two accepting points. A refused surface probe at any point withholds every row of
 // the actor, required and identity controls included, and the refusal is read from the probes, not from the actor-level reason.
-test('Decision 3: a surface probe refused at one point withholds every row of the actor, a check accepted on both sides of it included', async () => {
+test('surface refusal: a surface probe refused at one point withholds every row of the actor, a check accepted on both sides of it included', async () => {
   // The surface probe of p1 (after OWN, /own call 3) refused; p2 and p3, around F2, accepted.
   const run = await pointAssess({ own: { 3: 403 } });
   assert.deepEqual(member(run).between.map(b => b.probes.map(p => p.httpStatus)), [[200, 403], [200, 200], [200, 200]]);
@@ -599,7 +599,7 @@ test('Decision 3: a surface probe refused at one point withholds every row of th
   assert.equal(member(otherwise).reason, 'bracket-not-passed');
   assert.deepEqual(otherwise.results.map(r => [r.id, r.status, identityOf(r)]), run.results.map(r => [r.id, 'inconclusive', IDENTITY_REASONS['surface-refused']]));
   validateHttpRunEvidence(otherwise);
-  // An identity probe refused as well (Decision 3a): both refusals are route-level, and every row reads bracket-not-passed, the
+  // An identity probe refused as well (the identity-refusal rule): both refusals are route-level, and every row reads bracket-not-passed, the
   // reason identityReason ranks first.
   const both = await pointAssess({ own: { 3: 403 }, me: { 5: 401 } });
   assert.equal(member(both).reason, 'bracket-not-passed');
@@ -610,11 +610,11 @@ test('Decision 3: a surface probe refused at one point withholds every row of th
   assert.deepEqual(broken.results.map(r => r.status), ['pass', 'pass', 'inconclusive', 'pass', 'pass']);
 });
 
-// Decision 3a (DECISIONS-2026-10-09, round 2): an identity probe that answered a refusal status with the actor's own credential, at any
+// The identity-refusal rule: an identity probe that answered a refusal status with the actor's own credential, at any
 // probe point, is the same direct evidence of a refusal as a refused surface probe. It withholds every row of the actor, route-level,
 // with the reason bracket-not-passed. An identity probe that did not pass for another reason (a 500, an unfinished probe) stays
 // point-level. The rule is in rowIdentityReason, which the connector and the validator share.
-test('Decision 3a: an identity probe refused at one point withholds every row of the actor, a check accepted on both sides of it included; a 500 stays point-level', async () => {
+test('identity refusal: an identity probe refused at one point withholds every row of the actor, a check accepted on both sides of it included; a 500 stays point-level', async () => {
   const leaky = await pointAssess({ denials: { '/foreign/2': 200 } });
   // The identity route flaps: the identity probe of p1 (after OWN, /me call 3) is refused, while every surface probe accepts and
   // p2 and p3, the two points around F2, pass in full.
@@ -657,11 +657,11 @@ test('Decision 3a: an identity probe refused at one point withholds every row of
   validateHttpRunEvidence(unfinished);
 });
 
-// Decision 3b (DECISIONS-2026-10-09, round 3): an identity probe at a probe point is refused as identityRefused judges it, so a
+// The other-principal rule: an identity probe at a probe point is refused as identityRefused judges it, so a
 // complete 2xx JSON response that names another principal, or null (the Auth.js signed-out shape), is the same direct evidence
 // of a refusal as a 401 and withholds every row of the actor route-wide as bracket-not-passed, compare credit and the creator of
 // a captured value included. The connector and the validator share rowIdentityReason.
-test('Decision 3b: an identity probe answering a complete 2xx that names another principal or null at an inner point withholds every row of the actor', async () => {
+test('other principal: an identity probe answering a complete 2xx that names another principal or null at an inner point withholds every row of the actor', async () => {
   const leaky = await pointAssess({ denials: { '/foreign/2': 200 } });
   // The identity probe of p2 (after F1, /me call 4) answers 200 naming mallory, or 200 null; every surface probe accepts, and
   // p3 and p4, the two points around F3, pass in full, as p1 and p2's surface probes do.
@@ -696,9 +696,9 @@ test('Decision 3b: an identity probe answering a complete 2xx that names another
   assert.deepEqual(named.results.map(r => r.status), ['pass', 'pass', 'pass', 'pass', 'pass']);
 });
 
-// Decision 3b and the creator of a captured value: alice's identity probe at her opening point (which does not cover the capturing
+// The other-principal rule and the creator of a captured value: alice's identity probe at her opening point (which does not cover the capturing
 // check) answers 200 naming mallory, or 200 null; the capture is not attributed, so bob's dependent row is plainly inconclusive.
-test('Decision 3b (creator): a 2xx identity answer for another principal or none at a point that does not cover the capturing check still leaves the creator unproven', async () => {
+test('other principal (creator): a 2xx identity answer for another principal or none at a point that does not cover the capturing check still leaves the creator unproven', async () => {
   const envAB = { SCOPEHAVEN_TARGET_ALICE: 'tok-alice', SCOPEHAVEN_TARGET_BOB: 'tok-bob' };
   const as = (c, actorId) => ({ ...c, actorId });
   const creator = () => ({ id: 'creator-3b', name: 'Creator 3b', applicationId: 'creator-3b', origin: 'http://127.0.0.1:9', buildLabel: 'b', contextId: 'synthetic',
@@ -738,7 +738,7 @@ test('Decision 3b (creator): a 2xx identity answer for another principal or none
   }
 });
 
-test('A-3: a not-applicable row carries no decision, under every rule set, so none is exported as if it had been decided', async () => {
+test('a not-applicable row carries no decision, under every rule set, so none is exported as if it had been decided', async () => {
   const p = pointProfile(); p.checks.push({ ...boundary('F9', '/foreign/9'), applicability: { applies: false, reason: 'Not offered by this build.' } });
   const run = await runHttpAssessment(p, { env, transport: pointApp({}) }), na = row(run, 'F9');
   assert.deepEqual([na.status, Object.hasOwn(na, 'decision')], ['not_applicable', false]);
@@ -755,7 +755,7 @@ test('A-3: a not-applicable row carries no decision, under every rule set, so no
   assert.throws(() => validateHttpRunEvidence(older), e => e.code === 'invalid-run-evidence');
 });
 
-test('D-F3: the third state names identity or allowed use not established, which also covers a proven login whose allowed use failed', async () => {
+test('the third state names identity or allowed use not established, which also covers a proven login whose allowed use failed', async () => {
   assert.match(IDENTITY_UNPROVEN_SUMMARY, /identity or allowed use not established/);
   assert.doesNotMatch(IDENTITY_UNPROVEN_SUMMARY, /login was not proven/);
   // The OWN control itself (/own call 2) answers 500: the login is proven, a required allowed-use control failed, and each boundary

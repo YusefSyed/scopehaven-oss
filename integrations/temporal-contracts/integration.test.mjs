@@ -73,7 +73,7 @@ test('exclusive signed persistence and fresh-process canonical gate accept clean
   const altered=await fresh(args.map(v=>v===file?tampered:v));assert.equal(altered.code,2);assert.ok(altered.out.reasons.includes('refund-signature-invalid'));
   assert.equal(summarizeGate({candidate:envelope.run,expectedSuite:await currentRefundSuite('refund-clean')}).exitCode,2);
   assert.throws(()=>parseArgs(['--target','refund-clean','--saved-refund',file,'--expected-run',runId]));
-  assert.throws(()=>parseArgs([...args,'--require-model-identity']),/invalid-options/,'G1-v4 still requires a baseline');
+  assert.throws(()=>parseArgs([...args,'--require-model-identity']),/invalid-options/,'the strict model identity policy still requires a baseline');
   assert.throws(()=>parseArgs([...args,'--require-model-identity','--baseline',runId]),/invalid-options/,'saved refund verification cannot manufacture a baseline');
   const baseline=await runGate({targetId:'refund-clean',outputDirectory:join(root,'baseline-output'),baselineRunId:runId});
   assert.ok(baseline.reasons.includes('refund-fresh-baseline-required'));

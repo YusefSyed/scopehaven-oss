@@ -1,5 +1,5 @@
-// The stated scope of an absence pass decided by an egress recorder or an SMTP sink (FIX-01 option 1, FIX-05's
-// wording). Presentation only: it reads a saved run's sealed rows and never feeds a verdict, status, count, comparison,
+// The stated scope of an absence pass decided by an egress recorder or an SMTP sink.
+// Presentation only: it reads a saved run's sealed rows and never feeds a verdict, status, count, comparison,
 // gate outcome, note or any suite, policy, fixture, evaluator or profile hash. It is outside the HTTP evaluator hash,
 // so a wording edit never changes run identity, and the validator never reads it. The HTML report, SARIF, the
 // comparison export and the regression gate's JSON summary print it per row; the compact summary, which never reads traces,
@@ -11,7 +11,7 @@
 // And it is bounded in time: a matching send recorded from the check's start mark through the run's final mark
 // withholds or fails it; one made after the final mark is outside every window, so the pass says nothing about it.
 //
-// On a confined run (FIX-01 option 2: ./scopehaven assess --confine, src/confinement-record.mjs) a clause whose deciding windows
+// On a confined run (./scopehaven assess --confine, src/confinement-record.mjs) a clause whose deciding windows
 // all came from confined sinks reads tier "confined": the kernel refused the launched process tree every outbound connection
 // except to the declared sinks' ports and the recorded allowlist, within the limits the record states. Every other clause reads
 // tier "declared", as above.
@@ -47,7 +47,7 @@ function timeBound(run, deciding) {
 // One passing row's absence clauses that an egress recorder or SMTP sink decided, in row order:
 // [{ assertion, kind, observers: [instance id], via: [label], tier: 'confined' | 'declared', routing, timeBound, note }]. An effect.only pass is listed when
 // a complete authoritative egress or SMTP window was among the windows it judged. A row that did not pass lists nothing: its
-// clause may have passed while the row was withheld for another reason (PR382-REVIEW nit 5). Anything malformed lists nothing.
+// clause may have passed while the row was withheld for another reason. Anything malformed lists nothing.
 export function absenceScopeEntries(row, run = null) {
   if (row?.status !== 'pass') return [];
   const data = Array.isArray(row?.trace) && plain(row.trace[1]?.data) ? row.trace[1].data : null;

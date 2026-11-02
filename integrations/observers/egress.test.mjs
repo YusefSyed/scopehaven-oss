@@ -254,14 +254,14 @@ function raw(o, chunks, { waitMs = 300, keep = false } = {}) {
 }
 const post = (url, host) => `POST ${url} HTTP/1.1\r\nHost: ${host}\r\nContent-Length: 2\r\n\r\n{}`;
 
-test('W3 review M4: a send addressed under another name (Host mismatch) or by an undeclared IP literal leaves the window partial', async t => {
+test('a send addressed under another name (Host mismatch) or by an undeclared IP literal leaves the window partial', async t => {
   const o = await recorder(t);
-  // E8: the URL names an IP literal, the Host header the declared destination.
+  // The URL names an IP literal, the Host header the declared destination.
   const literal = await window(o, () => raw(o, [post('http://198.51.100.9/v1/charges', PAY)]));
   assert.equal(literal.coverage, 'partial');
   assert.match(literal.reason, /egress-address-literal/); assert.match(literal.reason, /egress-host-mismatch/);
   assert.notEqual(evaluateEffectAssertion(none({ name: PAY }), [literal]).verdict, 'pass');
-  // E9: an IPv6 literal in both.
+  // An IPv6 literal in both.
   const v6 = await window(o, () => raw(o, [post('http://[2001:db8::1]:8443/v1/charges', '[2001:db8::1]:8443')]));
   assert.match(v6.reason, /egress-address-literal/); assert.doesNotMatch(v6.reason, /egress-host-mismatch/);
   assert.notEqual(evaluateEffectAssertion(none({ name: PAY }), [v6]).verdict, 'pass');
@@ -273,12 +273,12 @@ test('W3 review M4: a send addressed under another name (Host mismatch) or by an
   assert.deepEqual([same.coverage, same.events.map(e => e.name)], ['complete', [PAY]]);
 });
 
-test('W3 review L5: a reused connection\'s next request is recorded; headers still arriving when collect runs leave the window partial', async t => {
+test('a reused connection\'s next request is recorded; headers still arriving when collect runs leave the window partial', async t => {
   const o = await recorder(t);
-  // E2: a second request on the same connection after the reply.
+  // A second request on the same connection after the reply.
   const reused = await window(o, () => raw(o, [post(`http://${PAY}/v1/charges`, PAY), post(`http://${PAY}/v1/refunds`, PAY)]));
   assert.deepEqual([reused.coverage, reused.events.map(e => e.resource)], ['complete', ['POST /v1/charges', 'POST /v1/refunds']]);
-  // E10: a request whose headers have not ended.
+  // A request whose headers have not ended.
   let held;
   const incomplete = await window(o, async () => { held = (await raw(o, [`POST http://${PAY}/v1/charges HTTP/1.1\r\nHost: ${PAY}\r\n`], { waitMs: 50, keep: true })).socket; });
   assert.deepEqual([incomplete.coverage, incomplete.reason], ['partial', 'egress-request-in-flight']);
@@ -286,7 +286,7 @@ test('W3 review L5: a reused connection\'s next request is recorded; headers sti
   held.destroy();
 });
 
-test('Gap 5 final mode: the run-end window (gap, final) keeps the arriving-request check; an ordinary gap window does not, as before', async t => {
+test('final mode: the run-end window (gap, final) keeps the arriving-request check; an ordinary gap window does not, as before', async t => {
   const o = await recorder(t);
   const asGap = options => ({ source: o.source, instanceId: o.instanceId, scope: o.scope, collect: (from, to) => o.collect(from, to, options) });
   const from = await o.mark();
@@ -314,10 +314,10 @@ test('Gap 5 final mode: the run-end window (gap, final) keeps the arriving-reque
   assert.deepEqual([clean.coverage, clean.reason], ['complete', null]);
 });
 
-test('W3 round-2 S-L1: a request still arriving behind a completed one in the same write leaves the window partial, open or cut off; an idle connection does not', async t => {
+test('a request still arriving behind a completed one in the same write leaves the window partial, open or cut off; an idle connection does not', async t => {
   const o = await recorder(t);
   const charging = `POST http://${PAY}/v1/charges HTTP/1.1\r\nHost: ${PAY}\r\n`; // headers not ended
-  // E10b: a complete hook call and the first bytes of a charge, in one write, the connection held open.
+  // A complete hook call and the first bytes of a charge, in one write, the connection held open.
   let held;
   const open = await window(o, async () => { held = (await raw(o, [post(`http://${HOOK}/x`, HOOK) + charging], { waitMs: 80, keep: true })).socket; });
   assert.deepEqual([open.coverage, open.reason, open.events.map(e => e.name)], ['partial', 'egress-request-in-flight', [HOOK]]);
@@ -334,7 +334,7 @@ test('W3 round-2 S-L1: a request still arriving behind a completed one in the sa
   idle.destroy();
 });
 
-test('S-L1 runtime pin: this Node keeps the HTTP server\'s connections list the recorder reads, and it reports a request still arriving', async t => {
+test('runtime pin: this Node keeps the HTTP server\'s connections list the recorder reads, and it reports a request still arriving', async t => {
   // The recorder reads Node's internal per-server connections list (kept for request timeouts). A runtime that drops
   // or changes it would make every egress window partial; this test names that change instead.
   const server = createServer((req, res) => { req.resume(); req.on('end', () => res.end()); });
@@ -352,7 +352,7 @@ test('S-L1 runtime pin: this Node keeps the HTTP server\'s connections list the 
   assert.equal(await settled(0), 0, 'a completed request is not');
 });
 
-test('W3 round-2 S-L1: without the server parser\'s state (another runtime) every window is partial', async t => {
+test('without the server parser\'s state (another runtime) every window is partial', async t => {
   const real = Object.getOwnPropertySymbols;
   Object.getOwnPropertySymbols = target => real(target).filter(k => k.description !== 'http.server.connections');
   let o;
@@ -362,7 +362,7 @@ test('W3 round-2 S-L1: without the server parser\'s state (another runtime) ever
   assert.equal(evaluateEffectAssertion(none({ name: PAY }), [quiet]).verdict, 'missing');
 });
 
-test('W3 review L8 and survivors: a witness nonce on a destination request is still a send; the query is in the digest; digests are salted per recorder', async t => {
+test('a witness nonce on a destination request is still a send; the query is in the digest; digests are salted per recorder', async t => {
   const o = await recorder(t);
   const from = await o.mark();
   await send(o, { method: 'GET', target: `http://${PAY}/v1/charges?scopehaven_witness=${encodeURIComponent(from.witnessNonce)}` });
@@ -462,7 +462,7 @@ async function app(t, sinkPort, { sends }) {
   return `http://127.0.0.1:${server.address().port}`;
 }
 // CHECKOUT is the actor's required allowed-use control with a positive effect (its order through the sink), before NO-CHARGE, so
-// NO-CHARGE's unpinned absence is guarded (FIX-07): an app that did nothing would fail CHECKOUT.
+// NO-CHARGE's unpinned absence is guarded: an app that did nothing would fail CHECKOUT.
 const profile = (origin, sinkPort) => ({ id: 'agent-app', name: 'Agent app', applicationId: 'agent-app', origin, buildLabel: 'b1', contextId: 'synthetic-agent',
   actors: { ops: { principalId: 'ops', credentialEnv: 'SCOPEHAVEN_TARGET_OPS', identityValue: 'ops' } }, requiredControlIds: ['WHOAMI', 'CHECKOUT'],
   observers: [{ id: 'sink', type: 'egress-recorder', port: sinkPort, routing: 'proxy', destinations: [{ host: PAY, paths: ['/v1/charges', '/v1/orders'] }], witness: { actorId: 'ops', method: 'GET', path: '/ping', host: WITNESS }, settleMs: 250, quietMs: 150 }],
@@ -490,7 +490,7 @@ const firstStartLoses = () => { let first = true; return (configs, options) => b
 // The checks run as bob; ops is only the sink's witness actor, with no check of its own.
 const asBob = p => ({ ...p, actors: { ...p.actors, bob: { principalId: 'bob', credentialEnv: 'SCOPEHAVEN_TARGET_BOB', identityValue: 'bob' } },
   checks: p.checks.map(c => ({ ...c, actorId: 'bob', assertions: c.assertions.map(a => a.pointer === '/user' ? { ...a, expected: 'bob' } : a) })) });
-test('round-2 lows: a sink witness actor with no check of its own is a used actor: its credential is required, and the witness carries it', async t => {
+test('a sink witness actor with no check of its own is a used actor: its credential is required, and the witness carries it', async t => {
   const bothEnv = { ...env, SCOPEHAVEN_TARGET_BOB: 'synthetic-bob-token' };
   const { p, run } = await profileRun(t, false, { shape: asBob, runEnv: bothEnv });
   const r = run.results.find(x => x.id === 'NO-CHARGE'), w = r.trace[1].data.windows[0];
@@ -499,7 +499,7 @@ test('round-2 lows: a sink witness actor with no check of its own is a used acto
   assert.equal(credentialReadiness(p, bothEnv).ready, true);
 });
 
-test('round-2 lows: a profile run is retried only when a sink lost its port; a window that fails for another reason stands', async t => {
+test('a profile run is retried only when a sink lost its port; a window that fails for another reason stands', async t => {
   const once = [];
   const { run } = await profileRun(t, false, { build: collectFails, attempts: once });
   assert.deepEqual([run.results.find(x => x.id === 'NO-CHARGE').trace[1].data.windows[0].coverage, once.length], ['failed', 1]);
@@ -516,7 +516,7 @@ test('egress in a profile: a forbidden outbound call fails the check; a clean ap
     assert.equal(r.assertions.find(a => a.name === 'HTTP status matches contract').status, 'pass', 'the response alone looks fine either way');
     validateHttpRunEvidence(run, { expectedSuite: createRegistry({ profiles: [p], env }).exportSuite(p.id) });
     assert.ok(run.limitations.some(l => l.startsWith('Egress recorders (sink: proxy routing')));
-    // S-L3: the addressing limit, pinned.
+    // The addressing limit, pinned.
     assert.ok(run.limitations.find(l => l.startsWith('Egress recorders (sink:')).includes('A proxy request whose Host header names another host than its URL, or that addresses an undeclared IP literal, leaves the window partial'));
     if (!sends) continue;
     // Relabelled as another request-path source (same lineage), resealed: only the observer-type binding refuses it.
@@ -534,9 +534,9 @@ test('egress profiles: refused before any request when the configuration is unso
   reject(o => { o.upstream = 'http://api.pay.example'; }, /an egress-recorder observer is/);
 });
 
-// 2026-10-16 security scan F6: a base-url request whose Host names anything but the sink is a browser's (DNS rebinding):
+// A base-url request whose Host names anything but the sink is a browser's (DNS rebinding):
 // refused, never recorded or forwarded as the app's send. Proxy-form requests name their destination in Host and are unaffected.
-test('SEC-F6: a base-url request naming another Host is refused like a browser and never becomes a send; the sink\'s own names pass', async t => {
+test('a base-url request naming another Host is refused like a browser and never becomes a send; the sink\'s own names pass', async t => {
   const o = await recorder(t, { routing: 'base-url', routes: [{ prefix: '/pay/', host: PAY }, { prefix: '/w/', host: WITNESS }] });
   const via = async (target, headers) => {
     const from = await o.mark();
@@ -567,9 +567,9 @@ test('SEC-F6: a base-url request naming another Host is refused like a browser a
   assert.deepEqual((await collectWindow(o, from, await o.mark())).events.map(e => [e.name, e.resource]), [[PAY, 'GET *']]);
 });
 
-// #351 on main 8df236b1: a refused (rebound) request is a window-wide problem, never a scoped late entry (the units
+// A refused (rebound) request is a window-wide problem, never a scoped late entry (the units
 // late-record binding and suspend settlement read) and never a send; the same late request naming the sink is a scoped entry.
-test('SEC-F6: in a scoped check window a rebound late request is window-wide, never a late entry or a send; the sink\'s own is a scoped entry', async t => {
+test('in a scoped check window a rebound late request is window-wide, never a late entry or a send; the sink\'s own is a scoped entry', async t => {
   const o = await recorder(t, { routing: 'base-url', routes: [{ prefix: '/pay/', host: PAY }, { prefix: '/w/', host: WITNESS }] });
   const late = async host => {
     const from = await o.mark();

@@ -81,9 +81,8 @@ test('payments effects: one send commits one privacy-safe, immutable refund rece
   assert.throws(() => { bundle.attempts.events[0].resource = 'read'; }, TypeError);
 });
 
-// Ledger Low PAYMENTS-V2-L8-COUNT-SCOPE (mutant P04): a refund count matches its charge id exactly. Two seeded
-// charges whose ids are a prefix of one another are separate charges: a refund on ch_order_10 is never counted
-// for ch_order_1.
+// A refund count matches its charge id exactly. Two seeded charges whose ids are a prefix of one another are
+// separate charges: a refund on ch_order_10 is never counted for ch_order_1.
 test('payments effects: a refund count matches the charge id exactly, never by prefix', async t => {
   const SHORT = 'ch_order_1', LONG = 'ch_order_10';
   const o = await double(t, { provider: { host: PAY, seed: [SHORT, LONG].map(id => ({ id, paymentMethod: ORIGINAL, amount: 2000, currency: 'cad' })) } });
@@ -339,6 +338,6 @@ test('owned loopback refunds app: declared post-response settle and payment coll
 test('payments effects: all sockets and listeners in these tests use loopback', () => {
   assert.ok(connections.length > 0 && listeners.length > 0);
   assert.deepEqual([...new Set(connections)], ['127.0.0.1']);
-  // The payments double holds its port on both loopback addresses (FIX-02): 127.0.0.1 and [::1].
+  // The payments double holds its port on both loopback addresses: 127.0.0.1 and [::1].
   assert.deepEqual([...new Set(listeners)].sort(), ['127.0.0.1', '::1']);
 });

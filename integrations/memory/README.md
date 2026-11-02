@@ -7,7 +7,7 @@ the agent omits the safety step not because an entry told it to, but because its
 own memory says it already did the work.
 
 The design note this was built from is a working document outside the repository
-and is deliberately not linked: it predates three review rounds and is wrong in
+and is deliberately not linked: it is out of date and wrong in
 several places. This README is the current description.
 
 ## What the harness owns, and what it still reads from the desk
@@ -142,7 +142,7 @@ decided from ledger effect events.
 
 ## Builds
 
-Beyond `vulnerable`, `repaired` and the two F8 degenerates, `desk.mjs` carries
+Beyond `vulnerable`, `repaired` and the two degenerate builds, `desk.mjs` carries
 builds that are each defective in exactly one way, so the mutation sweep can show
 which clause is the only thing catching each: `late-validation` (claims honestly,
 commits before the step runs) and `inflated-precedent` (correct order, only the

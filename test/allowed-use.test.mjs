@@ -168,7 +168,7 @@ test('SARIF, HTML and comparison exports carry allowedUse; the single-run JSON e
   assert.match(await (await fetch(`${app.origin}/api/runs/${candidate.id}/report.html`, { headers })).text(), new RegExp(`Allowed use: ${N} of ${N} allowed actions still work`));
 });
 
-// A control answered with its declared status but a reply that is not a declared success (after #289 a control's claim rules
+// A control answered with its declared status but a reply that is not a declared success (a control's claim rules
 // declare success only, so an honest refusal reads ambiguous): inconclusive, reported as possibly over-blocked, never in the rate.
 test('an inconclusive control whose status matched but whose claim was not a declared success is reported as possibly over-blocked', async () => {
   const sel = { source: 'http-egress', operation: 'send', name: 'payments.example.test' };

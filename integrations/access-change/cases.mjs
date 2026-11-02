@@ -159,15 +159,15 @@ export function caseSequence(def, { twin = false } = {}) {
 }
 const definitionOf = def => ({ id: def.id, guards: def.guards, gateRules: def.gateRules, failAfterCommitOnce: [false, true].map(t => Boolean(def.failAfterCommitOnce?.(t))),
   failBeforeCommitOnce: [false, true].map(t => Boolean(def.failBeforeCommitOnce?.(t))),
-  // Only a case that uses the hook names it, so the cases written before it keep their hash (the r3 MATRIX's d2c637169da8).
+  // Only a case that uses the hook names it, so the cases written before it keep their hash (the guard coverage matrix's d2c637169da8).
   ...(def.failMidCommitOnce ? { failMidCommitOnce: [false, true].map(t => Boolean(def.failMidCommitOnce(t))) } : {}), refusals: [false, true].map(t => def.refusals?.(t) ?? []),
   expect: [false, true].map(t => def.expect(t)), forbidden: caseSequence(def), twin: caseSequence(def, { twin: true }) });
 export const casesHash = (cases = CASES) => digest(cases.map(definitionOf));
 
 // Compare the desk's final refunds per ticket with the declared expectation. TWO rows, because
-// the comparison answers two different questions and they are not the same KIND of claim (lead
-// review r7, addendum low 3): "no MORE refunds than declared" is a prohibition, a boundary
-// claim, and "the declared refunds all happened" is an allowed-use control. Round 8 answered
+// the comparison answers two different questions and they are not the same KIND of claim:
+// "no MORE refunds than declared" is a prohibition, a boundary
+// claim, and "the declared refunds all happened" is an allowed-use control. An earlier version answered
 // both in one row and took its severity from whichever way it turned out, so a missing allowed
 // refund on a forbidden run was reported as a CRITICAL fail, and a passing boundary row called
 // itself a control and kept a pass that rested on the desk's own tables.
@@ -203,7 +203,7 @@ function finalStateResults(def, twin, state, aborted) {
   return [boundary, control];
 }
 
-// R3 REVOKE-CLOSE-01 (Root-Scoped Quiescence, arXiv 2609.21284). A revocation is CLOSED only
+// Revocation closure (Root-Scoped Quiescence, arXiv 2609.21284). A revocation is CLOSED only
 // when no carrier still holds the authority it retired - which is a different claim from "no
 // late commit was seen", and the harness folded the two together: a parked job landed in
 // pendingJobs and read `inconclusive`, the same as a reading we could not take.
@@ -220,7 +220,7 @@ function finalStateResults(def, twin, state, aborted) {
 //
 // Whether a revoke was attempted comes from the sequence THIS harness sent, never from the
 // app's account of itself: a build that logs nothing must read inconclusive, not "nothing to
-// close". Both tables are the application's own, so a FAIL stands and a PASS is held (#199).
+// close". Both tables are the application's own, so a FAIL stands and a PASS is held.
 const declaresRevoke = (def, twin) => def.steps(twin).some(step => step?.request?.path === '/api/admin/suspend');
 
 export function revokeClosureResults(def, twin, state, aborted) {
@@ -263,7 +263,7 @@ function refusalResults(def, twin, run) {
   return (def.refusals?.(twin) ?? []).map(({ id, title, request, codes }) => {
     const response = run.timeline.find(e => e.step === 'response' && e.request === request);
     const status = !response ? 'inconclusive' : codes.includes(response.status) ? 'pass' : 'fail';
-    // A3 (lead decision): the status is the application's own answer, observed first-hand on
+    // The status is the application's own answer, observed first-hand on
     // the request path. It decides a RESPONSE CONTRACT, pass or fail, exactly as a core HTTP
     // status check does, and never that no effect happened - so the row keeps its verdict, is
     // tagged subject-writable rather than independent, and says in its own basis that what
@@ -324,7 +324,7 @@ export async function runAccessChangeCases({ recheckAtCommit = false, repairs = 
   return { schema: ACCESS_CHANGE_SCHEMA, build: { repairs: rows[0]?.desk.repairs ?? null, hooks }, casesHash: casesHash(cases), counts, rows,
     limitations: ['Owned synthetic access desk on loopback with synthetic users; no customer system, model or payment provider.',
       `Sequence assertions read the app's audit table. A final-state check of the desk's own refunds and jobs tables, after a ${SETTLE_MS} ms settle, catches unaudited or late commits and unsettled jobs. A commit later than the settle is not seen.`,
-     'Each case\u2019s final state is answered by TWO rows on every run, because the comparison answers two different KINDS of claim, and both rows are tagged custody subject-writable: the refunds and jobs tables they read are the application\u2019s own. The boundary row (-FINAL-STATE) asserts a prohibition, that the refunds table holds no refund the declared outcome did not allow. It is critical; MORE refunds than declared is a fail; and its PASS is HELD at inconclusive, because nothing outside the application witnesses it. The control row (-FINAL-STATE-WORK) asserts allowed use, that the declared refunds all happened and the jobs settled. It is a control; FEWER refunds than declared is a fail; a job still not terminal after the settle is inconclusive; and it KEEPS its pass, with custody stated as a limit rather than withheld. So a forbidden run reports a held boundary row beside a passing control row, and the two are not in conflict: one says nothing extra was committed, the other says nothing declared went missing. Round 8 answered both questions in one row and took that row\u2019s severity from how it turned out, so a missing allowed refund on a forbidden run was reported as a CRITICAL fail, and a passing boundary row called itself a control and kept a pass it had not earned. Fails are unchanged either way: custody withholds passes, it never excuses a fail.',
+     'Each case\u2019s final state is answered by TWO rows on every run, because the comparison answers two different KINDS of claim, and both rows are tagged custody subject-writable: the refunds and jobs tables they read are the application\u2019s own. The boundary row (-FINAL-STATE) asserts a prohibition, that the refunds table holds no refund the declared outcome did not allow. It is critical; MORE refunds than declared is a fail; and its PASS is HELD at inconclusive, because nothing outside the application witnesses it. The control row (-FINAL-STATE-WORK) asserts allowed use, that the declared refunds all happened and the jobs settled. It is a control; FEWER refunds than declared is a fail; a job still not terminal after the settle is inconclusive; and it KEEPS its pass, with custody stated as a limit rather than withheld. So a forbidden run reports a held boundary row beside a passing control row, and the two are not in conflict: one says nothing extra was committed, the other says nothing declared went missing. An earlier version answered both questions in one row and took that row\u2019s severity from how it turned out, so a missing allowed refund on a forbidden run was reported as a CRITICAL fail, and a passing boundary row called itself a control and kept a pass it had not earned. Fails are unchanged either way: custody withholds passes, it never excuses a fail.',
       'A run that did not reach its access change, approval or drain is aborted and never passes.',
       'On the repaired build these nine declared cases read inconclusive, because only the app\'s own records decide them (custody) and no shipped observer held outside the app sees these writes. They cover these nine cases only, not every interleaving or every contract for "revoked".'] };
 }

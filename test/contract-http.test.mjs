@@ -15,7 +15,7 @@ import { HTTP_VERSION_TABLE, HTTP_V1_PAIR, HTTP_V2_PAIR, HTTP_CONNECTOR_V2_PENDI
 import { contractView, compareContracts, gateContracts } from '../src/contract-views.mjs';
 
 // Frozen v1 runs (test/fixtures/contract-http-v1/runs.json), generated once from the v1
-// connector at origin/main 4444dc7 with in-process stub transports. No socket or network is
+// connector with in-process stub transports. No socket or network is
 // used, and a later connector version cannot change these inputs.
 const FIXTURE = JSON.parse(await readFile(new URL('./fixtures/contract-http-v1/runs.json', import.meta.url), 'utf8'));
 const frozen = name => structuredClone(FIXTURE.runs[name]);
@@ -26,7 +26,7 @@ const recount = run => { run.counts = { pass: 0, fail: 0, inconclusive: 0, error
 const reseal = row => { row.evidenceDigest = digest({ evidence: row.trace[0].data, assertions: row.assertions }); };
 const UNOBSERVABLE = ['approval', 'authorization', 'access', 'commitment', 'disclosure', 'completionTruth'];
 
-test('AC12: the frozen inputs are v1 runs that carry no credential or response text', () => {
+test('the frozen inputs are v1 runs that carry no credential or response text', () => {
   assert.equal(FIXTURE.pair, HTTP_V1_PAIR);
   const serialized = JSON.stringify(FIXTURE);
   for (const privateText of ['synthetic-token', 'RESPONSE_TEXT_NOT_STORED', 'Access denied.']) assert.equal(serialized.includes(privateText), false, privateText);
@@ -37,7 +37,7 @@ test('AC12: the frozen inputs are v1 runs that carry no credential or response t
   }
 });
 
-test('AC12: response-only runs project without inferring backend stages', () => {
+test('response-only runs project without inferring backend stages', () => {
   const run = frozen('one'), before = JSON.stringify(run), view = contractView(run);
   assert.equal(view.supported, true); assert.equal(validateView(view), true); assert.equal(view.adapter, 'http-response/1');
   const expected = {
@@ -62,7 +62,7 @@ test('AC12: response-only runs project without inferring backend stages', () => 
   assert.equal(JSON.stringify(run), before);
 });
 
-test('AC12: timeouts, oversized responses and an expired run budget are observer failures, never passes', () => {
+test('timeouts, oversized responses and an expired run budget are observer failures, never passes', () => {
   const failures = contractView(frozen('failures'));
   assert.deepEqual([checkOf(failures, 'WHOAMI').verdict, checkOf(failures, 'WHOAMI').basis, checkOf(failures, 'WHOAMI').contractStatus], ['observer-failure', 'transport-timeout', 'error']);
   assert.deepEqual([checkOf(failures, 'OWN-RECORD').verdict, checkOf(failures, 'OWN-RECORD').basis, checkOf(failures, 'OWN-RECORD').contractStatus], ['observer-failure', 'transport-too-large', 'error']);
@@ -71,7 +71,7 @@ test('AC12: timeouts, oversized responses and an expired run budget are observer
   for (const c of budget.checks.filter(c => c.checkId !== 'NOT-APPLICABLE')) assert.deepEqual([c.verdict, c.basis, c.contractStatus], ['observer-failure', 'run-budget-expired', 'error'], c.checkId);
 });
 
-test('fix 1: stored assertion labels are recomputed from the retained evidence, never trusted', () => {
+test('stored assertion labels are recomputed from the retained evidence, never trusted', () => {
   // A status label flipped against the stored httpStatus, with the digest resealed.
   const label = frozen('one'), own = rowOf(label, 'OWN-RECORD');
   own.assertions[0] = { ...own.assertions[0], status: 'pass' }; reseal(own);
@@ -104,7 +104,7 @@ test('fix 1: stored assertion labels are recomputed from the retained evidence, 
   assert.deepEqual(verdictOf(status, 'OWN-RECORD'), ['conflicting', 'stored-status-disagrees', 'fail']);
 });
 
-test('fix 2: missing evidence never passes', () => {
+test('missing evidence never passes', () => {
   const backend = frozen('one'), b = rowOf(backend, 'BACKEND-UNVERIFIED');
   b.assertions = b.assertions.map(a => ({ ...a, status: 'pass' })); b.status = 'pass'; reseal(b); recount(backend);
   assert.deepEqual(verdictOf(backend, 'BACKEND-UNVERIFIED'), ['conflicting', 'stored-assertion-disagrees', 'inconclusive']);
@@ -132,7 +132,7 @@ test('fix 2: missing evidence never passes', () => {
   assert.deepEqual([c.verdict, c.observations[0].evidenceState], ['pass', 'observed']);
 });
 
-test('AC12: altered evidence is conflicting, comparisons refine scope rows and stay family-bound', async t => {
+test('altered evidence is conflicting, comparisons refine scope rows and stay family-bound', async t => {
   const altered = frozen('one'); rowOf(altered, 'WHOAMI').trace[0].data.httpStatus = 201;
   const whoami = checkOf(contractView(altered), 'WHOAMI');
   assert.deepEqual([whoami.verdict, whoami.basis, whoami.observations[0].evidenceState], ['conflicting', 'evidence-digest-mismatch', 'conflicting']);
@@ -150,7 +150,7 @@ test('AC12: altered evidence is conflicting, comparisons refine scope rows and s
   assert.equal(contractView(await store.get(run.id)).viewDigest, contractView(run).viewDigest);
 });
 
-test('fix 6: v2 stays pending, unknown pairs are unsupported and the v1 reader refuses downgrades', () => {
+test('v2 stays pending, unknown pairs are unsupported and the v1 reader refuses downgrades', () => {
   assert(Object.hasOwn(HTTP_VERSION_TABLE, `${HTTP_ADAPTER_VERSION}|${ASSERTION_SCHEMA_VERSION}`), 'the current connector pair needs a version-table entry');
   assert.equal(HTTP_VERSION_TABLE[HTTP_V2_PAIR], HTTP_CONNECTOR_V2_PENDING);
   const relabel = ([adapterVersion, assertionSchemaVersion]) => contractView({ ...frozen('one'), adapterVersion, assertionSchemaVersion });
@@ -165,7 +165,7 @@ test('fix 6: v2 stays pending, unknown pairs are unsupported and the v1 reader r
   }
 });
 
-test('AC13: imported results stay attributed; other families and non-runs are explicitly unsupported', async t => {
+test('imported results stay attributed; other families and non-runs are explicitly unsupported', async t => {
   const source = await readFile(new URL('../integrations/evaluation-import/fixtures/promptfoo-0.123.1-v3.synthetic.json', import.meta.url), 'utf8');
   const preview = importPromptfooJson(source, INPUT_CONTRACT);
   assert.equal(preview.ok, true);

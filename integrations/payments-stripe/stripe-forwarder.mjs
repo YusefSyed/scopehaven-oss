@@ -1,4 +1,4 @@
-// The stage-2 forwarder (N14, STAGE-2.md "What the stage-2 PR changes" item 2): the desk's Stripe base and the operator's seeding
+// The stage-2 forwarder: the desk's Stripe base and the operator's seeding
 // path in stage 2. It listens on 127.0.0.1 and sends each request it accepts on to api.stripe.com unchanged, so the money moves at
 // Stripe, and gives the slow provider the timeout scenario needs: for the first refund on a named charge it sends Stripe's answer no
 // earlier than ms after the request arrived (slowFirstRefund, the stand-in's switch of the same name and timing: committed at once,

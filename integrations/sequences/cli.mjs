@@ -58,7 +58,7 @@ export function buildObservers(configs, options) {
   if (configs.some(c => ['egress-recorder', 'smtp-sink'].includes(c?.type) && c.witness !== undefined)) throw new Error('Sequences cannot use a routed egress recorder or SMTP sink (with "witness"): they send no witness request, so its windows would always be partial. Declare it without "routing" and "witness" (presence-only).');
   // Keyed retries are counted only by HTTP effect clauses (countBy, src/idempotency.mjs), which sequences do not use.
   if (configs.some(c => c?.type === 'egress-recorder' && Array.isArray(c.destinations) && c.destinations.some(d => d !== null && typeof d === 'object' && Object.hasOwn(d, 'idempotency')))) throw new Error('Sequences cannot use an egress destination that declares "idempotency": only HTTP effect clauses count keyed retries.');
-  // Forwarding to an upstream (readiness edge E1) is for HTTP profiles, whose validator checks the upstream against the target origin.
+  // Forwarding to an upstream is for HTTP profiles, whose validator checks the upstream against the target origin.
   if (configs.some(c => c?.type === 'egress-recorder' && Array.isArray(c.destinations) && c.destinations.some(d => d?.forward !== undefined))) throw new Error('Sequences cannot use an egress recorder destination with "forward": forwarding is checked only for HTTP profiles.');
   return buildDeclared(configs, options);
 }
@@ -137,7 +137,7 @@ export async function main(argv = process.argv.slice(2), { env = process.env, lo
       try { baseline = await store.get(baselineId); validateRun(baseline); }
       catch (error) { throw new Error(`the baseline run was refused (${error.message})`); }
     }
-    // CMP-ROE-01: checked last, once the configuration and any baseline are valid, before any observer or the gate starts
+    // The authorization record: checked last, once the configuration and any baseline are valid, before any observer or the gate starts
     // and any request is sent.
     try {
       granted = await authorizeConfigured({ id: seq.id, applicationId: seq.applicationId, origin: opt('--origin'), observers: observerConfigs, actors: seq.actors },

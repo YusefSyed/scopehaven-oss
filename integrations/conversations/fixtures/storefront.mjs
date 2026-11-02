@@ -1,10 +1,10 @@
-// Test fixture: copy of a review record outside this repository (owned, synthetic).
+// Test fixture (owned, synthetic).
 // Owned practice storefront/helpdesk with a support assistant: the stand-in for
 // "any business with a support bot". Loopback only, synthetic data, no
 // dependencies (Node 24 built-ins). The assistant is deterministic (rules, no
 // model), so planted drills fail the same way on every run.
 //
-// What it models (the fit test from STRATEGY.md section 3):
+// What it models:
 //   - the assistant shows one customer's data (order lookup);
 //   - it acts on accounts (refund, cancel);
 //   - it makes money commitments (courtesy discount credits, capped by plan);

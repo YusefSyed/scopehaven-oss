@@ -1,4 +1,4 @@
-// The Supabase identity rules wired into the run (NC9 item 3): a target's "supabaseRules" (src/contracts.mjs), the rules' resolver
+// The Supabase identity rules wired into the run: a target's "supabaseRules" (src/contracts.mjs), the rules' resolver
 // passed by the factory to the actor capture, the service-role note on a pinned clause, and rls-zero-row judged per allowed-use control
 // after its window, FAIL-only (src/http-effects.mjs). End to end through runHttpAssessment and the shared validator, against a scripted
 // fake Postgres whose actor capture is answered through scriptedDb's answer hook (no real database).
@@ -96,17 +96,17 @@ test('supabaseRules: a tool, service roles, a pass-through and allowed writes, o
   reject(p => { p.observers[0].tables = [{ table: 'orders', key: 'id', schema: 'billing' }]; }, /one its capturing observer reads/);
   reject(p => { p.checks[1].effects = [{ kind: 'effect.exists', select: { source: 'sql-snapshot', name: 'orders', operation: 'delete' } }]; }, /declares a positive clause on its write/);
   reject(p => { p.checks[1].effects = [{ kind: 'effect.none', select: { source: 'sql-snapshot', name: 'orders', operation: 'insert' } }, { kind: 'effect.count', select: { source: 'sql-snapshot', name: 'orders', operation: 'update' }, expected: 0 }]; }, /positive clause|positive/);
-  // Declarations under which the rule could never fire are refused (PR520 review MINOR 2): an actor read from an app column (a statement
+  // Declarations under which the rule could never fire are refused: an actor read from an app column (a statement
   // that changed no row records none), a control actor without a credential, a control principal the capture does not map.
   reject(p => { p.observers[0].actorCapture.block = { ...p.observers[0].actorCapture.block, actor: { from: 'column' }, tables: [{ table: 'orders', key: 'id', actorColumn: 'made_by' }] }; }, /names its actors from "jwt-claims" or "current-user"/);
   reject(p => { p.actors.bob = { principalId: 'bob' }; }, /control's actor is credentialed/);
   reject(p => { p.observers[0].actorCapture.block = { ...p.observers[0].actorCapture.block, principals: { [EVE]: 'eve' } }; }, /control's principal is one its capture maps/);
-  // The rules are in the profile's digest when declared, and only then (PR520 review MINOR 3).
+  // The rules are in the profile's digest when declared, and only then.
   const hashOf = target => createRegistry({ profiles: [load(target)], env }).exportSuite(target.id).hash;
   const base = profile('http://127.0.0.1:4000', [observer(5432)]), without = profile('http://127.0.0.1:4000', [observer(5432)], { rules: null });
   const other = profile('http://127.0.0.1:4000', [observer(5432)], { rules: { ...RULES, tool: 'refund-desk' } });
   assert.equal(new Set([hashOf(base), hashOf(without), hashOf(other)]).size, 3);
-  // The exported suite names the declared write and its capturing observer on that control only (PR520 review MAJOR 2).
+  // The exported suite names the declared write and its capturing observer on that control only.
   const suite = createRegistry({ profiles: [ok], env }).exportSuite(ok.id);
   assert.deepEqual(suite.checks.map(c => [c.id, c.zeroRow ?? null]), [['WHOAMI', null], ['REFUND', { table: 'public.orders', op: 'UPDATE', instanceId: 'pg-snapshot-db' }]]);
 });
@@ -145,7 +145,7 @@ test('rls-zero-row never fails a write that happened, a refusal the app surfaced
   const tool = await runWith(t, db => { db.ledger.push(zeroRowOf(), serviceWrite({ row_xmin: db.write() })); });
   assert.equal(rowOf(tool.run, 'REFUND').trace[1].data.effects[0].zeroRow, undefined);
   // A write no one is named for (a backend session that is not a declared service role, claims unbound) may be the control's own: no
-  // FAIL (PR520 review MINOR 1).
+  // FAIL.
   const backend = await runWith(t, db => { db.ledger.push(zeroRowOf(), entry({ claims_sub: null, claims_role: null, header_sub: null, set_role: 'none', session_role: 'app_backend', row_xmin: db.write() })); });
   assert.deepEqual(rowOf(backend.run, 'REFUND').trace[1].data.zeroRow.facts.writes, [{ table: 'public.orders', op: 'UPDATE', actor: null, serviceRole: false }]);
   assert.equal(rowOf(backend.run, 'REFUND').trace[1].data.effects[0].zeroRow, undefined);
@@ -180,7 +180,7 @@ test('the validator recomputes the stage from the sealed record: a dropped, forg
   assert.throws(() => validateHttpRunEvidence(forge(row => { row.trace[1].data.zeroRow.instanceId = 'pg-snapshot-other'; }), { expectedSuite: suite }), /invalid-run-evidence/);
   assert.throws(() => validateHttpRunEvidence(forge((row, copy) => { const who = rowOf(copy, 'WHOAMI'); who.trace = [...who.trace, structuredClone(row.trace[1])]; reseal(who); }), { expectedSuite: suite }), /invalid-run-evidence/);
   validateHttpRunEvidence(run, { expectedSuite: suite });
-  // The record bound to the declaration (PR520 review MAJOR 2): in a run where the write happened (no finding), dropping the record
+  // The record bound to the declaration: in a run where the write happened (no finding), dropping the record
   // changes no decision, so only the suite binding refuses it; and facts that contradict the window (bob's write left out) are refused.
   const made = await runWith(t, db => { db.ledger.push(zeroRowOf(), entry({ row_xmin: db.write() })); });
   const madeSuite = createRegistry({ profiles: [made.p], env }).exportSuite(made.p.id);
@@ -213,7 +213,7 @@ test('without supabaseRules nothing is sealed and nothing is judged; the collect
   const reading = rlsZeroRow({ check, row, entries, block: BLOCK, capture: 'intact', actors: { bob: { principalId: 'bob' } }, decl: RULES });
   const finding = zeroRowFinding({ instanceId: 'pg-snapshot-db', expect: RULES.allowedWrites.REFUND, facts }, { principal: 'bob', role: 'control', method: 'PATCH', succeeded: true });
   assert.deepEqual([reading.verdict, finding?.finding, finding?.alsoWrittenBy], ['fail', 'rls-zero-row', ['eve']]);
-  // A write no one is named for suppresses the FAIL in both (PR520 review MINOR 1).
+  // A write no one is named for suppresses the FAIL in both.
   const unnamed = parseLedger([zeroRowOf(), entry({ claims_sub: null, claims_role: null, header_sub: null, set_role: 'none', session_role: 'app_backend' })]);
   const unnamedFacts = zeroRowFacts({ entries: unnamed, block: BLOCK, capture: 'intact', resolve });
   assert.notEqual(rlsZeroRow({ check, row, entries: unnamed, block: BLOCK, capture: 'intact', actors: { bob: { principalId: 'bob' } }, decl: RULES }).verdict, 'fail');
@@ -256,7 +256,7 @@ test('the zero-row facts: an upsert or a MERGE that changed another row of the t
   assert.equal(zeroRowFinding({ instanceId: 'pg-snapshot-db', expect: RULES.allowedWrites.REFUND, facts: { ...listed, omitted: { statements: 0, writes: 1 } } }, { principal: 'bob', role: 'control', method: 'PATCH', succeeded: true }), null);
 });
 
-// PR520 review MAJOR 1: a lifecycle change check whose declared write changed no row although another write matched its clause passed
+// A lifecycle change check whose declared write changed no row although another write matched its clause passed
 // when sent, so its post-change check was sent; the stage then fails it at run end, the post-change check reads change-not-attributed,
 // and the validator accepts the run.
 async function suspension(t, { otherWrite }) {
@@ -299,7 +299,7 @@ test('a lifecycle change check failed by rls-zero-row keeps the run valid; its p
   const reuse = rowOf(run, 'REUSE');
   assert.ok(reuse.assertions.some(a => a.name === PRECONDITION_ASSERTION && a.actual === PRECONDITION_REASONS['change-not-attributed']), JSON.stringify(reuse.assertions.map(a => [a.name, a.status])));
 });
-// PR520 review R2-1: the rule's main case. The change check's own UPDATE matched nothing and no other write matched its clause, so it read
+// The rule's main case. The change check's own UPDATE matched nothing and no other write matched its clause, so it read
 // missing when sent: never confirmed, its post-change check was not sent (change-not-confirmed), and the stage's FAIL keeps the run valid.
 test('a lifecycle change check that read missing when sent and then fails on rls-zero-row keeps the run valid; its post-change check was not sent', async t => {
   const run = await suspension(t, { otherWrite: false });
@@ -308,7 +308,7 @@ test('a lifecycle change check that read missing when sent and then fails on rls
   const reuse = rowOf(run, 'REUSE');
   assert.equal(reuse.trace[0].data.notSent, 'change-not-confirmed');
 });
-// PR520 review R2-1, the predicate alone: a zero-row FAIL counts as passed when sent only over a prior pass, or a prior inconclusive that an
+// The predicate alone: a zero-row FAIL counts as passed when sent only over a prior pass, or a prior inconclusive that an
 // attribution, settlement or later-outcome tag withheld after a pass. A prior missing or an untagged inconclusive was never confirmed.
 test('a zero-row FAIL is passed-when-sent only over a prior pass or a tagged inconclusive', () => {
   const row = (priorVerdict, tag = {}) => ({ status: 'fail', assertions: [{ name: 'Response contract', status: 'pass' },

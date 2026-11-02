@@ -1,4 +1,4 @@
-// effect.only with countBy "idempotency-key" (DP2 practice product gap a): on a host whose egress window records keys, an exact
+// effect.only with countBy "idempotency-key": on a host whose egress window records keys, an exact
 // keyed replay of a send is that send's application, not one more effect; any other later send under a reused key is undecided,
 // so it can never pass. Pure unit tests over synthetic windows (no I/O).
 import test from 'node:test';
@@ -43,7 +43,7 @@ test('an exact keyed replay counts with its application; without countBy it is a
   assert.match(d.basis, /1 exact keyed replay\(s\) counted with their application/);
   assert.equal(d.counts.judged, 1);
   assert.equal(verdict(retry, plainOnly), 'fail', 'today: beyond the expected count');
-  // A rejected-then-retried exact replay on a forwarded host (E2b): one application.
+  // A rejected-then-retried exact replay on a forwarded host: one application.
   const forward = { [HOST]: { upstreamPort: 47100, applied: [200, 201], rejected: [402], proof: true } };
   const declined = { outcome: 'rejected', status: 402, proven: true }, applied = { outcome: 'applied', status: 201, proven: true };
   assert.equal(verdict([send(1, { key: '1', upstream: declined }), send(2, { key: '1', upstream: applied })], only(), scopeOf({ forward })), 'pass');
@@ -110,7 +110,7 @@ test('profile: an effect.only countBy clause needs an egress-recorder destinatio
   assert.throws(() => validateTargetFile({ schemaVersion: 1, targets: [profile(null)] }), /effect-only-count-by-unrecorded/);
 });
 
-// Review of #294 (the readiness owner): settlement and attribution re-judge an effect.only clause with its countBy, and an
+// Settlement and attribution re-judge an effect.only clause with its countBy, and an
 // unproven resend that fits no declared selector stays a fail.
 test('re-judges keep countBy: a late or background effect removed leaves the keyed retry one application, so the fail is released', () => {
   const EARLY = 'POST /v1/early', BG_HOST = 'crm.example.test';

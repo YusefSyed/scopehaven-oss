@@ -15,7 +15,7 @@ export const CONFIDENCE = Object.freeze(['stated', 'stated-default', 'adopted-de
 export const LIFECYCLE_SUBJECTS = Object.freeze(['actor', 'role', 'tenant']);
 // The rule id a stated-default decision names: the statement's own defaults, never a matrix.
 export const DEFAULT_RULE_ID = 'defaults.unlisted';
-// An adopted declaration keeps the importer's category, so the coverage report shows its R9 warning.
+// An adopted declaration keeps the importer's category, so the coverage report shows its declared-intent warning.
 export const ADOPTED_CATEGORY = 'Declared policy';
 export const MAX_CREATORS = 5;
 // How the statement reads beside a matrix's declaration for the same cell (checkStatement). A declaration of allow or deny

@@ -1,4 +1,4 @@
-// E2a tightening: a declared webhook signature or timestamp header leaves head only for a timestamped scheme whose values parse
+// A declared webhook signature or timestamp header leaves head only for a timestamped scheme whose values parse
 // inside the run window, and re-signed sends count as one application only when their signed items agree; MACs with no timestamp
 // stay bound. Each condition is shown with the re-sign it still allows and the collapse it now refuses. Windows are built directly.
 import test from 'node:test';

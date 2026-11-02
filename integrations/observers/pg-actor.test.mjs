@@ -1,4 +1,4 @@
-// pg-actor (NC2 item 2) without a database: the profile block, the installed SQL, the definition check, the install and
+// pg-actor without a database: the profile block, the installed SQL, the definition check, the install and
 // removal flow, the ledger, the claims binding and the txid joins. pg-actor.live.test.mjs runs the same against a local
 // Supabase stack.
 import test from 'node:test';

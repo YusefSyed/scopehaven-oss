@@ -1,5 +1,5 @@
-// E2 end to end over real loopback HTTP: re-signed webhook redeliveries collapse only when the declared volatile signature
-// headers are all that changed (and, since the E2a tightening, only when their scheme parses inside the run window and the
+// End to end over real loopback HTTP: re-signed webhook redeliveries collapse only when the declared volatile signature
+// headers are all that changed (and only when their scheme parses inside the run window and the
 // signatures agree), and an event id read from a declared body pointer counts each event once. Every request goes to 127.0.0.1;
 // destination hosts are names only and are never resolved or contacted.
 import test from 'node:test';

@@ -1,5 +1,5 @@
-// Readiness gap 2, the late tail (src/http-timing.mjs): a declared effect horizon and run budget. A send the app makes 35 to
-// 45 s after its reply (one 36.6 s after it in a backoff tail, and queued sends: the DP1 class W4) is judged in its own
+// The late tail (src/http-timing.mjs): a declared effect horizon and run budget. A send the app makes 35 to
+// 45 s after its reply (one 36.6 s after it in a backoff tail, and queued sends) is judged in its own
 // check's window, or withholds that check's pass, and never fails a later check it did not cause. A virtual clock, an
 // injected transport and injected observers that place every committed send on that clock: no socket, no database, no
 // model, no provider. The cases are general synthetic ones built from the class descriptions only.
@@ -119,9 +119,9 @@ const refusedAs = detail => error => error.code === 'invalid-run-evidence' && er
 const startMark = k => 1 + 2 * k, endMark = k => 2 + 2 * k;
 
 // ---------------------------------------------------------------------------
-// Acceptance (DP1 W4 class descriptions, synthetic): late and queued sends.
+// Acceptance (synthetic): late and queued sends.
 
-test('DP1 W4 backoff tail: a refund webhook sent 36.6 s after the reply is judged in its own check\'s window and never fails a later check', async () => {
+test('late tail, backoff: a refund webhook sent 36.6 s after the reply is judged in its own check\'s window and never fails a later check', async () => {
   // Today's longest settle (30 s): the owner's webhook misses its control's window and lands in the member's boundary window.
   const today = await assess(desk({ settleMs: SETTLE_BOUNDS.maxMs }), deskApp());
   assert.equal(clause(today.run, 'OWNER-REFUND').verdict, 'fail');
@@ -139,7 +139,7 @@ test('DP1 W4 backoff tail: a refund webhook sent 36.6 s after the reply is judge
   validateHttpRunEvidence(JSON.parse(JSON.stringify(run)), { expectedSuite: suiteOf(p) });
 });
 
-test('DP1 W4 queued sends: sends flushed 20 to 44 s after their replies each land in their own check\'s window', async () => {
+test('late tail, queued sends: sends flushed 20 to 44 s after their replies each land in their own check\'s window', async () => {
   for (const [owner, member] of [[20000, 44000], [44000, 20000], [36600, 41000]]) {
     const { run } = await assess(timed(desk()), deskApp({ owner, member }));
     assert.equal(run.counts.pass, 4, `${owner}/${member}`);
@@ -148,7 +148,7 @@ test('DP1 W4 queued sends: sends flushed 20 to 44 s after their replies each lan
   }
 });
 
-test('DP1 W4 forbidden late send: judged in its own boundary window (fail), and the next boundary it fits keeps its pass', async () => {
+test('late tail, forbidden late send: judged in its own boundary window (fail), and the next boundary it fits keeps its pass', async () => {
   const p = timed(desk());
   const { run } = await assess(p, deskApp({ owner: 100, forbidden: 36600 }));
   assert.deepEqual(ownEvents(run, 'MEMBER-REFUND-OWNER'), [O1]);
@@ -557,7 +557,7 @@ test('compat: profiles without "timing" keep their digests; a declared timing mo
   const P = await import('../integrations/core-practice/profiles.mjs');
   const origin = 'http://127.0.0.1:4100', sinkPort = 40100;
   const profiles = { lab: makeLabProfile(origin), lifecycle: P.lifecycleProfile({ origin, sinkPort }), creator: P.creatorProfile({ origin, sinkPort }), settlement: P.settlementProfile({ origin, sinkPort }) };
-  // Computed on base 303bf27 before readiness gap 2.
+  // Computed on a build from before the declared horizon and run budget.
   const BASE = { lab: 'b87e6a535167384fffde0f98d1a19c20b51af85767fffa2cb2fea4ea76cb8a13', lifecycle: '496e538ad37ec33793ca3eb2b61b2c28865e3129b7e5f6c8c7d6385921d3ae1e',
     creator: 'db3394137718a6fe512ad902e7e6632442fa08d9b63ea05a0f46abb4f3d6a1a2', settlement: 'e032b66e75216311b7db783fcb7cbfbb1c762a0be09f3913cf6ce0f5fcc95d07' };
   for (const [name, p] of Object.entries(profiles)) assert.equal(contractDigest(validateTargetFile({ schemaVersion: 1, targets: [p] })[0]), BASE[name], name);
@@ -675,7 +675,7 @@ test('late rules: an exists or count fail its own late effect, or an earlier che
   const keyedRows = d => [{ effects: [d], windows: [gw(Array.from({ length: d.matched }, () => sendEv({ resource: O2 })))] }, lrow([none(O3)])];
   assert.deepEqual(lateFind(keyedRows(keyed(2, 2)), gapsOf(2, [sendEv({ resource: O2 })]))[0], [null]);
   assert.deepEqual(lateFind(keyedRows(keyed(0, 0)), gapsOf(2, [sendEv({ resource: O2 })]))[0], ['late-unattributed']);
-  // An upstream outcome requirement (readiness edge E1) is set aside: a later send could be the clause's own whatever its outcome reads.
+  // An upstream outcome requirement is set aside: a later send could be the clause's own whatever its outcome reads.
   const upstreamFail = { kind: 'effect.exists', select: sel({ resource: O2, upstream: 'applied' }), verdict: 'fail', matched: 0, basis: 'synthetic', custody: null };
   const rejected = sendEv({ resource: O2, upstream: { outcome: 'rejected', status: 409, proven: true } });
   assert.deepEqual(lateFind([{ effects: [upstreamFail], windows: [gw()] }, lrow([none(O3)])], gapsOf(2, [rejected]))[0], ['late-unattributed']);

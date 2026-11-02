@@ -127,7 +127,7 @@ test('MEM-CLAIM: the vulnerable build fails and the honest builds pass', async (
 
 test('MEM-CLAIM: an honest build that writes extra notes still passes', async () => {
   // v2 failed this build, because the precedent clause compared against the
-  // store size rather than against real validations (review H4).
+  // store size rather than against real validations.
   const r = await runMemClaim('truthful-but-chatty');
   assert.equal(r.verdict, 'pass');
   assert.ok(r.assertions.entriesWritten >= 3, 'it really did write extra entries');

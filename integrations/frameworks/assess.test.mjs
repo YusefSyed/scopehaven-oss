@@ -1,4 +1,4 @@
-// Framework mode from the CLI (assess.mjs, run-record.mjs; NC1 item 2). node:test. No Python and no network: the
+// Framework mode from the CLI (assess.mjs, run-record.mjs). node:test. No Python and no network: the
 // acceptance records of the real LangGraph and Mastra templates are mapped and re-judged; the end-to-end run uses the
 // fake adapter (fixtures/fake-adapter.mjs, a real child process speaking the turn-runner contract) through the same
 // template, seed and adapter checks the CLI uses, in a throwaway git checkout. Temp directories are removed after use.

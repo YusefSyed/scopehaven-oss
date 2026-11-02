@@ -38,7 +38,7 @@ async function deskRun(dir, build, { withGate = true, extra = [] } = {}) {
       audit: { table: 'audit_log', idColumn: 'id', actorColumn: 'actor', actionColumn: 'action', resourceColumn: 'resource', actions: { 'refund.request': 'insert' } } }]));
     writeFileSync(join(work, 'gate.json'), JSON.stringify({ upstream: tools.url, port: gatePort, rules: [{ id: 'approve', method: 'POST', pathPrefix: '/v1/approve' }, { id: 'refund', method: 'POST', pathPrefix: '/tool/refund', holds: 0 }] }));
     const lines = [];
-    // CMP-ROE-01: the record covering the sequence, the desk, its observer and (with the gate) the tools upstream.
+    // The authorization record covering the sequence, the desk, its observer and (with the gate) the tools upstream.
     const authorization = sequenceAuthorizationArgs(join(work, 'authorization.json'), JSON.parse(readFileSync(SEQUENCE_FILE, 'utf8')), { origin: desk.origin, ...(withGate ? { gateUpstream: tools.url } : {}) });
     const code = await main(['--sequence', SEQUENCE_FILE, '--origin', desk.origin, '--observers', join(work, 'observers.json'), ...(withGate ? ['--gate', join(work, 'gate.json')] : []),
       '--out', join(work, 'runs'), '--save', join(dir, 'store'), '--build', build, ...authorization, ...extra], { env, log: s => lines.push(s) });
@@ -286,7 +286,7 @@ test('the gate refuses edited sequence evidence and binds a candidate to its sui
   assert.equal(SEQUENCE_EVALUATOR_HASH, run.evaluatorHash);
 });
 
-// Lead decision (parity with the HTTP identity proof), from the v2 review's same-actor probe: a refusal row passes, or is
+// Parity with the HTTP identity proof: a refusal row passes, or is
 // restored, only after an earlier 2xx for the same actor in the same run; otherwise it reads inconclusive
 // (identity-not-established) and earns no credit. A served request still fails, and rows answered otherwise are unaffected.
 // Ben's accepted request (the window from amy-done to after, the second mark) records his refund: the gate needs an effect control
@@ -309,7 +309,7 @@ async function pairingRun(sequence, { after = 403, acceptance = 200, build = 'b'
 }
 
 test('a refusal row without an earlier same-actor acceptance never yields a clean gate or restoration credit', async () => {
-  // The v2 review's probe: Amy's refusal with only Ben's control was clean on v2 (exit 0, AMY-REFUSED contract-restored).
+  // Amy's refusal with only Ben's control was clean before this rule (exit 0, AMY-REFUSED contract-restored).
   const seq = pairingSequence({ paired: false });
   const [baseline, candidate] = [await pairingRun(seq, { after: 200, build: 'before' }), await pairingRun(seq, { after: 403, build: 'after' })];
   const row = candidate.run.results.find(r => r.id === 'AMY-REFUSED');

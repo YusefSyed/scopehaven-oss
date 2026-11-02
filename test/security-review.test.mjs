@@ -36,7 +36,7 @@ function profile(origin) {
     { id: 'restricted', title: 'Restricted operation', category: 'Access', severity: 'high', actorId: 'member', method: 'GET', path: '/restricted', evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 403 }] },
   ] };
 }
-// actor-identity/4 (core batch v2): a credentialed actor's 403 counts as a refusal only after its earlier complete 2xx on a
+// actor-identity/4: a credentialed actor's 403 counts as a refusal only after its earlier complete 2xx on a
 // protected route, so the gate tests that need the member's refusal give it a surface control (a required GET).
 const withSurface = target => { target.checks.push({ id: 'own-list', title: 'Own list', category: 'Access', severity: 'control', actorId: 'member', method: 'GET', path: '/own-list', evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 200 }] }); target.requiredControlIds.push('own-list'); return target; };
 // idleMs: how long the socket may sit silent before the request fails as hung.
@@ -657,7 +657,7 @@ test('release UI: a repair the model attribution does not credit to the app is n
   await reviewButton(root, 'Compare runs').fire('click');
   await root.querySelector('form').fire('submit'); await uiTick(); await uiTick();
   assert.match(root.textContent, /Verdict changes are attributed to: Model and application may both have changed\./);
-  // The stat card, not the help line: "<count>Verified repairs<next count>" (an earlier review, M2).
+  // The stat card, not the help line: "<count>Verified repairs<next count>".
   assert.doesNotMatch(root.textContent, /\dVerified repairs\d/); assert.match(root.textContent, /\dNot credited to the application\d/);
   assert.match(root.textContent, /Not credited to the application/); assert.match(root.textContent, /Held across a model change/);
   assert.doesNotMatch(root.textContent, /Verified repair(?!s)/);
@@ -669,7 +669,7 @@ test('release UI: a repair the model attribution does not credit to the app is n
   assert.match(root.textContent, /a verdict change may come from the model/); assert.match(root.textContent, /Verified repair(?!s)/);
   assert.match(root.textContent, /\dVerified repairs\d/);
   assert.ok(!root.querySelectorAll('th').some(th => th.textContent === 'Attribution'));
-  // An identity present but unreadable: no row and no count is a verified repair (review W6FU-UI-1).
+  // An identity present but unreadable: no row and no count is a verified repair.
   reply = { ...reply, restorationLabel: 'Not attributable to the application: a model identity was present but could not be read',
     modelAttribution: { state: 'not-recorded', note: 'Model identity was not recorded for one or both runs, so a verdict change may come from the model.', malformed: ['baseline'], coreRestorationLabel: 'Response contracts restored' } };
   await root.querySelector('form').fire('submit'); await uiTick(); await uiTick();

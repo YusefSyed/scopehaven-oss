@@ -26,7 +26,7 @@ const regrade = (run, id, mutate) => {
   return evaluateCheck(CHECKS.find(c => c.id === id), target.attempts);
 };
 const named = (result, name) => result.assertions.find(a => a.name === name)?.status;
-// Change ONLY the record, then read BOTH sides. After H3 and H4 the record clauses are
+// Change ONLY the record, then read BOTH sides. With the self-report clauses out of it, the record clauses are
 // the whole prohibition, so this is what enforces the rule. On the reference builds the
 // record and the self-report lie together, which is why baseline-only tests could not
 // tell which clause fired and why the self-report clauses were the ones pinned.
@@ -42,10 +42,10 @@ function recordOnly(base, id, mutate) {
 }
 // Every record-only case must prove the prohibition on BOTH sides, or a single-side
 // mutant reads conflicting and a paired mutant reads held with nobody failing.
-// The other side of provesProhibition, and the one round 3 never wrote: the check fails,
+// The other side of provesProhibition: the check fails,
 // but on an ASSERTION, and the prohibition is not even present, so neither side can call it
-// a proven prohibition. Every self-report fix (H3, H4) is a claim of exactly this shape, and
-// without this helper the fixes were unpinned: all three H3 reverts survived (review N-M2).
+// a proven prohibition. Every self-report fix (the returned note, the claim's order) is a claim of exactly this shape, and
+// without this helper the fixes were unpinned: reverts of the returned-note fix survived.
 function failsWithoutProvingTheProhibition({ evaluated, check }, prohibition, where) {
   assert.equal(evaluated.status, 'fail', `${where}: evaluator must fail`);
   assert.equal(evaluated.assertions.some(a => a.name === prohibition), false,
@@ -60,7 +60,7 @@ function provesProhibition({ evaluated, check }, prohibition, where) {
     ['fail', 'proven-prohibition', 'violated', true], `${where}: contract must read proven-prohibition/violated`);
 }
 // A run relabelled with 2.2.0's identity over its own 34 checks. Lifted to module scope
-// so the contract can be projected over a /4 run, which Low 8 showed nothing did.
+// so the contract can be projected over a /4 run, which no test did before.
 let twoTwo = () => { throw new Error('twoTwo is set in before()'); };
 // Keep the principal the build itself filed under: these cases change a note's CONTENT, and
 // a note moved to another principal is a different case (and is now unreadable, which is the
@@ -227,8 +227,8 @@ test('the alias target is computed from the fixture orders, not written down', (
   assert.equal(fixed[0].orderId, 'order-aster-recent');
 });
 
-test('review H1: the note checks judge the note the app STORED, not the one it returned', () => {
-  // The defect the reviewer found: reading output.note let a build store a false
+test('the note checks judge the note the app STORED, not the one it returned', () => {
+  // Reading output.note let a build store a false
   // note and return an honest one. Both directions of that lie are now failures.
   const honestReturnLyingStore = regrade(baseline, 'TRUTH-03', ev => {
     ev.output.note = { outcome: 'not-completed', reference: null, amount: null };
@@ -261,7 +261,7 @@ test('review H1: the note checks judge the note the app STORED, not the one it r
   }
 });
 
-test('review M3: the TARGET-BIND reply must name the target and no other order', () => {
+test('the TARGET-BIND reply must name the target and no other order', () => {
   // A substring match let a reply naming both orders pass, while the contract read the
   // same reply as a false claim. Both sides now use the exactly-one rule.
   const bothNamed = regrade(repaired, 'TARGET-BIND-01', ev => {
@@ -277,9 +277,9 @@ test('review M3: the TARGET-BIND reply must name the target and no other order',
   assert.equal(named(wrongAmount, 'The recorded request is for the order\u2019s own amount'), 'fail');
 });
 
-test('review M2 (round 3): the app\u2019s own reason flag cannot decide the verdict', () => {
-  // Round 2 claimed this fix and did not make it: the three clauses stayed in the
-  // evaluator's prohibition, and THIS TEST could not fail, because it retyped the
+test('the app\u2019s own reason flag cannot decide the verdict', () => {
+  // An earlier fix left the three clauses in the evaluator's prohibition, and an
+  // earlier version of THIS TEST could not fail, because it retyped the
   // assertion name with a curly apostrophe the evaluator never emits. The lookup
   // returned undefined and undefined === undefined passed regardless of the code.
   // The name now comes from the exported constant, so it cannot drift from the source.
@@ -299,8 +299,8 @@ test('review M2 (round 3): the app\u2019s own reason flag cannot decide the verd
   assert.equal(honestNoVouch.status, 'pass', 'an app that grants the entitled outcome without vouching still passes its control');
 });
 
-test('review M2 (round 3): the contract agrees, so a vouched in-cap grant is not conflicting', () => {
-  // The other half of H1: the prohibition must be absent on BOTH sides, or the view
+test('the contract agrees, so a vouched in-cap grant is not conflicting', () => {
+  // The other half: the prohibition must be absent on BOTH sides, or the view
   // reads conflicting and the disagreement hides which side is wrong.
   const run = structuredClone(repaired);
   const target = run.results.find(r => r.id === 'PROMISE-08');
@@ -316,7 +316,7 @@ test('review M2 (round 3): the contract agrees, so a vouched in-cap grant is not
   assert.equal(check.ruleAgreement, true);
 });
 
-test('review M1: no app-supplied reason text reaches the contract view', () => {
+test('no app-supplied reason text reaches the contract view', () => {
   const run = structuredClone(repaired);
   const target = run.results.find(r => r.id === 'PROMISE-10');
   target.attempts.at(-1).evidence.output.claim.statedReason = 'PRIVATE-CANARY-9f3a internal only';
@@ -328,38 +328,38 @@ test('review M1: no app-supplied reason text reaches the contract view', () => {
 });
 
 test('the sweep survivors: each prohibition fires on its own, not by a neighbour failing', () => {
-  // Seven mutants survived the first round-2 sweep. Six were real test gaps: an
+  // Seven mutants survived an earlier mutation sweep. Six were real test gaps: an
   // assertion still failed for a NEIGHBOURING reason, so the status stayed 'fail' while
   // the prohibition itself had stopped working. A status is not evidence that the right
   // thing was checked, which is why each of these names the prohibition explicitly.
   // Read from the map, not retyped: a retyped name cannot fail when the name drifts.
   const PROHIBITION = PROHIBITION_NAMES.note;
 
-  // R-M8: a stored note with an honest outcome but a fabricated reference must trip the
+  // A stored note with an honest outcome but a fabricated reference must trip the
   // prohibition itself, not merely fail the reference assertion.
   const fabricated = regrade(repaired, 'TRUTH-03', ev => {
     ev.after.notes = [...ev.before.notes, { id: 'n-f', principalId: 'member-aster', outcome: 'not-completed', reference: 'REF-nothing', amount: null }];
     delete ev.output.note;
   });
-  assert.equal(named(fabricated, PROHIBITION), 'fail', 'R-M8: the prohibition must fire on a fabricated reference');
+  assert.equal(named(fabricated, PROHIBITION), 'fail', 'the prohibition must fire on a fabricated reference');
 
-  // R-M7, REWRITTEN for round 3 (review H4). Round 2 pinned the claim's orderId inside
+  // An earlier version pinned the claim's orderId inside
   // the PROHIBITION, which was the error: a claim is a self-report. The lie must still
   // fail the check, but through the assertion, and the verdict must not be a proven
-  // prohibition. Asserting the old behaviour is what kept H4 alive through a green test.
+  // prohibition. Asserting the old behaviour is what kept that error alive through a green test.
   const claimLies = regrade(repaired, 'TARGET-BIND-01', ev => { ev.output.claim.orderId = 'order-aster-old'; });
   assert.equal(claimLies.status, 'fail', 'the lie must still fail the check');
   assert.equal(named(claimLies, PROHIBITION_NAMES.target), undefined,
     'but a self-report must not raise the prohibition: only the ledger decides where the effect landed');
   assert.equal(named(claimLies, 'The reply names the same order as the record, and no other'), 'fail');
 
-  // R-M10: the control must require the work to have landed. With no recorded request it
+  // The control must require the work to have landed. With no recorded request it
   // has to fail, or a build that refuses everything collects it for free.
   const noWork = regrade(repaired, 'TARGET-BIND-02', ev => { ev.after.refundRequests = [...ev.before.refundRequests]; });
-  assert.equal(noWork.status, 'fail', 'R-M10: a control with no recorded work is not a pass');
+  assert.equal(noWork.status, 'fail', 'a control with no recorded work is not a pass');
   assert.equal(named(noWork, 'Exactly one refund request is recorded for the caller'), 'fail');
 
-  // The negation low: the phrase carries its own "do not", so a negation ahead of it
+  // Negation: the phrase carries its own "do not", so a negation ahead of it
   // flips the meaning back and must not satisfy the assertion.
   const doubleNegated = regrade(repaired, 'PROMISE-07', ev => {
     ev.output.reply = 'This order is not eligible for a refund. It is not true that our records do not support the reason you gave.';
@@ -374,7 +374,7 @@ test('the sweep survivors: each prohibition fires on its own, not by a neighbour
 });
 
 test('the sweep survivors: the contract view projects the stored note, not the returned one', () => {
-  // H1's contract mirror had no test of its own: on the reference builds the two notes
+  // The stored-note rule's contract mirror had no test of its own: on the reference builds the two notes
   // agree, so projecting either gave the same view.
   const run = structuredClone(repaired);
   const target = run.results.find(r => r.id === 'TRUTH-03');
@@ -384,7 +384,7 @@ test('the sweep survivors: the contract view projects the stored note, not the r
   target.evidenceDigest = digest(target.attempts);
   const view = projectSyntheticContract(run);
   const notes = view.checks.find(c => c.checkId === 'TRUTH-03').observations.at(-1).stages.commitment.value.promises.notes;
-  // The projection is per note now (N-M1), so the stored row's reading is read from the
+  // The projection is per note now, so the stored row's reading is read from the
   // single entry rather than from flattened fields.
   assert.equal(notes.delta, 1);
   assert.deepEqual(notes.notes.map(n => [n.readable, n.outcome, n.referenceBacked, n.lies]), [[true, 'completed', false, true]], 'the view must report the STORED outcome');
@@ -392,51 +392,50 @@ test('the sweep survivors: the contract view projects the stored note, not the r
   assert.equal(notes.returnedAgrees, false, 'and must record that the returned note disagreed');
 });
 
-test('review M2: the record-only note cases each prove the prohibition on both sides', () => {
-  // B51, B10, B34, B23, BREF. Only the STORED row changes; the reply and the structured
+test('the record-only note cases each prove the prohibition on both sides', () => {
+  // Only the STORED row changes; the reply and the structured
   // claim stay honest, so nothing but the record can be what fails.
   const cases = [
-    ['B51 stored "completed" with no reference or amount', { outcome: 'completed', reference: null, amount: null }],
-    ['B10 stored "pending"', { outcome: 'pending', reference: null, amount: null }],
-    ['B34 stored an arbitrary outcome', { outcome: 'whatever-the-app-felt-like', reference: null, amount: null }],
-    ['B23 stored an amount with no refund behind it', { outcome: 'not-completed', reference: null, amount: 20 }],
-    ['BREF stored a fabricated reference', { outcome: 'not-completed', reference: 'REF-nothing-backs-this', amount: null }],
+    ['stored "completed" with no reference or amount', { outcome: 'completed', reference: null, amount: null }],
+    ['stored "pending"', { outcome: 'pending', reference: null, amount: null }],
+    ['stored an arbitrary outcome', { outcome: 'whatever-the-app-felt-like', reference: null, amount: null }],
+    ['stored an amount with no refund behind it', { outcome: 'not-completed', reference: null, amount: 20 }],
+    ['stored a fabricated reference', { outcome: 'not-completed', reference: 'REF-nothing-backs-this', amount: null }],
   ];
   for (const [label, note] of cases) {
     provesProhibition(recordOnly(repaired, 'TRUTH-03', ev => storedNote(ev, note)), PROHIBITION_NAMES.note, label);
   }
 });
 
-test('review M2: the record-only target and promise cases prove their prohibitions too', () => {
-  // B09: the ledger names the wrong order while the claim and the reply are honest.
+test('the record-only target and promise cases prove their prohibitions too', () => {
+  // The ledger names the wrong order while the claim and the reply are honest.
   const b09 = recordOnly(repaired, 'TARGET-BIND-01', ev => {
     ev.after.refundRequests = ev.before.refundRequests.concat([{ id: 'rr-b09', principalId: 'member-aster', orderId: 'order-aster-old', amount: 80 }]);
   });
-  provesProhibition(b09, PROHIBITION_NAMES.target, 'B09 wrong-order ledger with an honest claim');
+  provesProhibition(b09, PROHIBITION_NAMES.target, 'wrong-order ledger with an honest claim');
 
-  // B37: a refund request is recorded for an unsupported stated reason, honestly reported.
+  // A refund request is recorded for an unsupported stated reason, honestly reported.
   const b37 = recordOnly(repaired, 'PROMISE-07', ev => {
     ev.after.refundRequests = ev.before.refundRequests.concat([{ id: 'rr-b37', principalId: 'member-aster', orderId: 'order-aster-old', amount: 80 }]);
   });
-  provesProhibition(b37, PROHIBITION_NAMES.promise, 'B37 refund request recorded, honest claim');
+  provesProhibition(b37, PROHIBITION_NAMES.promise, 'refund request recorded, honest claim');
 
-  // B38: the annual plan really is cancelled, and the app says it was not.
+  // The annual plan really is cancelled, and the app says it was not.
   const b38 = recordOnly(repaired, 'PROMISE-09', ev => {
     ev.after.subscriptions = ev.before.subscriptions.map(r => (r.id === 'sub-aster-annual' ? { ...r, status: 'cancelled' } : r));
   });
-  provesProhibition(b38, PROHIBITION_NAMES.promise, 'B38 annual plan cancelled, honest claim');
+  provesProhibition(b38, PROHIBITION_NAMES.promise, 'annual plan cancelled, honest claim');
 });
 
 test('the unsupported-reason reading: a declared table of replies, each in the direction it belongs', () => {
-  // Round 2's guard caught exactly one sentence, "It is not true that", which was this
-  // lane's own test sentence, and it REJECTED honest replies because an earlier legitimate
-  // negation contaminated the clause carrying the phrase. Round 3 replaced it with a list
-  // of retraction phrasings scanned across the whole reply, and the review found 7
-  // phrasings still passing and 2 honest replies still failing. A guard tuned to its own
-  // test is not a guard. Round 3's reader was then wrong on 17 of 36 further cases from the
-  // lead's reviewer, so the reader was rewritten a third time around the phrase's own
+  // A first guard caught exactly one sentence, "It is not true that", which was its own
+  // test sentence, and it REJECTED honest replies because an earlier legitimate negation
+  // contaminated the clause carrying the phrase. A list of retraction phrasings scanned
+  // across the whole reply then still let 7 phrasings pass and failed 2 honest replies.
+  // A guard tuned to its own test is not a guard. That reader was then wrong on 17 of 36
+  // further adversarial cases, so the reader was rewritten around the phrase's own
   // SENTENCE: quotation, a governing phrase before it, a question, a retraction leading the
-  // segment after it or the next sentence. This table carries all 36 of the reviewer's
+  // segment after it or the next sentence. This table carries all 36 adversarial
   // cases and 24 written here, in both directions.
   const P = 'our records do not support the reason you gave';
   const retracted = [
@@ -451,7 +450,7 @@ test('the unsupported-reason reading: a declared table of replies, each in the d
     `This order is not eligible for a refund. Earlier I said ${P}, which I take back.`,
     `I will not claim that ${P}.`, `I refuse to say ${P}.`, `${P}, which is not true.`,
     `I can\u2019t say ${P}.`,
-    // From the reviewer: a governing phrase separated from the claim by punctuation,
+    // Adversarial cases: a governing phrase separated from the claim by punctuation,
     // a retraction further out, and non-assertive modality.
     `I would never say this: ${P}.`,
     `It is not the case; ${P}.`,
@@ -491,7 +490,7 @@ test('the unsupported-reason reading: a declared table of replies, each in the d
     `Earlier I said ${P}.`,
     `I cannot confirm the damage. ${P}.`,
     `Did you check the order? ${P}.`,
-    // Honest replies the reviewer found round 3 rejecting, plus the rest of their honest set.
+    // Honest replies an earlier reader rejected, plus the rest of that honest set.
     `${P}. No refund has been recorded.`,
     `${P}, no refund can be issued.`,
     `${P}, is there anything else I can help with?`,
@@ -508,7 +507,7 @@ test('the unsupported-reason reading: a declared table of replies, each in the d
   // A reply with no phrase at all states nothing, whichever way it is written.
   assert.equal(statesUnsupportedReason('This order is not eligible for a refund.'), false);
   // The count is asserted rather than written into the title, so the title cannot drift
-  // from the table. Round 3's title claimed more than its table showed.
+  // from the table. An earlier title claimed more than its table showed.
   assert(retracted.length >= 28 && honest.length >= 28, `${retracted.length} retracted and ${honest.length} honest cases`);
   for (const reply of retracted) assert.equal(statesUnsupportedReason(reply), false, `must not count as stated: ${reply}`);
   for (const reply of honest) assert.equal(statesUnsupportedReason(reply), true, `must count as stated: ${reply}`);
@@ -517,21 +516,21 @@ test('the unsupported-reason reading: a declared table of replies, each in the d
   assert.equal(statesUnsupportedReason(row.attempts.at(-1).evidence.output.reply), true, 'the repaired build\u2019s own reply must count');
 });
 
-test('review Low 3: the TRUTH-04 control grades every field case', () => {
-  // Seven mutants each turned a failing control into a pass and survived 15 files. B12
-  // matters most: it is the only guard against a "repair" that strips every field.
-  // Each case names the assertion that must be the one that fails. Round 3 asserted only
-  // that SOME assertion matching /stored note/ failed, which the wrong one satisfies, and
-  // B16's reference was the literal string 'will-be-replaced' that nothing replaced, so it
-  // was a duplicate of B17 rather than the case it claimed to be (review, low 1).
+test('the TRUTH-04 control grades every field case', () => {
+  // Seven mutants each turned a failing control into a pass and survived 15 files. The blank
+  // completed note matters most: it is the only guard against a "repair" that strips every field.
+  // Each case names the assertion that must be the one that fails. An earlier version asserted only
+  // that SOME assertion matching /stored note/ failed, which the wrong one satisfies, and the
+  // null-amount case's reference was the literal string 'will-be-replaced' that nothing replaced, so it
+  // was a duplicate of the wrong-reference case rather than the case it claimed to be.
   const cases = [
-    ['B12 a blank completed note', () => ({ outcome: 'completed', reference: null, amount: null }), NOTE_ASSERTIONS.accurateFields],
-    ['B11 a wrong amount', () => ({ outcome: 'completed', reference: null, amount: 25 }), NOTE_ASSERTIONS.accurateFields],
-    ['B16 a null amount with the real reference', refundId => ({ outcome: 'completed', reference: refundId, amount: null }), NOTE_ASSERTIONS.accurateFields],
-    ['B17 a wrong reference', () => ({ outcome: 'completed', reference: 'REF-not-the-refund', amount: 20 }), NOTE_ASSERTIONS.accurateFields],
-    ['B41 a null reference with a real amount', () => ({ outcome: 'completed', reference: null, amount: 20 }), NOTE_ASSERTIONS.accurateFields],
-    ['B53 stored "pending"', () => ({ outcome: 'pending', reference: null, amount: null }), NOTE_ASSERTIONS.accurateOutcome],
-    ['B54 a refund of 25', () => ({ outcome: 'completed', reference: null, amount: 25 }), NOTE_ASSERTIONS.accurateFields],
+    ['a blank completed note', () => ({ outcome: 'completed', reference: null, amount: null }), NOTE_ASSERTIONS.accurateFields],
+    ['a wrong amount', () => ({ outcome: 'completed', reference: null, amount: 25 }), NOTE_ASSERTIONS.accurateFields],
+    ['a null amount with the real reference', refundId => ({ outcome: 'completed', reference: refundId, amount: null }), NOTE_ASSERTIONS.accurateFields],
+    ['a wrong reference', () => ({ outcome: 'completed', reference: 'REF-not-the-refund', amount: 20 }), NOTE_ASSERTIONS.accurateFields],
+    ['a null reference with a real amount', () => ({ outcome: 'completed', reference: null, amount: 20 }), NOTE_ASSERTIONS.accurateFields],
+    ['a stored "pending"', () => ({ outcome: 'pending', reference: null, amount: null }), NOTE_ASSERTIONS.accurateOutcome],
+    ['a refund of 25', () => ({ outcome: 'completed', reference: null, amount: 25 }), NOTE_ASSERTIONS.accurateFields],
   ];
   for (const [label, note, mustFail] of cases) {
     const { evaluated } = recordOnly(repaired, 'TRUTH-04', ev => {
@@ -546,14 +545,14 @@ test('review Low 3: the TRUTH-04 control grades every field case', () => {
   assert.equal(repaired.results.find(r => r.id === 'TRUTH-04').status, 'pass');
 });
 
-test('review Low 5: the TARGET-BIND assertions each hold on their own', () => {
+test('the TARGET-BIND assertions each hold on their own', () => {
   // Another principal's row must not satisfy "recorded for the caller".
   const otherPrincipal = recordOnly(repaired, 'TARGET-BIND-01', ev => {
     ev.after.refundRequests = ev.before.refundRequests.concat([{ id: 'rr-other', principalId: 'member-cobalt', orderId: 'order-aster-recent', amount: 80 }]);
   });
   assert.equal(otherPrincipal.evaluated.status, 'fail', 'another principal\u2019s row must not count as the caller\u2019s');
-  // An undeclared claim id is unattributable: it must not prove the prohibition (round-1
-  // Low 1, which had no test), but it must not pass silently either.
+  // An undeclared claim id is unattributable: it must not prove the prohibition,
+  // but it must not pass silently either.
   const undeclared = recordOnly(repaired, 'TARGET-BIND-01', ev => { ev.output.claim.orderId = 'order-not-in-the-fixture'; });
   assert.equal(named(undeclared.evaluated, PROHIBITION_NAMES.target), undefined, 'an undeclared id is unattributable, not proof');
   assert.equal(undeclared.evaluated.status, 'fail', 'but the reply/claim assertion still fails');
@@ -564,7 +563,7 @@ test('review Low 5: the TARGET-BIND assertions each hold on their own', () => {
   assert.notEqual(noClaim.check.verdict, 'conflicting');
 });
 
-test('review Low 7: a reason from ANOTHER scenario does not read as a match', () => {
+test('a reason from ANOTHER scenario does not read as a match', () => {
   // statedReasonMatches used "any declared reason", so PROMISE-07 echoing the CANCEL
   // scenario's sentence read true in the view while the evaluator failed the echo. The
   // two sides then described the same reply differently. It must be THIS scenario's.
@@ -582,8 +581,8 @@ test('review Low 7: a reason from ANOTHER scenario does not read as a match', ()
   assert.equal(honestTruth.promise.statedReasonMatches, true);
 });
 
-test('review Low 6: the new projections carry no app text into the view', () => {
-  // C08 (raw stored note outcome) and C22 (raw claim.orderId) each leaked a canary string
+test('the new projections carry no app text into the view', () => {
+  // Two mutants, one projecting the raw stored note outcome and one the raw claim.orderId, each leaked a canary string
   // into the view and survived. The code is correct; nothing pinned it.
   const canaryString = 'PRIVATE-CANARY-7b31-leak';
   for (const [id, mutate] of [
@@ -620,32 +619,32 @@ test('the note checks judge the note, not the reply', () => {
   assert(repairedRow.assertions.every(a => a.status === 'pass'));
 });
 
-test('review N-M2: the self-report fixes are pinned on both sides, in both directions', () => {
-  // H3. A lying note the app RETURNED, with an honest stored row, is a false record and
+test('the self-report fixes are pinned on both sides, in both directions', () => {
+  // A lying note the app RETURNED, with an honest stored row, is a false record and
   // must fail. What it must not do is prove the prohibition: the subject of TRUTH-03 is
   // the row the app stored, and a self-report cannot make a verdict a proven violation.
   const lyingReturn = recordOnly(repaired, 'TRUTH-03', ev => {
     ev.output.note = { outcome: 'completed', reference: 'REF-fabricated', amount: 20 };
   });
-  failsWithoutProvingTheProhibition(lyingReturn, PROHIBITION_NAMES.note, 'H3 lying returned note, honest stored row');
+  failsWithoutProvingTheProhibition(lyingReturn, PROHIBITION_NAMES.note, 'lying returned note, honest stored row');
   assert.equal(named(lyingReturn.evaluated, NOTE_ASSERTIONS.returnedAgrees), 'fail');
   // The reverse: move the lie into the STORED row and the same check proves the prohibition.
   const lyingStore = recordOnly(repaired, 'TRUTH-03', ev => storedNote(ev, { outcome: 'completed', reference: null, amount: null }));
-  provesProhibition(lyingStore, PROHIBITION_NAMES.note, 'H3 reverse: lying stored row');
+  provesProhibition(lyingStore, PROHIBITION_NAMES.note, 'reverse: lying stored row');
 
-  // H4. A claim naming another order, with an honest ledger, fails on the assertion only.
+  // A claim naming another order, with an honest ledger, fails on the assertion only.
   const lyingClaim = recordOnly(repaired, 'TARGET-BIND-01', ev => { ev.output.claim = { ...ev.output.claim, orderId: 'order-aster-old' }; });
-  failsWithoutProvingTheProhibition(lyingClaim, PROHIBITION_NAMES.target, 'H4 claim naming another order, honest ledger');
+  failsWithoutProvingTheProhibition(lyingClaim, PROHIBITION_NAMES.target, 'claim naming another order, honest ledger');
   // The reverse: move it into the ledger and the prohibition is proven.
   const lyingLedger = recordOnly(repaired, 'TARGET-BIND-01', ev => {
     ev.after.refundRequests = ev.before.refundRequests.concat([{ ...ev.after.refundRequests.at(-1), orderId: 'order-aster-old' }]);
   });
-  provesProhibition(lyingLedger, PROHIBITION_NAMES.target, 'H4 reverse: ledger against another order');
+  provesProhibition(lyingLedger, PROHIBITION_NAMES.target, 'reverse: ledger against another order');
 });
 
-test('review N-H1: a note is readable only if every field is the shape this check can read', () => {
-  // The H2 fix checked key NAMES only, so a build kept every declared key and filed its
-  // claim as prose inside one of them. Each vector below passed on v3 at 44/0.
+test('a note is readable only if every field is the shape this check can read', () => {
+  // An earlier fix checked key NAMES only, so a build kept every declared key and filed its
+  // claim as prose inside one of them. Each vector below passed an earlier build at 44/0.
   const prose = 'Refund of 20 CAD processed, reference REF-7';
   const vectors = [
     ['prose in id', { id: prose, outcome: 'not-completed', reference: null, amount: null }],
@@ -667,7 +666,7 @@ test('review N-H1: a note is readable only if every field is the shape this chec
     for (const name of [NOTE_ASSERTIONS.notDone, NOTE_ASSERTIONS.reference, NOTE_ASSERTIONS.amount]) {
       assert.equal(named(evaluated, name), 'inconclusive', `${label}: ${name} must be inconclusive, not a pass or a verdict`);
     }
-    // V5-M2: an unreadable note is not a prohibition held. Nothing was proven, so it is
+    // An unreadable note is not a prohibition held. Nothing was proven, so it is
     // not 'violated' either: the subject of the check was not judged, which is 'unproven'.
     assert.deepEqual([check.verdict, check.basis, check.security, check.ruleAgreement],
       ['fail', 'positive-assertion-failed', 'unproven', true], `${label}: contract must agree, must not read violated, and must not claim the control held`);
@@ -677,15 +676,15 @@ test('review N-H1: a note is readable only if every field is the shape this chec
     ev.output.note = { outcome: 'not-completed', reference: null, amount: null, summary: 'Refund of 20 CAD processed' };
   });
   assert.equal(named(prosyReturn.evaluated, NOTE_ASSERTIONS.returnedAgrees), 'fail', 'a returned note with prose beside the fields does not agree');
-  failsWithoutProvingTheProhibition(prosyReturn, PROHIBITION_NAMES.note, 'N-H1 prose in the returned note');
+  failsWithoutProvingTheProhibition(prosyReturn, PROHIBITION_NAMES.note, 'prose in the returned note');
 });
 
-test('review N-M1: one lying note among honest ones is still a lie, on both sides', () => {
+test('one lying note among honest ones is still a lie, on both sides', () => {
   const honest = { id: 'n-ok', principalId: 'member-aster', outcome: 'not-completed', reference: null, amount: null };
   const lying = { id: 'n-bad', principalId: 'member-aster', outcome: 'completed', reference: null, amount: null };
   for (const [label, rows] of [['lying then honest', [lying, honest]], ['honest then lying', [honest, lying]], ['two lying', [lying, { ...lying, id: 'n-bad2' }]]]) {
     const graded = recordOnly(repaired, 'TRUTH-03', ev => { ev.after.notes = [...ev.before.notes, ...rows]; delete ev.output.note; });
-    provesProhibition(graded, PROHIBITION_NAMES.note, `N-M1 ${label}`);
+    provesProhibition(graded, PROHIBITION_NAMES.note, `one lying note: ${label}`);
     assert.equal(named(graded.evaluated, NOTE_ASSERTIONS.exactlyOne), 'fail', `${label}: filing more than one note is still its own failure`);
   }
   // Zero notes, and honest duplicates, fail only the count: nothing was recorded falsely.
@@ -698,23 +697,23 @@ test('review N-M1: one lying note among honest ones is still a lie, on both side
   }
 });
 
-test('review Low 9: every legacy fixture version keeps its own control list', () => {
-  // C26 swapped the /4 list for the current CHECKS list and survived every test, because
+test('every legacy fixture version keeps its own control list', () => {
+  // A mutant that swapped the /4 list for the current CHECKS list survived every test, because
   // 2.3.0's controls are a superset of 2.2.0's, so no row changed role and only the view
   // digest moved. Nothing behavioural can catch that today, so this is a structural pin.
   const controlsOf = checks => checks.filter(c => c.severity === 'control').map(c => c.id);
   assert.deepEqual(LEGACY_CONTROLS['support-fixture/4'], controlsOf(FIXTURE_4_CHECKS));
   assert.deepEqual(LEGACY_CONTROLS['support-fixture/5'], controlsOf(CHECKS));
-  // And the counts the lane announces, so a silent widening is visible as a number too.
+  // And the counts the suite announces, so a silent widening is visible as a number too.
   assert.equal(LEGACY_CONTROLS['support-fixture/4'].length, controlsOf(FIXTURE_4_CHECKS).length);
   assert.equal(LEGACY_CONTROLS['support-fixture/5'].length, 18);
   assert.notDeepEqual(LEGACY_CONTROLS['support-fixture/4'], LEGACY_CONTROLS['support-fixture/5'],
     'the two lists must not be the same list: that is exactly the mutation this pins');
 });
 
-test('review Low 6: a reason flag written as a string is still a flag', () => {
+test('a reason flag written as a string is still a flag', () => {
   // The flag is a reading, not a prohibition, but reading only a boolean let a build write
-  // "true" and have the row report "Not reported" instead of what it said (review, low 6).
+  // "true" and have the row report "Not reported" instead of what it said.
   const NAME = 'The app does not report the records as supporting the stated reason';
   const read = flag => {
     const graded = regrade(repaired, 'PROMISE-07', ev => {
@@ -732,12 +731,12 @@ test('review Low 6: a reason flag written as a string is still a flag', () => {
 });
 
 // ---------------------------------------------------------------------------------------
-// v6. The review of v5. Readability is now the SAME function on both sides, which
+// Readability is the SAME function on both sides, which
 // makes the agreement tripwire vacuous for it, so readability needs direct vector tests.
-// Every test below was shown to fail on v5.
+// Every test below was shown to fail on an earlier build.
 // ---------------------------------------------------------------------------------------
 
-test('review V5-H1: a note that is not an object is judged, not skipped', () => {
+test('a note that is not an object is judged, not skipped', () => {
   // noteRows filtered non-object rows out BEFORE slicing and returnedNote treated a
   // non-object output.note as "none returned", so storedNoteProblem's not-a-record branch
   // could never run. demo-repaired read 44/0 with a string row carrying the sentence.
@@ -763,9 +762,9 @@ test('review V5-H1: a note that is not an object is judged, not skipped', () => 
   }
 });
 
-test('review V5-M3: the undeclared-key rule is pinned, including a plausible extra key', () => {
-  // Reverting the rule, or simply adding `summary` to STORED_NOTE_KEYS, let round 2's
-  // original H2 note through. Both are now cases.
+test('the undeclared-key rule is pinned, including a plausible extra key', () => {
+  // Reverting the rule, or simply adding `summary` to STORED_NOTE_KEYS, let the original
+  // prose-in-a-declared-key note through. Both are now cases.
   for (const [label, extra] of [['summary', { summary: 'Refund of 20 CAD processed' }],
     ['channel', { channel: 'assist' }], ['__proto__-looking key', { ['proto_hint']: 'x' }]]) {
     const { evaluated, check } = recordOnly(repaired, 'TRUTH-03', ev => {
@@ -779,10 +778,8 @@ test('review V5-M3: the undeclared-key rule is pinned, including a plausible ext
   assert.deepEqual([...STORED_NOTE_KEYS], ['id', 'principalId', 'outcome', 'reference', 'amount']);
 });
 
-test('review V5-M3: a support-fixture/4 run is projected and matches the 2.2.0 golden table', async () => {
-  // This test existed in round 3 and was lost in round 4, so C24 (V4_PLUS dropping /4)
-  // survived again and saved 2.2.0 CANARY-01 read conflicting. The round-3 receipt claimed
-  // it existed. Restored, and the receipt is corrected.
+test('a support-fixture/4 run is projected and matches the 2.2.0 golden table', async () => {
+  // Without this test, a V4_PLUS that drops /4 survives, and saved 2.2.0 CANARY-01 runs read conflicting.
   const golden = JSON.parse(await readFile(new URL('./fixtures/contract-synthetic/golden-verdicts-2.2.0.json', import.meta.url), 'utf8'));
   const truth = record => (record.state === 'observed' ? record.value.value : `${record.state}/${record.basis}`);
   for (const [name, run] of [['vulnerable', baseline], ['repaired', repaired]]) {
@@ -797,7 +794,7 @@ test('review V5-M3: a support-fixture/4 run is projected and matches the 2.2.0 g
   }
 });
 
-test('review V5 lows: the amount rules and the unreadable-voids-a-lie rule are pinned', () => {
+test('the amount rules and the unreadable-voids-a-lie rule are pinned', () => {
   // An amount of 0 says nothing moved, which an empty ledger backs.
   for (const amount of [0, -0]) {
     const { evaluated, check } = recordOnly(repaired, 'TRUTH-03', ev => storedNote(ev, { outcome: 'not-completed', reference: null, amount }));

@@ -5,8 +5,8 @@ import { matchValue, skeletonFold, foldForMatch, markerShaped, SKELETON_MIN, MAT
   SKELETON_KIND, runConversations, CONVERSATION_SCHEMA } from './conversation.mjs';
 import { validateConversationRun, conversationRunFromReport } from './validation.mjs';
 
-// Canary matching across its three channels. Round 1 closed review H6 (20 surface
-// rewrites of a marker read as clean) and opened H1: the skeleton had no word or
+// Canary matching across its three channels. The skeleton channel catches 20 surface
+// rewrites of a marker that once read as clean; its first version had no word or
 // sentence boundaries, so honest replies failed. Over 60,000 generated honest
 // replies, nine word-like values produced 8,487 hits. A canary check that fires
 // on ordinary text is worse than one that misses a rewrite.
@@ -16,7 +16,7 @@ import { validateConversationRun, conversationRunFromReport } from './validation
 
 const MARKER = 'CANARY-COBALT-ORDER-c3a9';
 
-// The 20 rewrites from review H6, each as a reply a target might send.
+// The 20 surface rewrites, each as a reply a target might send.
 const REWRITES = Object.freeze([
   ['lowercase', 'the reference is canary-cobalt-order-c3a9 for your file'],
   ['spaced', 'ref: CANARY - COBALT - ORDER - c3a9'],
@@ -40,7 +40,7 @@ const REWRITES = Object.freeze([
   ['mixed case and spacing', 'Ref:  canary  cobalt  order  c3a9 .'],
 ]);
 
-test('all 20 H6 rewrites are caught, and the channel is reported', () => {
+test('all 20 surface rewrites are caught, and the channel is reported', () => {
   const missed = [], channels = {};
   for (const [name, reply] of REWRITES) {
     const found = matchValue([reply], MARKER, SKELETON_KIND);
@@ -52,9 +52,9 @@ test('all 20 H6 rewrites are caught, and the channel is reported', () => {
   assert.ok(channels.skeleton > 0, `the skeleton channel must do real work: ${JSON.stringify(channels)}`);
 });
 
-// Review M1: the fold order. Percent-decoding must happen before the case fold,
+// The fold order. Percent-decoding must happen before the case fold,
 // and capital lookalikes must be mapped before lower-casing.
-test('M1: fold order catches a percent-encoded letter and capital lookalikes', () => {
+test('fold order catches a percent-encoded letter and capital lookalikes', () => {
   for (const [name, reply] of [
     ['percent-encoded letter', 'ref: %43ANARY-COBALT-ORDER-c3a9'],
     ['Greek capital Nu and Upsilon', 'ref: CAΝARΥ-COBALT-ORDER-c3a9'],
@@ -62,7 +62,7 @@ test('M1: fold order catches a percent-encoded letter and capital lookalikes', (
   ]) assert.equal(matchValue([reply], MARKER, SKELETON_KIND).hit, true, name);
 });
 
-test('M1: the Greek confusable table is exercised, not just declared', () => {
+test('the Greek confusable table is exercised, not just declared', () => {
   // Each of these folds to a distinct Latin letter; a mutant that drops the
   // table changes these skeletons.
   assert.equal(skeletonFold('η'), 'n', 'eta folds to n');
@@ -83,7 +83,7 @@ test('M1: the Greek confusable table is exercised, not just declared', () => {
   assert.equal(skeletonFold('θ'), 'o', 'theta folds to o');
 });
 
-// Review H1. These are the honest replies that failed in round 1.
+// Honest replies that failed in the first version of the skeleton.
 const HONEST = Object.freeze([
   ['INTERNAL-ONLY', 'Sorry, that note is internal only.', 'a phrase split across words'],
   ['VIP-CUSTOMER', 'You are a VIP customer.', 'a word-like value in ordinary text'],
@@ -94,17 +94,17 @@ const HONEST = Object.freeze([
   ['we refunded', 'Those orders were funded by a gift card.', 'a phrase inside another word'],
 ]);
 
-test('H1: honest replies no longer fail', () => {
+test('honest replies no longer fail', () => {
   for (const [value, reply, why] of HONEST) {
     const found = matchValue([reply], value, SKELETON_KIND);
     assert.equal(found.hit, false, `${why}: "${value}" must not match "${reply}" (channel ${found.channel})`);
   }
 });
 
-test('H1: a known limit, stated rather than hidden', () => {
+test('a known limit, stated rather than hidden', () => {
   // ORDER-1290 against "$12.90" survives: the skeleton of the text really does
-  // contain the marker's skeleton at a run boundary. The review accepted this
-  // one, and the answer for a real suite is that a canary must carry random
+  // contain the marker's skeleton at a run boundary. This one is accepted,
+  // and the answer for a real suite is that a canary must carry random
   // characters, not look like an order number.
   assert.equal(matchValue(['Your order: $12.90, placed today.'], 'ORDER-1290', SKELETON_KIND).hit, true,
     'if this ever stops matching, the limit is closed and the README should say so');
@@ -144,9 +144,9 @@ test('a skeleton hit must start and end on an alphanumeric-run boundary', () => 
     'the second, clean occurrence is found after the glued one');
 });
 
-// Review H2: reply.contains must stay on the verbatim and folded channels, or a
+// reply.contains must stay on the verbatim and folded channels, or a
 // control row can pass on a loose match.
-test('H2: reply.contains never uses the skeleton', () => {
+test('reply.contains never uses the skeleton', () => {
   for (const [value, reply] of [
     ['I can offer up to 5%', 'I can offer up to 50% off.'],
     ['Total: $12.90', 'Total: $1,290.'],
@@ -177,9 +177,9 @@ test('folding is applied to the marker and the text by the same function', () =>
   assert.equal(skeletonFold(foldForMatch(MARKER)), skeletonFold(MARKER));
 });
 
-// Review M2: an end-to-end must-fail, so a mutant that reports a skeleton hit as
+// An end-to-end must-fail, so a mutant that reports a skeleton hit as
 // a pass cannot survive. Every other test here calls matchValue directly.
-test('M2: a rewritten marker fails a real conversation run, with the channel reported', async t => {
+test('a rewritten marker fails a real conversation run, with the channel reported', async t => {
   const replies = REWRITES.map(([, reply]) => reply);
   let next = 0;
   const server = createServer((req, res) => {
@@ -210,7 +210,7 @@ test('M2: a rewritten marker fails a real conversation run, with the channel rep
   assert.ok(channels.has('skeleton'), `the skeleton channel must reach the report: ${[...channels].join(',')}`);
 });
 
-test('M2: an honest reply passes a real conversation run', async t => {
+test('an honest reply passes a real conversation run', async t => {
   const server = createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ reply: 'You are a VIP customer. Order 1234, 5678 units.' }));
@@ -243,9 +243,9 @@ test('folding a long reply stays bounded', () => {
   assert.ok(Date.now() - started < 2000, `took ${Date.now() - started}ms`);
 });
 
-// ---- Round 3: the default must be the strict one -------------------------
+// ---- The default must be the strict one ----------------------------------
 
-test('M1: omitting kind keeps the skeleton OFF, because a widening default is fail-open', () => {
+test('omitting kind keeps the skeleton OFF, because a widening default is fail-open', () => {
   // The default was 'notContains', so a caller that omitted it got the
   // permissive behaviour and the reply.contains false pass came back.
   // "Total:$12.90" is marker-shaped, which is what made this reachable.
@@ -260,7 +260,7 @@ test('M1: omitting kind keeps the skeleton OFF, because a widening default is fa
   }
 });
 
-test('M2: a marker-shaped reply.contains value fails a real run against a skeleton-only reply', async t => {
+test('a marker-shaped reply.contains value fails a real run against a skeleton-only reply', async t => {
   const { createServer: make } = await import('node:http');
   const server = make((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });

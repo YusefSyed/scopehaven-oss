@@ -1,5 +1,5 @@
-// Form decimals, fail direction only (FORM-DECIMALS-DESIGN.md). A form-encoded value such as amount=105.05 read unknown against a
-// pinned 105.5, so a field-pinned clause abstained on a refund that plainly differs (the G2 replay's R62-024 and R62-133). A form
+// Form decimals, fail direction only. A form-encoded value such as amount=105.05 read unknown against a
+// pinned 105.5, so a field-pinned clause abstained on a refund that plainly differs. A form
 // decimal now has two readings (the separator as a decimal mark or as a group mark) and a rounding band at the pinned precision;
 // when none gives the pinned value it reads "no", but only inside the fail-only judgements (src/effect-events.mjs
 // evaluateEffectAssertion, integrations/collateral/only.mjs judgeOnly), which keep that reading only when it makes a missing clause

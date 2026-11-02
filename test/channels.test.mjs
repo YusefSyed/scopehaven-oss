@@ -1,4 +1,4 @@
-// The declared-channel rule for absence (N11, src/channels.mjs). A boundary absence pass counts only when every channel the
+// The declared-channel rule for absence (src/channels.mjs). A boundary absence pass counts only when every channel the
 // profile declares was observed in that check's window by an observer that holds its records, no declared observer's window
 // carried an effect the check's clauses do not select, and the run's confinement shows no undeclared way out; otherwise the
 // report, SARIF and the comparison read it inconclusive (channel-unobserved:<channel>, channel-unaccounted:<channel>,

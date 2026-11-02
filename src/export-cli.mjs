@@ -12,11 +12,11 @@ import { residualDocument } from './residual.mjs';
 import { compareRuns } from './runner.mjs';
 import { assertRuntime } from './runtime.mjs';
 import { idValid } from './http.mjs';
-// Coverage in every export (NC1 item 3): the operator's pre-run coverage report when its files are given (read only), and the
+// Coverage in every export: the operator's pre-run coverage report when its files are given (read only), and the
 // per-actor allowed-use coverage read from the run (src/report.mjs coverageOf). Presentation only: outside every verdict and hash.
 import { coverageReport, coverageLines } from '../integrations/coverage-report/coverage.mjs';
 import { validateTargetFile, contractDigest } from './contracts.mjs';
-// Signed by default (NC1 item 4): the `scopehaven export` command signs every export into a DSSE envelope beside it with a local
+// Signed by default: the `scopehaven export` command signs every export into a DSSE envelope beside it with a local
 // Ed25519 key (integrations/attest), unless --unsigned. The signer verifies its own envelope before the envelope is written; a
 // failed sign removes the export it would have covered. Library callers of exportRun() and main() sign only when asked
 // (sign: true, a signing key directory, or main's signedByDefault), so a test or a tool that signs with its own key makes no key.

@@ -347,7 +347,7 @@ runs:
           fi
           rm -f "$work/pack-status.err"
         fi
-        # CMP-ROE-01: the record is checked here, before the wait or any request: the same check assess and the gate make
+        # The authorization record is checked here, before the wait or any request: the same check assess and the gate make
         # (target, every endpoint, every credentialed account, the window now), and the wait-url's origin, which the wait
         # contacts, must be one of the record's origins too. A refusal names its code and contacts nothing.
         # Pinned packs, checked first: the authorization check below loads the profile too, and would refuse a lock that does not

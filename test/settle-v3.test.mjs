@@ -1,5 +1,6 @@
-// SETTLE-V3 fixes A and C over synthetic admitted scoped egress windows (the shape the connector collects and the validator
-// binds); fix B is test 24 of test/http-settlement-judge.test.mjs, and the connector end to end is in
+// Late scoped entries (A: a decided fail or count; C: the late-entry lift) over synthetic admitted scoped egress windows (the shape
+// the connector collects and the validator binds); a countBy effect.only clause under the judge is test 24 of
+// test/http-settlement-judge.test.mjs, and the connector end to end is in
 // test/egress-scoped-coverage.test.mjs. Pure decisions: no socket, no database, no model, no provider. Each newly decided case
 // sits beside the forbidden case next to it.
 //   A: a fail or count on a selector no entry could fit is decided on a scoped window whose late entries were followed.
@@ -43,13 +44,13 @@ const verdictOf = (clause, windows) => decideEffects([clause], windows)[0].verdi
 const only = ({ expect = [sel(BILL, CHARGE)], allow = [sel(CRM, SYNC)], countBy } = {}) => ({ kind: 'effect.only', expect: expect.map(select => ({ select, count: 1 })), allow, sources: ['http-egress'], ...(countBy ? { countBy } : {}) });
 
 // ---------------------------------------------------------------------------
-// Fix A.
+// A.
 test('A. a fail or a count on another destination is decided through a followed late entry; the pass rule is unchanged', () => {
   const crmLate = () => scoped([], [[CRM, SYNC]]);
   assert.equal(verdictOf(exists(BILL, CHARGE), [crmLate()]), 'fail', 'the missing write fails (was missing)');
   assert.equal(verdictOf(count(BILL, CHARGE, 1), [crmLate()]), 'fail', 'a count of 1 over 0 sends fails (was missing)');
-  assert.equal(verdictOf(none(BILL, CHARGE), [crmLate()]), 'pass', 'the pass reads as on main');
-  assert.equal(verdictOf(count(BILL, CHARGE, 0), [crmLate()]), 'pass', 'a count that would pass reads as on main');
+  assert.equal(verdictOf(none(BILL, CHARGE), [crmLate()]), 'pass', 'the pass reads as before');
+  assert.equal(verdictOf(count(BILL, CHARGE, 0), [crmLate()]), 'pass', 'a count that would pass reads as before');
   // An in-flight entry the drain followed reads the same.
   assert.equal(verdictOf(exists(BILL, CHARGE), [scoped([], [[CRM, SYNC, [IN_FLIGHT]]])]), 'fail');
   // Every outcome reads the same coverage now.
@@ -71,13 +72,13 @@ test('A adjacent: a fitting entry, a path-ambiguous entry and an unfollowed wind
 });
 
 // ---------------------------------------------------------------------------
-// Fix C.
+// C.
 test('C. an effect.only pass reads through late sends that definitely fit an allowed selector and fit no expected one', () => {
   const w = () => scoped([ev(BILL, CHARGE)], [[CRM, SYNC]]);
   const decided = decideEffects([only()], [w()])[0];
   assert.equal(decided.verdict, 'pass', decided.basis);
   assert.match(decided.basis, /did not attribute fits an allowed selector and no expected one/);
-  // Without the lift (main) the same window reads missing.
+  // Without the lift the same window reads missing.
   assert.equal(judgeOnly(only(), [w()], { fields: true, countBy: true }).verdict, 'missing');
   // An in-flight entry and a prefix allow (decided on the entry's exact text) lift alike.
   assert.equal(verdictOf(only(), [scoped([ev(BILL, CHARGE)], [[CRM, SYNC, [IN_FLIGHT]]])]), 'pass', 'in flight, drain followed');
@@ -100,11 +101,11 @@ test('C adjacent: an allow with a hidden pin, an expected could-fit, a null reso
     [only(), w([[CRM, 'POST *'], [CRM, SYNC]]), 'one of two entries is not allowed'],
   ];
   for (const [clause, window, why] of cases) assert.equal(verdictOf(clause, [window]), 'missing', why);
-  // Review of SETTLE-V3: a second recorder's window-wide gap is not lifted with the first one's (every gap must be lifted).
+  // A second recorder's window-wide gap is not lifted with the first one's (every gap must be lifted).
   const mailToo = only({ allow: [sel(CRM, SYNC), sel(MAIL)] });
   assert.equal(verdictOf(mailToo, [w(), other([], 'partial')]), 'missing', 'one lifted window, one window-wide partial');
   assert.equal(verdictOf(mailToo, [w(), other()]), 'pass', 'adjacent: the second recorder complete');
-  // Review of SETTLE-V3: an event the window did not record as committed must be one of its entries' sends.
+  // An event the window did not record as committed must be one of its entries' sends.
   const unknown = resource => scoped([ev(BILL, CHARGE), ev(CRM, resource, { outcome: 'unknown' })], [[CRM, SYNC]]);
   assert.equal(verdictOf(only(), [unknown('POST /v1/other')]), 'missing', 'a non-committed event no entry covers');
   assert.equal(verdictOf(only(), [unknown(SYNC)]), 'pass', 'adjacent: the entry covers it');
@@ -115,7 +116,7 @@ test('C adjacent: under countBy an entry anywhere on an expected selector\'s hos
   const spec = countBy => only({ allow: [sel(BILL, REFUND)], countBy });
   assert.equal(verdictOf(spec(), [w()]), 'pass', 'no countBy: the refund is allowed and cannot be the charge');
   assert.equal(verdictOf(spec('idempotency-key'), [w()]), 'missing', 'countBy: host-wide');
-  // Review of SETTLE-V3: under countBy an entry on any host that records keys never lifts, allowed-only or not (an unseen send could
+  // Under countBy an entry on any host that records keys never lifts, allowed-only or not (an unseen send could
   // share a key with one seen and make it an unproven resend); a host that records no keys lifts as without countBy.
   const crmKeyed = Object.freeze({ ...SCOPE, idempotency: { [CRM]: validateIdempotencyDeclaration({ header: 'idempotency-key' }) } });
   const keyedCrm = scope => scoped([ev(BILL, CHARGE)], [[CRM, SYNC]], { scope });
@@ -124,7 +125,7 @@ test('C adjacent: under countBy an entry anywhere on an expected selector\'s hos
   assert.equal(verdictOf(only(), [keyedCrm(crmKeyed)]), 'pass', 'adjacent: no countBy, keys are not read');
 });
 
-// Fix C follow-up (2026-10-12): host-wide fitting applies only on a host that records keys, whose entries never lift. On a host
+// Host-wide fitting applies only on a host that records keys, whose entries never lift. On a host
 // that records none, countBy judges a send as without it, so an entry there fits an expected selector only on its resource.
 const CRM_KEYED = Object.freeze({ ...SCOPE, idempotency: { [CRM]: validateIdempotencyDeclaration({ header: 'idempotency-key' }) } });
 const keyedOnly = (crm, allow = [sel(CRM, SYNC)]) => only({ expect: [sel(BILL, CHARGE), sel(CRM, crm)], allow, countBy: 'idempotency-key' });
@@ -140,7 +141,7 @@ test('C under countBy: a late send on a host that records no keys, to another re
   assert.equal(judgeOnly(clause, [lateSync()], { fields: true, countBy: true }).verdict, 'missing', 'without the lift');
   assert.equal(verdictOf(keyedOnly(CLOSE, [sel(CRM)]), [lateSync()]), 'pass', 'a whole-host allow');
   assert.equal(verdictOf(clause, [lateSync(SCOPE)]), 'pass', 'a window that records no keys at all');
-  // Under the judge the pass stands when the sync lands after the check (fix B: counted as its own, worst case).
+  // Under the judge the pass stands when the sync lands after the check (counted as its own, worst case).
   const row = { effects: [decided], windows: [w] };
   assert.deepEqual(settlementFindings([row], [[complete([], KEYED)], [complete([ev(CRM, SYNC)], KEYED)]], undefined, { judge: true }), [['effect-outside-window-judged']]);
 });
@@ -168,7 +169,7 @@ test('C: the lift is toward a pass only; every other result is exactly the one w
   same(only({ expect: [{ ...sel(BILL, CHARGE), actor: 'svc' }] }), [ev(BILL, CHARGE)], 'an unattributable expected send');
   same(only(), [ev(BILL, CHARGE), ev(BILL, REFUND)], 'an offending send');
   same(only(), [ev(BILL, CHARGE), ev(BILL, CHARGE)], 'beyond its count');
-  // Review of SETTLE-V3: a claimed operation no vouching observer covers keeps main's gap result (missing), never unobservable.
+  // A claimed operation no vouching observer covers keeps the gap result (missing), never unobservable.
   const { sources, ...anySource } = only();
   const audit = { source: 'sql-audit-table', instanceId: 'sqlite-audit-db', scope: { operations: ['insert'], names: null, actorAttribution: 'none', evidence: 'authoritative' }, coverage: 'complete', reason: null, events: [] };
   const windows = [w([ev(BILL, CHARGE)]), audit];
@@ -186,7 +187,7 @@ test('C under the judge: an own scoped window carries the lift into the re-judge
   assert.equal(first.effects[0].verdict, 'pass', first.effects[0].basis);
   const gaps = rows => [[complete()], ...rows.slice(1).map(() => [complete()]), [complete([ev(CRM, SYNC)])]];
   assert.deepEqual(settlementFindings([first], gaps([first]), undefined, { judge: true }), [['effect-outside-window-judged']], 'judged: the sync counted as its own is allowed');
-  assert.deepEqual(settlementFindings([first], gaps([first]), undefined), [['effect-outside-window']], 'undeclared: the 2026-10-10 rule');
+  assert.deepEqual(settlementFindings([first], gaps([first]), undefined), [['effect-outside-window']], 'undeclared: the withholding rule');
   // A later check's scoped window with an allowed late sync and no event: covered under the declaration, unobserved without it.
   const before = rowOf([only()], [complete([ev(BILL, CHARGE)])]), after = rowOf([none(BILL, REFUND)], [scoped([], [[CRM, SYNC]])]);
   const quiet = [[complete()], [complete()], [complete()]];
@@ -195,7 +196,7 @@ test('C under the judge: an own scoped window carries the lift into the re-judge
   // Adjacent: a later late entry this clause does not allow is still unobserved under the declaration.
   const otherLate = rowOf([none(BILL, REFUND)], [scoped([], [[CRM, 'POST *']])]);
   assert.deepEqual(settlementFindings([before, otherLate], quiet, undefined, { judge: true })[0], ['settlement-unobserved'], 'judged: an unallowed later entry');
-  // Review of SETTLE-V3: a lifted own window with no candidate of its own keeps its lift when another instance's window takes one.
+  // A lifted own window with no candidate of its own keeps its lift when another instance's window takes one.
   const mailToo = only({ allow: [sel(CRM, SYNC), sel(MAIL)] });
   const two = rowOf([mailToo], [scoped([ev(BILL, CHARGE)], [[CRM, SYNC]]), other()]);
   assert.equal(two.effects[0].verdict, 'pass', two.effects[0].basis);

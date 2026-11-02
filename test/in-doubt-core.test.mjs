@@ -1,8 +1,8 @@
-// In-doubt resolution, IDR-1: the resolution core (src/in-doubt.mjs) and resolver R0 (IN-DOUBT-DESIGN-ADDENDUM-R1 1.1, 1.3 to 1.5 and 2;
-// ADDENDUM-R2 2.1 to 2.5; IN-DOUBT-REVIEW-R2's IDR-1 conditions a to d; PR342-REVIEW findings 1 to 4). Checked: the strict combination with
-// resolver applicability owned by the core; R0 per attempt; the retry whose first attempt was forwarded and reset; operations and group
-// intervals (full interval on any failure or conflict); gates A and B and the backend tier; countBy and keyed effect.only under "resolved"
-// (the review's wrong pass, now a fail); a seeded differential against main's frozen evaluator with no opt-in, keyed sends included; the
+// In-doubt resolution: the resolution core (src/in-doubt.mjs) and its first resolver, r0, the transport record. Checked: the strict
+// combination with resolver applicability owned by the core; the transport record per attempt; the retry whose first attempt was
+// forwarded and reset; operations and group intervals (full interval on any failure or conflict); gates A and B and the backend tier;
+// countBy and keyed effect.only under "resolved" (a refused attempt beside an applied same-key retry fails); a seeded differential
+// against a frozen earlier evaluator with no opt-in, keyed sends included; the
 // property that failing any record never turns a non-pass into a pass, for clauses, operations and groups, and never narrows a group's
 // interval; window copies; the forwarder and the recorder over real loopback; and sealed connector runs recomputed by the validator.
 //
@@ -63,11 +63,11 @@ const core = clause => { const { semantics: _s, ...rest } = clause; return rest;
 const verdictOf = (clause, windows) => clause.kind === 'effect.only' ? judgeOnly(clause, windows, { fields: true, countBy: true }).verdict : evaluateEffectAssertion(core(clause), windows, { countBy: true }).verdict;
 const r = (resolver, status, result) => status === 'succeeded' ? { resolver, status, result } : { resolver, status, reason: result };
 const stripTransport = events => events.map(e => { if (!e.upstream?.transport) return e; const { transport: _t, ...u } = e.upstream; return { ...e, upstream: u }; });
-// A stub later resolver (r1) that applies to every in-doubt attempt and takes supplied records, as IDR-3 and IDR-4 will.
+// A stub later resolver (r1) that applies to every in-doubt attempt and takes supplied records, as read-back and the request feed do.
 const STUB_TABLE = Object.freeze({ ...RESOLVER_TABLE, r1: Object.freeze({ applies: inDoubtAttempt }) });
 
 // ---------------------------------------------------------------------------------------------------------------------------------
-test('1. strict combination, with resolver applicability owned by the core (PR342-REVIEW finding 4)', () => {
+test('1. strict combination, with resolver applicability owned by the core', () => {
   assert.equal(combine([]), 'in-doubt');
   assert.equal(combine([r('r0', 'succeeded', 'refutes')]), 'refuted');
   assert.equal(combine([r('r0', 'succeeded', 'silent')]), 'in-doubt');
@@ -78,11 +78,12 @@ test('1. strict combination, with resolver applicability owned by the core (PR34
   for (const bad of [[null], [{ resolver: 'r0', status: 'succeeded', result: 'maybe' }], [{ resolver: 'r0', status: 'ok', result: 'refutes' }], 'x']) assert.equal(combine(bad), 'in-doubt', JSON.stringify(bad));
   assert.equal(strictlyDecided([r('r0', 'succeeded', 'silent')]), true);
   assert.equal(strictlyDecided([r('r0', 'succeeded', 'silent'), r('r1', 'failed', 'record-missing')]), false);
-  // The core decides which resolvers apply: R0 to every in-doubt attempt; a record for a resolver that does not apply is ignored.
+  // The core decides which resolvers apply: r0 (the transport record) to every in-doubt attempt;
+  // a record for a resolver that does not apply is ignored.
   assert.deepEqual(applicableResolvers(send(UP.reset)), ['r0']);
   assert.deepEqual(applicableResolvers(send(UP.applied)), [], 'a proven reply needs no resolver');
   assert.equal(attemptResolution(send(UP.refused), [r('r1', 'succeeded', 'confirms')]).verdict, 'refuted', 'r1 does not apply in this build');
-  assert.equal(attemptResolution(send(UP.reset), [r('r0', 'succeeded', 'refutes')]).verdict, 'in-doubt', 'R0 reads only its event');
+  assert.equal(attemptResolution(send(UP.reset), [r('r0', 'succeeded', 'refutes')]).verdict, 'in-doubt', 'r0 reads only its event');
   // With a later resolver that applies, a forgotten record is failed by construction, never skipped.
   assert.deepEqual(attemptRecords(send(UP.refused), [], STUB_TABLE), [r('r0', 'succeeded', 'refutes'), r('r1', 'failed', 'record-missing')]);
   assert.equal(attemptResolution(send(UP.refused), [], STUB_TABLE).verdict, 'in-doubt');
@@ -91,7 +92,7 @@ test('1. strict combination, with resolver applicability owned by the core (PR34
   assert.equal(attemptResolution(send(UP.refused), [r('r1', 'succeeded', 'confirms')], STUB_TABLE).conflict, true);
 });
 
-test('2. R0 per attempt: a connect that never completed refutes; a reset after connect, a missing or invalid record stays in doubt', () => {
+test('2. the transport record per attempt: a connect that never completed refutes; a reset after connect, a missing or invalid record stays in doubt', () => {
   assert.deepEqual(r0Record(send(UP.refused)), r('r0', 'succeeded', 'refutes'));
   assert.deepEqual(r0Record(send(UP.reset)), r('r0', 'succeeded', 'silent'));
   assert.deepEqual(r0Record(send(UP.unknown)), r('r0', 'failed', 'record-missing'));
@@ -114,11 +115,11 @@ test('2. R0 per attempt: a connect that never completed refutes; a reset after c
   assert.deepEqual(transportRecord({}, 1, Number.NaN), { connected: true, mono: 1, wall: null }, 'no flag reads connected: never a refutation');
 });
 
-test('3. gate A: only "resolved", outcomeJudged and their key collapse read a resolution; "applied" and unpinned clauses read main\'s record', () => {
+test('3. gate A: only "resolved", outcomeJudged and their key collapse read a resolution; "applied" and unpinned clauses read the record as without the opt-in', () => {
   const refused = send(UP.refused);
   assert.equal(upstreamState(refused, 'applied'), 'unknown'); assert.equal(upstreamState(refused, 'resolved'), 'no'); assert.equal(resolvedState(send(UP.reset)), 'unknown');
   const w = [win([send(UP.refused)])];
-  assert.equal(verdictOf({ kind: 'effect.count', select: close('applied'), expected: 0 }, w), 'missing', 'main: a refused forward stays unknown');
+  assert.equal(verdictOf({ kind: 'effect.count', select: close('applied'), expected: 0 }, w), 'missing', 'without the opt-in: a refused forward stays unknown');
   assert.equal(verdictOf(count(0), w), 'pass');
   assert.equal(verdictOf({ kind: 'effect.count', select: CLOSE_SEL, expected: 1 }, w), 'pass', 'unpinned: one attempt');
   assert.equal(verdictOf({ kind: 'effect.only', expect: [], allow: [] }, w), 'fail', 'effect.only without outcomeJudged: an attempt');
@@ -145,9 +146,9 @@ test('4. the retry: attempt 1 forwarded and reset, attempt 2 refused before forw
   assert.equal(decideEffects([EXISTS], both)[0].resolution.operation, 'confirmed');
 });
 
-test('5. PR342-REVIEW finding 1: a refused attempt never stands for a key group whose retry applied (keyed effect.only with outcomeJudged)', () => {
+test('5. a refused attempt never stands for a key group whose retry applied (keyed effect.only with outcomeJudged)', () => {
   const pair = (a, b, contents = ['c', 'c']) => { const first = send(a, { key: '1', content: contents[0] }); return [win([first, send(b, { key: '1', firstSeq: first.seq, content: contents[1] })], { keyed: true })]; };
-  // The review's case: LD-3n (nothing expected) over a refused attempt and an exact same-key retry, proven applied. It must fail.
+  // Nothing expected over a refused attempt and an exact same-key retry, proven applied. It must fail.
   const reviewed = judgeOnly(KEYED_ONLY([]), pair(UP.refused, UP.applied), { fields: true, countBy: true });
   assert.equal(reviewed.verdict, 'fail');
   assert.equal(reviewed.offending.length, 1);
@@ -160,22 +161,22 @@ test('5. PR342-REVIEW finding 1: a refused attempt never stands for a key group 
   // The collapse itself: under outcomeJudged the refused attempt is the replay, the applied retry stands.
   const w = pair(UP.refused, UP.applied)[0];
   assert.deepEqual([...keyedReplays(w, CRM, { outcomeJudged: true }).replay].map(e => e.seq), [w.events[0].seq]);
-  assert.deepEqual([...keyedReplays(w, CRM).replay].map(e => e.seq), [w.events[1].seq], 'without the opt-in, main\'s reading: the earlier send stands');
+  assert.deepEqual([...keyedReplays(w, CRM).replay].map(e => e.seq), [w.events[1].seq], 'without the opt-in, the default reading: the earlier send stands');
   // The connector, the validator and the sealed record agree: the row fails.
 });
 
-test('6. operations and group intervals: refuted only on every attempt and route; the full interval on any failure or conflict (finding 2)', () => {
+test('6. operations and group intervals: refuted only on every attempt and route; the full interval on any failure or conflict', () => {
   assert.equal(operationOf([], { covered: true }).operation, 'none');
   assert.equal(operationOf(['refuted', 'refuted'], { covered: true }).operation, 'refuted');
   assert.equal(operationOf(['refuted', 'refuted'], { covered: false }).operation, 'in-doubt');
   assert.equal(operationOf(['refuted', 'applied']).operation, 'confirmed');
   assert.equal(operationOf(['in-doubt'], { covered: true }).operation, 'in-doubt');
-  // Members from events: P proven applied, R0-refuted members leave D, F = [P, P + D].
+  // Members from events: P proven applied, members the transport record refutes leave D, F = [P, P + D].
   const members = (...events) => events.map(e => groupMember(e));
   const g = (ms, results) => admitGroupCount(ms, results);
   assert.deepEqual(g(members(send(UP.applied), send(UP.reset), send(UP.refused)), []), { admitted: true, low: 1, high: 2, conflict: false }, 'no group result: I = F');
   assert.deepEqual(g(members(send(UP.applied), send(UP.reset)), [{ resolver: 'r2', status: 'succeeded', low: 2, high: 2 }]), { admitted: true, low: 2, high: 2, conflict: false });
-  // The review's counterexample: two confirmed (here: strict, in doubt) members and an exact count of 1 against R1's [2, 2]: a conflict, so F.
+  // Two confirmed (here: strict, in doubt) members and an exact count of 1 against r1's [2, 2]: a conflict, so F.
   const two = members(send(UP.reset), send(UP.reset));
   assert.deepEqual(g(two, [{ resolver: 'r1', status: 'succeeded', low: 2, high: 2 }, { resolver: 'r2', status: 'succeeded', low: 1, high: 1 }]), { admitted: false, low: 0, high: 2, conflict: true });
   assert.deepEqual(g(two, [{ resolver: 'r2', status: 'failed', reason: 'read-failed' }]), { admitted: false, low: 0, high: 2, conflict: false });
@@ -183,13 +184,13 @@ test('6. operations and group intervals: refuted only on every attempt and route
   // A member whose record failed, or whose resolvers disagree: F, with that member back in D.
   assert.deepEqual(g(members(send(UP.unknown), send(UP.applied)), [{ resolver: 'r2', status: 'succeeded', low: 1, high: 1 }]), { admitted: false, low: 1, high: 2, conflict: false });
   assert.deepEqual(g([groupMember(send(UP.refused), [r('r1', 'succeeded', 'confirms')], STUB_TABLE)], []), { admitted: false, low: 0, high: 1, conflict: true });
-  // PR342-REVIEW-R2 N1: the members' own decisions bound the group whatever the caller passes. A later resolver confirms both members and the
-  // caller passes only an R2 count of 1: a conflict, so F. Passed nothing, the confirmations alone give [2, 2].
+  // The members' own decisions bound the group whatever the caller passes. A later resolver confirms both members and the
+  // caller passes only an r2 count of 1: a conflict, so F. Passed nothing, the confirmations alone give [2, 2].
   const confirmedTwice = [send(UP.reset), send(UP.reset)].map(e => groupMember(e, [r('r1', 'succeeded', 'confirms')], STUB_TABLE));
   assert.deepEqual(confirmedTwice.map(m => m.decided), ['confirmed', 'confirmed']);
   assert.deepEqual(g(confirmedTwice, [{ resolver: 'r2', status: 'succeeded', low: 1, high: 1 }]), { admitted: false, low: 0, high: 2, conflict: true });
   assert.deepEqual(g(confirmedTwice, []), { admitted: true, low: 2, high: 2, conflict: false });
-  // A later refutation leaves the member in D but lowers the high bound; an R0 refutation removes it from D (never counted twice).
+  // A later refutation leaves the member in D but lowers the high bound; a transport-record refutation removes it from D (never counted twice).
   const laterRefuted = groupMember(send(UP.reset), [r('r1', 'succeeded', 'refutes')], STUB_TABLE), r0AndLater = groupMember(send(UP.refused), [r('r1', 'succeeded', 'refutes')], STUB_TABLE);
   assert.deepEqual([laterRefuted.decided, laterRefuted.r0Refuted, r0AndLater.decided, r0AndLater.r0Refuted], ['refuted', false, null, true]);
   assert.deepEqual(g([laterRefuted, groupMember(send(UP.applied))], []), { admitted: true, low: 1, high: 1, conflict: false });
@@ -199,7 +200,7 @@ test('6. operations and group intervals: refuted only on every attempt and route
   assert.deepEqual(g([{ proven: 'maybe' }], []), { admitted: false, low: 0, high: 0, conflict: false });
 });
 
-test('7. gate B and the backend tier; a window copy keeps its admission and its in-doubt condition (finding 3)', () => {
+test('7. gate B and the backend tier; a window copy keeps its admission and its in-doubt condition', () => {
   const events = () => [send(UP.applied), send(UP.reset)];
   const opted = decideEffects([EXISTS], [win(events())])[0];
   assert.deepEqual([opted.verdict, opted.authoritative, backendObserved([opted])], ['pass', false, false]);
@@ -220,11 +221,11 @@ test('7. gate B and the backend tier; a window copy keeps its admission and its 
   assert.ok(IN_DOUBT_LABELS.includes(COLLECTOR_RECORDS['egress-recorder'].label));
 });
 
-test('8. countBy on effect.count under "resolved": an R0-refuted keyed attempt drops out of its key group as a declared rejection does', () => {
+test('8. countBy on effect.count under "resolved": a keyed attempt the transport record refutes drops out of its key group as a declared rejection does', () => {
   const c = upstream => { const { resource: _r, ...select } = close(upstream); return { kind: 'effect.count', select, expected: 1, countBy: 'idempotency-key' }; };
   const pair = (a, b) => { const first = send(a, { key: '1', content: 'x' }); return [validateWindow(win([first, send(b, { key: '1', firstSeq: first.seq, content: 'y' })], { keyed: true }))]; };
   assert.equal(evaluateEffectAssertion(c('resolved'), pair(UP.refused, UP.applied), { countBy: true }).verdict, 'pass');
-  assert.equal(evaluateEffectAssertion(c('applied'), pair(UP.refused, UP.applied), { countBy: true }).verdict, 'missing', 'main: the first attempt stays unknown');
+  assert.equal(evaluateEffectAssertion(c('applied'), pair(UP.refused, UP.applied), { countBy: true }).verdict, 'missing', 'without the opt-in: the first attempt stays unknown');
   assert.equal(evaluateEffectAssertion(c('resolved'), pair(UP.reset, UP.applied), { countBy: true }).verdict, 'missing');
 });
 
@@ -253,7 +254,7 @@ const MAIN = [{ kind: 'effect.exists', select: close('applied') }, { kind: 'effe
   { kind: 'effect.count', select: { source: 'http-egress', operation: 'send', name: CRM }, expected: 1, countBy: 'idempotency-key' },
   { kind: 'effect.only', expect: [{ select: CLOSE_SEL, count: 1 }], allow: [] }, { kind: 'effect.only', expect: [{ select: CLOSE_SEL, count: 1 }], allow: [], countBy: 'idempotency-key' }];
 
-test('9. differential: with no opt-in, every result over windows carrying transport records equals main\'s frozen evaluator (4b2e2f7, IDR-0 merged) without them (keyed sends included)', () => {
+test('9. differential: with no opt-in, every result over windows carrying transport records equals the frozen earlier evaluator without them (keyed sends included)', () => {
   const g = rng(1016);
   let n = 0, keyedCases = 0;
   for (let i = 0; i < 1500; i++) {
@@ -312,23 +313,23 @@ test('10. property: failing any record never turns a non-pass into a pass (claus
   assert.ok(degradedPasses > 300 && fullOnlyPasses > 50 && keyedChecked > 100, `exercised: ${degradedPasses} degraded passes, ${fullOnlyPasses} passes only with every record, ${keyedChecked} keyed replays checked`);
 });
 
-test('11. property, groups (ADDENDUM-R2 2.5, PR342-REVIEW-R2 N1): with a stub group resolver, conflicts, failed results, blind reads and results that contradict the members\' own decisions, failing any record only widens I', () => {
+test('11. property, groups: with a stub group resolver, conflicts, failed results, blind reads and results that contradict the members\' own decisions, failing any record only widens I', () => {
   const g = rng(31337);
   let admitted = 0, conflicts = 0, narrowed = 0, contradicted = 0;
   const contains = (outer, inner) => outer.low <= inner.low && inner.high <= outer.high;
   for (let i = 0; i < 4000; i++) {
-    // Members: proven, R0-decided or in doubt, each with a stub r1 record (or none, which the core makes failed).
+    // Members: proven, decided by the transport record or in doubt, each with a stub r1 record (or none, which the core makes failed).
     const events = Array.from({ length: 1 + Math.floor(g() * 4) }, () => send(pick(g, OUTCOMES)));
     const r1 = events.map(() => (g() < 0.8 ? [r('r1', 'succeeded', pick(g, ['confirms', 'silent', 'silent', 'refutes']))] : []));
     const P = events.filter(e => e.upstream.outcome === 'applied').length, D = events.length - P - events.filter(e => e.upstream.outcome === 'rejected').length;
     // The members' own decisions, read from the per-attempt combination: strict confirmations count, strict refutations by a later resolver
-    // lower the high bound, and an R0 refutation leaves D.
+    // lower the high bound, and a transport-record refutation leaves D.
     const decisions = events.map((e, k) => (inDoubtAttempt(e) ? attemptResolution(e, r1[k], STUB_TABLE) : null));
     const r0Out = decisions.filter(d => d?.strict && d.verdict === 'refuted' && d.records.some(x => x.resolver === 'r0' && x.result === 'refutes')).length;
     const confirmedN = decisions.filter(d => d?.strict && d.verdict === 'confirmed').length;
     const refutedN = decisions.filter(d => d?.strict && d.verdict === 'refuted' && !d.records.some(x => x.resolver === 'r0' && x.result === 'refutes')).length;
     const Dcore = D - r0Out, perLow = P + confirmedN, perHigh = P + Dcore - refutedN;
-    // Group results: a stub exact count, a blind read (F), an R1-style interval, a conflicting count, a count the members' own decisions
+    // Group results: a stub exact count, a blind read (F), an interval like the request feed's, a conflicting count, a count the members' own decisions
     // contradict (inside F, outside [perLow, perHigh]: the caller left out the later resolver's interval), or a failed result.
     const results = Array.from({ length: Math.floor(g() * 3) }, () => {
       const kind = pick(g, ['exact', 'blind', 'interval', 'conflict', 'contradict', 'contradict', 'failed']);
@@ -411,7 +412,7 @@ test('13. recorder (egress-recorder/7): each settled forward records its transpo
   assert.deepEqual([refused.upstream.transport.connected, refused.upstream.transport.wall, refused.upstream.transport.mono > 0, refused.upstream.target.exact], [false, 1760000000000, true, true]);
   assert.equal(reset.upstream.transport.connected, true);
   assert.deepEqual([upstreamState(refused, 'applied'), upstreamState(refused, 'resolved'), upstreamState(reset, 'resolved')], ['unknown', 'no', 'unknown']);
-  // The current recorder writes transport records (IN_DOUBT_LABELS: /7, and /8 since IDR-4); with no request feed declared, no arrival.
+  // The current recorder writes transport records (IN_DOUBT_LABELS: /7, and /8 since the request feed); with no request feed declared, no arrival.
   assert.ok(IN_DOUBT_LABELS.includes(COLLECTOR_RECORDS['egress-recorder'].label));
   assert.deepEqual([Object.keys(refused.upstream.transport), Object.keys(reset.upstream.transport)], [['connected', 'mono', 'wall'], ['connected', 'mono', 'wall']]);
 });
@@ -443,10 +444,10 @@ const runOf = async (effects, events, options) => {
   return { run, row: run.results.find(x => x.id === 'TASK') };
 };
 
-test('14. sealed and recomputed: the operation record, the R0 verdicts and gate B travel with the run; tampering is refused', async () => {
+test('14. sealed and recomputed: the operation record, the transport-record verdicts and gate B travel with the run; tampering is refused', async () => {
   const claims = [{ trigger: { field: { pointer: '/closed', success: [true], refusal: [false] } }, select: close(), semantics: 'agent-write' }];
-  // Refused before any byte left (R0 refutes it), then retried and applied. Positive clauses: an absence clause pinned to an outcome
-  // also needs an allowed-use control twin (main's positive-match pairing), which this profile does not declare.
+  // Refused before any byte left (the transport record refutes it), then retried and applied. Positive clauses: an absence clause pinned to an outcome
+  // also needs an allowed-use control twin (the positive-match pairing), which this profile does not declare.
   const { run, row } = await runOf([count(1), { ...ONLY, expect: [{ select: CLOSE_SEL, count: 1 }] }], () => [send(UP.refused), send(UP.applied)], { claims });
   const data = row.trace[1].data;
   assert.equal(run.observers[0].collector.label, COLLECTOR_RECORDS['egress-recorder'].label);
@@ -455,7 +456,7 @@ test('14. sealed and recomputed: the operation record, the R0 verdicts and gate 
   assert.deepEqual(data.effects[0].resolution, { operation: 'confirmed', applied: 1, refuted: 1, inDoubt: 0, attempts: [{ observer: INST, seq: data.windows[0].events[0].seq, fate: 'refuted', by: 'r0', resolvers: ['r0'] }, { observer: INST, seq: data.windows[0].events[1].seq, fate: 'applied', by: 'proof', resolvers: [] }] });
   assert.equal(data.claims[0].resolution.attempts[0].by, 'r0');
   assert.deepEqual([row.backendEvidence, row.assertions.find(a => a.name === BACKEND_ASSERTION).status], ['observed', 'pass']);
-  assert.equal(evaluateEffectAssertion({ kind: 'effect.count', select: close('applied'), expected: 1 }, [win(stripTransport([send(UP.refused), send(UP.applied)]), { admit: false })]).verdict, 'missing', 'main holds it');
+  assert.equal(evaluateEffectAssertion({ kind: 'effect.count', select: close('applied'), expected: 1 }, [win(stripTransport([send(UP.refused), send(UP.applied)]), { admit: false })]).verdict, 'missing', 'without the transport records it stays missing');
   const refused = (copy, why) => assert.throws(() => validateHttpRunEvidence(copy), error => error.code === 'invalid-run-evidence', why);
   refused(reseal(run, x => { for (const w of x.trace[1].data.windows) for (const e of w.events) if (e.upstream?.transport) e.upstream.transport.connected = true; }), 'a refused connect edited to connected');
   const unsealed = structuredClone(run); unsealed.results.find(x => x.id === 'TASK').trace[1].data.windows[0].events[0].upstream.transport.connected = true; refused(unsealed, 'the evidence digest');
@@ -471,10 +472,10 @@ test('14. sealed and recomputed: the operation record, the R0 verdicts and gate 
   assert.deepEqual([under('egress-recorder/7').authoritative, under('egress-recorder/7').resolution.operation], [false, 'confirmed']);
 });
 
-test('15. connector rows: an opted-in pass beside an attempt in doubt is not backend observed; the review\'s keyed case fails end to end', async () => {
+test('15. connector rows: an opted-in pass beside an attempt in doubt is not backend observed; the keyed refused-then-applied case fails end to end', async () => {
   const { row } = await runOf([EXISTS], () => [send(UP.applied), send(UP.reset)]);
   assert.deepEqual([row.trace[1].data.effects[0].verdict, row.backendEvidence, row.assertions.find(a => a.name === BACKEND_ASSERTION).status], ['pass', 'unavailable', 'inconclusive']);
-  // PR342-REVIEW finding 1 through the connector and the shared validator: the row fails, and its sealed record agrees with the verdict.
+  // A refused attempt beside an applied same-key retry, through the connector and the shared validator: the row fails, and its sealed record agrees with the verdict.
   const keyed = RECORDER({ idempotency: { header: 'idempotency-key' } });
   const keyedEvents = () => { const first = send(UP.refused, { key: '1' }); return [first, send(UP.applied, { key: '1', firstSeq: first.seq })]; };
   const { row: k } = await runOf([KEYED_ONLY([])], keyedEvents, { recorder: keyed });
@@ -485,7 +486,7 @@ test('15. connector rows: an opted-in pass beside an attempt in doubt is not bac
   assert.throws(() => validateHttpRunEvidence(forged), error => error.code === 'invalid-run-evidence');
 });
 
-test('16. label sequencing (PR341-REVIEW-R2): each egress-recorder label keeps every capability the one before had (/6 to /7, /7 to /8 since IDR-4, /8 to /9 since IDR-3, /9 to /10 since SB-W2, /10 to /11 since FIX-04, /11 to /12 since the drain\'s quiet recheck, /12 to /13 since FIX-08), the target flags included', async () => {
+test('16. label sequencing: each egress-recorder label keeps every capability the one before had (/6 to /7, /7 to /8 since the request feed, /8 to /9 since read-back, /9 to /10 since the exclusive loopback binds, /10 to /11 since declared aliases and sibling hosts, /11 to /12 since the drain\'s quiet recheck, /12 to /13 since another recorder\'s destinations), the target flags included', async () => {
   const current = COLLECTOR_RECORDS['egress-recorder'].label;
   assert.equal(current, 'egress-recorder/13');
   assert.ok(TARGET_LABELS.includes(current) && IN_DOUBT_LABELS.includes(current), 'a /13 run may carry target flags, object routes and transport records');
@@ -501,7 +502,7 @@ test('16. label sequencing (PR341-REVIEW-R2): each egress-recorder label keeps e
     if (list.includes('egress-recorder/12')) assert.ok(list.includes('egress-recorder/13'), `${name} lists /12 but not /13`);
   }
   // A current run whose profile declares object routes and an outcomeJudged clause validates (with its suite) and keeps its object record
-  // (no required allowed-use control guards its effect.only, so its pass reads inconclusive: allowed-use-not-declared, FIX-07).
+  // (no required allowed-use control guards its effect.only, so its pass reads inconclusive: allowed-use-not-declared).
   const { run, row } = await runOf([ONLY], () => [send(UP.refused)]);
   assert.deepEqual([run.observers[0].collector.label, Object.keys(run.observers[0].objects), row.trace[1].data.effects[0].pairing], [current, [CRM], 'allowed-use-not-declared']);
 });

@@ -1,11 +1,11 @@
-// Suspend-aware lead-in and stop (review record, not in this repository).
+// Suspend-aware lead-in and stop.
 // A host sleep must not move an earlier request's send into a later check's window, where a presence clause would pass on it:
 //   (a) under a timing plan the lead-in before an observed check is held in awake time, and a check whose lead-in is still short is
 //       not sent, nor any later one (run-budget-exhausted);
 //   (b) without a plan, a check whose settle or barrier a sleep left short is the last one sent (host-suspend-run-stopped);
-//   minor 2: an awake clock that moved earlier in the run but reads no movement over a pair past the threshold is a suspend of the
+//   (c) an awake clock that moved earlier in the run but reads no movement over a pair past the threshold is a suspend of the
 //       whole pair, while one that never moved stays inert;
-//   and a second sleep inside an extension is owed again. Main's side of every comparison is main's own code, frozen at 61adb01
+//   and a second sleep inside an extension is owed again. The frozen side of every comparison is an earlier build's own code
 // (test/fixtures/http-connector-61adb01.mjs and suspend-clock-61adb01.mjs). A virtual clock with an injected transport and observer:
 // destination hosts are names only and are never resolved or contacted; no socket, no database, no model, no provider.
 import test from 'node:test';
@@ -105,10 +105,10 @@ const reseal = (run, edit) => {
 };
 const refused = run => assert.throws(() => validateHttpRunEvidence(run), error => error.code === 'invalid-run-evidence');
 
-// PR343-REVIEW finding 1(a), probe B: H = 30 s; GET /me (unobserved) makes a send to HOOK 25 s of awake time after its reply, and
+// (a): H = 30 s; GET /me (unobserved) makes a send to HOOK 25 s of awake time after its reply, and
 // REFUND (effect.exists on HOOK) makes none. A sleep in REFUND's lead-in (the run's first wait) used to put ME's send inside
 // REFUND's window, where the presence clause passed on it.
-test('finding 1(a), declared timing: a sleep in the lead-in never lets GET /me\'s send decide REFUND; the lead-in is extended in awake time, or REFUND and every later check is cut', async t => {
+test('lead-in, declared timing: a sleep in the lead-in never lets GET /me\'s send decide REFUND; the lead-in is extended in awake time, or REFUND and every later check is cut', async t => {
   const H = 30000, REFUND = { id: 'REFUND', method: 'POST', path: '/refund', severity: 'control', effects: [{ kind: 'effect.exists', select: sel(HOOK) }] };
   const AFTER = { id: 'AFTER', method: 'POST', path: '/after', severity: 'high', effects: [{ kind: 'effect.none', select: sel(PAY) }] };
   const p = target([ME, REFUND, AFTER], { H }), sends = { 'GET /me': [{ name: HOOK, delay: 25000 }] };
@@ -132,16 +132,16 @@ test('finding 1(a), declared timing: a sleep in the lead-in never lets GET /me\'
       if (asleep) assert.ok(head.v.sleeps[1] > 0 && head.v.sleeps[1] <= H, `the lead-in was extended: ${head.v.sleeps}`);
     }
   }
-  // Not vacuous: main passes REFUND on ME's send, and head both restores lead-ins and cuts the ones it cannot restore.
+  // Not vacuous: the frozen build passes REFUND on ME's send, and head both restores lead-ins and cuts the ones it cannot restore.
   assert.ok(table.filter(r => r.endsWith('/pass')).length >= 4, table.join(' '));
   assert.ok(table.some(r => r.includes(':fail/pass')) && table.some(r => r.includes(':not-sent/pass')), table.join(' '));
-  t.diagnostic(`lead-in sweep (before+asleep: head/main): ${table.join(' ')}`);
+  t.diagnostic(`lead-in sweep (before+asleep: head/frozen): ${table.join(' ')}`);
 });
 
-// PR343-REVIEW finding 1(b), probe C2: run mode, no timing plan. A forbids sends to PAY, and its app also sends to HOOK 4.8 s of awake
+// (b): run mode, no timing plan. A forbids sends to PAY, and its app also sends to HOOK 4.8 s of awake
 // time after its reply; B (effect.exists on HOOK) sends nothing. A 60 s sleep in A's settle used to leave A partial but let B pass on
 // A's send. The short check watched a different destination, so settlement did not withhold B either.
-test('finding 1(b), no timing plan: after a settle a sleep left short, no later check is sent, so A\'s displaced send never decides B', async t => {
+test('short settle, no timing plan: after a settle a sleep left short, no later check is sent, so A\'s displaced send never decides B', async t => {
   const A = { id: 'A', method: 'POST', path: '/a', severity: 'high', effects: [{ kind: 'effect.none', select: sel(PAY) }] };
   const B = { id: 'B', method: 'POST', path: '/b', severity: 'control', effects: [{ kind: 'effect.exists', select: sel(HOOK) }] };
   const sends = { 'POST /a': [{ name: HOOK, delay: 4800 }] };
@@ -164,12 +164,12 @@ test('finding 1(b), no timing plan: after a settle a sleep left short, no later 
       assert.deepEqual([a.coverage, a.events.map(e => e.name), status], ['complete', [HOOK], 'fail'], table.at(-1));
     }
   }
-  // Main passes B on A's send in run mode (in per-check mode A's barrier already absorbed it, and head stops there too).
-  assert.ok(table.filter(r => r.startsWith('run') && r.endsWith('/pass')).length >= 2, `main passes B on A's send: ${table.join(' | ')}`);
+  // The frozen build passes B on A's send in run mode (in per-check mode A's barrier already absorbed it, and head stops there too).
+  assert.ok(table.filter(r => r.startsWith('run') && r.endsWith('/pass')).length >= 2, `the frozen build passes B on A's send: ${table.join(' | ')}`);
   t.diagnostic(table.join(' | '));
 });
 
-test('finding 1(b), per-check: a barrier a sleep left short stops the run too, and a run that stopped validates only as the connector wrote it', async () => {
+test('short barrier, per-check: a barrier a sleep left short stops the run too, and a run that stopped validates only as the connector wrote it', async () => {
   const A = { id: 'A', method: 'POST', path: '/a', severity: 'high', effects: [{ kind: 'effect.none', select: sel(PAY) }] };
   const B = { id: 'B', method: 'POST', path: '/b', severity: 'control', effects: [{ kind: 'effect.exists', select: sel(HOOK) }] };
   const p = target([ME, A, B], { perCheck: true });
@@ -205,10 +205,10 @@ test('finding 1(b), per-check: a barrier a sleep left short stops the run too, a
   refused(swap(clean.run));
 });
 
-// PR343-REVIEW minor 2 (the decision: fail closed). A sleep that begins the instant a wait does leaves the awake clock with no
+// (c), fail closed: a sleep that begins the instant a wait does leaves the awake clock with no
 // movement at all across that pair. Where the clock has moved earlier in the run (it is alive), the pair is a suspend of its whole
-// length: the wait is extended, and a wait still short reads partial. A clock that never moves stays inert, exactly as main.
-test('minor 2, detector: a live awake clock that reads no movement over a pair past the threshold is a suspend of the whole pair; one that never moved is unchecked', () => {
+// length: the wait is extended, and a wait still short reads partial. A clock that never moves stays inert, exactly as the frozen build.
+test('still clock, detector: a live awake clock that reads no movement over a pair past the threshold is a suspend of the whole pair; one that never moved is unchecked', () => {
   const h = { awake: 0, elapsed: 0 }, clocks = { wall: () => WALL0 + h.elapsed, awake: () => h.awake, elapsed: () => h.elapsed };
   const d = createSuspendDetector({ ...clocks, timersCountSuspend: true }), at = d.mark();
   h.awake += 20; h.elapsed += 20;
@@ -220,7 +220,7 @@ test('minor 2, detector: a live awake clock that reads no movement over a pair p
   assert.deepEqual(suspendRecord(d.between(at, d.mark())), { cause: 'host-sleep', count: 1, ms: 60000, from: new Date(WALL0 + 20).toISOString(), to: new Date(WALL0 + 60020).toISOString() });
   h.elapsed += 1500;
   assert.deepEqual(d.sample(), [], 'a short still pair decides nothing');
-  // Never moved (frozen throughout, as main): unchecked, never a suspend, nothing lost.
+  // Never moved (frozen throughout, as the frozen build): unchecked, never a suspend, nothing lost.
   const g = { elapsed: 0 }, still = createSuspendDetector({ wall: () => WALL0 + g.elapsed, awake: () => 5000, elapsed: () => g.elapsed, timersCountSuspend: true }), m = still.mark();
   g.elapsed += 60000;
   assert.deepEqual(still.sample().map(b => b.kind), ['unchecked']);
@@ -231,8 +231,8 @@ test('minor 2, detector: a live awake clock that reads no movement over a pair p
   assert.deepEqual(linuxLike.sample(), []);
 });
 
-test('minor 2, connector: a sleep at the exact instant a wait starts gives a partial window, with or without a timing plan; a clock frozen throughout keeps main\'s verdicts', async t => {
-  // FORBID also proves its own send to PAY (a positive clause), so the allowed-use guard (FIX-07) leaves its absence clause as main read it.
+test('still clock, connector: a sleep at the exact instant a wait starts gives a partial window, with or without a timing plan; a clock frozen throughout keeps the frozen build\'s verdicts', async t => {
+  // FORBID also proves its own send to PAY (a positive clause), so the allowed-use guard leaves its absence clause as the frozen build read it.
   const FORBID = { id: 'FORBID', method: 'POST', path: '/forbid', severity: 'high', effects: [{ kind: 'effect.none', select: sel(HOOK) }, { kind: 'effect.exists', select: sel(PAY) }] };
   // No plan: 60 s asleep from the instant FORBID's settle starts (its first wait), and again from the instant the final settle starts;
   // the default budget has no room to restore either.
@@ -243,12 +243,12 @@ test('minor 2, connector: a sleep at the exact instant a wait starts gives a par
   assert.deepEqual([w.coverage, carriesSuspendShort(w), w.suspend.cause, w.suspend.shortMs, Object.hasOwn(w, 'suspendUnchecked')], ['partial', true, 'host-sleep', 5000, false]);
   assert.deepEqual([tail.coverage, carriesSuspendShort(tail)], ['partial', true]);
   assert.equal(clauseOf(head.run, 'FORBID'), 'inconclusive');
-  assert.deepEqual([clauseOf(main.run, 'FORBID'), windowOf(main.run, 'FORBID').coverage, windowOf(main.run, 'FORBID').suspendUnchecked], ['pass', 'complete', true], 'main read the still pairs unchecked and passed on missing evidence');
+  assert.deepEqual([clauseOf(main.run, 'FORBID'), windowOf(main.run, 'FORBID').coverage, windowOf(main.run, 'FORBID').suspendUnchecked], ['pass', 'complete', true], 'the frozen build read the still pairs unchecked and passed on missing evidence');
   // Room to restore it (a 300 s budget): extended by the whole settle, so the send lands in the window and the clause fails.
   const roomy = await assess(HEAD, p, { sends, onSleep: atStart(60000, 1), limits: { ...HTTP_LIMITS, runTimeoutMs: 300000 } });
   assert.deepEqual([roomy.v.sleeps.slice(0, 2), windowOf(roomy.run, 'FORBID').coverage, clauseOf(roomy.run, 'FORBID')], [[5000, 5000], 'complete', 'fail']);
 
-  // Declared timing, the review's probe A at offset 0: H = 30 s, the send 28 s after the reply, asleep 30 to 100 s from the instant
+  // Declared timing, at offset 0: H = 30 s, the send 28 s after the reply, asleep 30 to 100 s from the instant
   // the horizon starts. Never a pass; held short, the horizon reads truncated.
   const H = 30000, timed = target([ME, FORBID], { H }), late = { 'POST /forbid': [{ name: HOOK, delay: 28000 }] }, table = [];
   for (const seconds of [30, 40, 60, 80, 100]) {
@@ -260,10 +260,10 @@ test('minor 2, connector: a sleep at the exact instant a wait starts gives a par
     assert.notEqual(status, 'pass', table.at(-1));
     if (held < H) assert.deepEqual([windowOf(now.run, 'FORBID').coverage, windowOf(now.run, 'FORBID').reason.split(',').includes(HORIZON_TRUNCATED)], ['partial', true]);
   }
-  assert.ok(table.some(r => r.endsWith('/pass')), `main passes at offset 0: ${table.join(' ')}`);
-  t.diagnostic(`offset-0 horizon sweep (seconds, head status/awake ms held/main): ${table.join(' ')}`);
+  assert.ok(table.some(r => r.endsWith('/pass')), `the frozen build passes at offset 0: ${table.join(' ')}`);
+  t.diagnostic(`offset-0 horizon sweep (seconds, head status/awake ms held/frozen): ${table.join(' ')}`);
 
-  // Frozen throughout: inert, with verdicts and waits equal to main's, and the note says why nothing could be checked.
+  // Frozen throughout: inert, with verdicts and waits equal to the frozen build's, and the note says why nothing could be checked.
   const inert = await assess(HEAD, p, { sends, onSleep: atStart(60000), detector: 'still' }), mainInert = await assess(MAIN, p, { sends, onSleep: atStart(60000), detector: 'still' });
   validated(p, inert.run);
   assert.deepEqual(inert.v.sleeps, mainInert.v.sleeps);
@@ -274,8 +274,8 @@ test('minor 2, connector: a sleep at the exact instant a wait starts gives a par
   assert.match(SUSPEND_UNCHECKED_NOTE, /none could be read, or it never moved/);
 });
 
-// The extension (PR343's machinery, reused by the lead-in): a second sleep inside an extension step took awake time from it too, and
-// is owed again. Main capped the whole extension at what the first sleep took, so the wait held less than declared and read complete.
+// The extension (the settle extension's machinery, reused by the lead-in): a second sleep inside an extension step took awake time from it too, and
+// is owed again. The frozen build capped the whole extension at what the first sleep took, so the wait held less than declared and read complete.
 test('extension: a second sleep inside the extension is owed again, so the wait holds its declared awake time or reads short', async () => {
   const A = { id: 'A', method: 'POST', path: '/a', severity: 'high', effects: [{ kind: 'effect.none', select: sel(HOOK) }] };
   const B = { id: 'B', method: 'POST', path: '/b', severity: 'control', effects: [{ kind: 'effect.exists', select: sel(HOOK) }] };
@@ -285,9 +285,9 @@ test('extension: a second sleep inside the extension is owed again, so the wait 
   const head = await assess(HEAD, p, { sends, onSleep, limits: { ...HTTP_LIMITS, runTimeoutMs: 120000 } }), main = await assess(MAIN, p, { sends, onSleep, limits: { ...HTTP_LIMITS, runTimeoutMs: 120000 } });
   validated(p, head.run);
   assert.deepEqual(head.v.sleeps.slice(0, 3), [5000, 3000, 2500], 'owed again: 2500 ms more');
-  assert.deepEqual(main.v.sleeps.slice(0, 3), [5000, 3000, 2000], 'main: capped at the first sleep\'s 3000 ms, 500 ms of awake time short');
+  assert.deepEqual(main.v.sleeps.slice(0, 3), [5000, 3000, 2000], 'the frozen build: capped at the first sleep\'s 3000 ms, 500 ms of awake time short');
   assert.deepEqual([clauseOf(head.run, 'A'), windowOf(head.run, 'A').coverage, clauseOf(head.run, 'B')], ['fail', 'complete', 'fail']);
-  assert.deepEqual([clauseOf(main.run, 'A'), clauseOf(main.run, 'B')], ['inconclusive', 'pass'], 'main: A\'s send was displaced into B\'s window, where B passed on it');
+  assert.deepEqual([clauseOf(main.run, 'A'), clauseOf(main.run, 'B')], ['inconclusive', 'pass'], 'the frozen build: A\'s send was displaced into B\'s window, where B passed on it');
   assert.deepEqual([windowOf(main.run, 'A').coverage, windowOf(main.run, 'A').events, windowOf(main.run, 'B').events.map(e => e.name)], ['complete', [], [HOOK]]);
   // With no room for the second step, the wait reads short and the run stops.
   const tight = await assess(HEAD, p, { sends, onSleep: (ms, n) => (n === 1 ? [1000, 3000] : n === 2 ? [500, 60000] : null) });
@@ -316,12 +316,12 @@ test('nits 4 to 6: suspend records only where the connector writes them, a note 
   validated(timed, t1.run);
   const shortened = w => { w.suspend = { ...(w.suspend ?? { cause: 'host-sleep', count: 1, ms: 3000, from: '2026-10-16T20:14:01.000Z', to: '2026-10-16T20:14:04.000Z' }), shortMs: 1000 }; w.coverage = 'partial'; w.reason = 'host-suspend-wait-short'; delete w.scoped; };
   refused(reseal(t1.run, r => shortened(r.settlement.gaps.at(-1).windows[0])));
-  // Nit 5: a discontinuity is never counted as lost time, so its note does not say the waits held.
+  // A discontinuity is never counted as lost time, so its note does not say the waits held.
   const disc = { cause: 'clock-discontinuity', count: 1, ms: 30000, from: '2026-10-16T20:14:00.000Z', to: '2026-10-16T20:14:30.000Z' };
   assert.doesNotMatch(suspendHeldNote(disc), /held their declared awake time/);
   assert.match(suspendHeldNote(disc), /not counted as lost awake time, so its waits may have held less awake time than declared/);
   assert.match(suspendHeldNote({ ...disc, cause: 'host-sleep' }), /its waits held their declared awake time/);
-  // Nit 6: a wall clock outside the years a record can state is clamped into them, so the record and its shortfall are kept.
+  // A wall clock outside the years a record can state is clamped into them, so the record and its shortfall are kept.
   for (const wall of [Date.parse('9999-12-31T23:59:59.000Z') + 5000, 8.64e15 + 1, -8.64e15 - 1]) {
     const r = suspendRecord([{ kind: 'suspend', ms: 60000, from: { wall, awake: 0, elapsed: 0 }, to: { wall: wall + 60000, awake: 0, elapsed: 60000 } }], { shortMs: 2500 });
     assert.ok(validSuspendRecord(r), JSON.stringify(r));
@@ -330,14 +330,14 @@ test('nits 4 to 6: suspend records only where the connector writes them, a note 
   assert.ok(SUSPEND_LIMITS.breaks >= 1);
 });
 
-// Property, against main's own code (frozen at 61adb01): seeded random runs, each made four ways (head and main, each with the real
+// Property, against the frozen build's own code: seeded random runs, each made four ways (head and the frozen build, each with the real
 // detector and with the inert one). The virtual host knows the truth: each check's own application sends, every one of them within
 // its declared settle or horizon in awake time (an unobserved request's sends only under a timing plan, whose lead-in is meant to
 // separate them). So with the real detector a clause head decides must agree with what the check's own request caused; every move
-// from main is toward inconclusive (pass or fail to inconclusive, or a check not sent), or from a verdict main got wrong, or left
-// undecided, to the true one; never an undecided clause to a wrong verdict. With the inert detector head is exactly main. The host
+// from the frozen build is toward inconclusive (pass or fail to inconclusive, or a check not sent), or from a verdict the frozen build got wrong, or left
+// undecided, to the true one; never an undecided clause to a wrong verdict. With the inert detector head is exactly the frozen build. The host
 // sleeps either in the n-th wait of the run (at its very start or inside it), or at fixed instants of the application's awake time
-// (in the wait under way then, or from the start of the next one), which head and main share until their waits first differ.
+// (in the wait under way then, or from the start of the next one), which head and the frozen build share until their waits first differ.
 const UNDECIDED = ['inconclusive', 'not-sent'];
 function scenario(seed, id) {
   let s = seed >>> 0;
@@ -376,7 +376,7 @@ function scenario(seed, id) {
 }
 const clausesOf = (run, truth) => [...truth.keys()].flatMap(id => truth.get(id).map((_, i) => ({ id, i, status: clauseOf(run, id, i) })));
 
-test('property (480 seeded runs against main\'s own code, real and inert detectors): every move is toward inconclusive or to the true verdict, never an undecided clause to a wrong one; inert is main', async t => {
+test('property (480 seeded runs against the frozen build\'s own code, real and inert detectors): every move is toward inconclusive or to the true verdict, never an undecided clause to a wrong one; inert is the frozen build', async t => {
   const moves = new Map(), count = key => moves.set(key, (moves.get(key) ?? 0) + 1);
   let mainWrong = 0, mainWrongPass = 0, headDecided = 0, stops = 0, leadCuts = 0, inertSame = 0;
   const scenarios = Array.from({ length: 480 }, (_, k) => scenario(0x4f4c0000 + k, `leadin-${k}`));
@@ -390,28 +390,28 @@ test('property (480 seeded runs against main\'s own code, real and inert detecto
     const head = await assess(HEAD, c.p, { ...options, onSleep: c.onSleep() }), main = await assess(MAIN, c.p, { ...options, onSleep: c.onSleep() });
     const headInert = await assess(HEAD, c.p, { ...options, onSleep: c.onSleep(), detector: 'inert' }), mainInert = await assess(MAIN, c.p, { ...options, onSleep: c.onSleep(), detector: 'inert' });
     for (const r of [head.run, headInert.run]) validateHttpRunEvidence(r, { expectedSuite: suiteOf(c.p) });
-    // Inert: the waits and every verdict exactly main's, but for the allowed-use guard's moves (FIX-07: an unguarded absence's pass
+    // Inert: the waits and every verdict exactly the frozen build's, but for the allowed-use guard's moves (an unguarded absence's pass
     // reads inconclusive; test/fixtures/allowed-use-guard-moves.mjs).
     assert.deepEqual(headInert.v.sleeps, mainInert.v.sleeps, `${k} ${c.label}: inert waits`);
     assert.deepEqual(headInert.run.results.map(r => [r.id, r.status, r.assertions.map(a => a.status)]), guardAdjusted(headInert.run, mainInert.run).map(r => [r.id, r.status, r.assertions.map(a => a.status)]), `${k} ${c.label}: inert verdicts`);
     inertSame++;
-    // Real: a clause head decides is the truth; every move from main is toward inconclusive or to the truth.
+    // Real: a clause head decides is the truth; every move from the frozen build is toward inconclusive or to the truth.
     const now = clausesOf(head.run, c.truth), was = clausesOf(main.run, c.truth);
     now.forEach((x, j) => {
       const truth = c.truth.get(x.id)[x.i], before = was[j].status;
-      if (!UNDECIDED.includes(x.status)) { headDecided++; assert.equal(x.status, truth, `${k} ${c.label}: head decided ${x.id} clause ${x.i + 1} against the truth (main ${before})`); }
+      if (!UNDECIDED.includes(x.status)) { headDecided++; assert.equal(x.status, truth, `${k} ${c.label}: head decided ${x.id} clause ${x.i + 1} against the truth (the frozen build ${before})`); }
       if (!UNDECIDED.includes(before) && before !== truth) { mainWrong++; if (before === 'pass') mainWrongPass++; }
       if (x.status !== before) {
         assert.ok(UNDECIDED.includes(x.status) || x.status === truth, `${k} ${c.label}: ${before} -> ${x.status}`);
-        count(`${before} -> ${x.status}${UNDECIDED.includes(x.status) ? '' : UNDECIDED.includes(before) ? ' (undecided to the truth)' : ' (main wrong, head true)'}`);
+        count(`${before} -> ${x.status}${UNDECIDED.includes(x.status) ? '' : UNDECIDED.includes(before) ? ' (undecided to the truth)' : ' (the frozen build wrong, head true)'}`);
       } else count(`${before} -> ${x.status}`);
     });
     if (head.run.results.some(r => r.trace[0].data.notSent === SUSPEND_STOPPED)) stops++;
     if (head.run.results.some(r => r.trace[0].data.notSent === RUN_BUDGET_EXHAUSTED) && !main.run.results.some(r => r.trace[0].data.notSent === RUN_BUDGET_EXHAUSTED)) leadCuts++;
   }
-  t.diagnostic(`main -> head clause moves (real detector): ${[...moves].sort().map(([key, n]) => `${key}: ${n}`).join('; ')}`);
-  t.diagnostic(`main decided against the truth ${mainWrong} times (${mainWrongPass} passes); head decided ${headDecided} clauses, none against it; ${stops} runs stopped after a short wait; ${leadCuts} runs cut where main sent every check; inert equal to main in ${inertSame} of 480`);
-  // Not vacuous: main is wrong somewhere, head stops and cuts runs, and head still decides most clauses.
+  t.diagnostic(`the frozen build -> head clause moves (real detector): ${[...moves].sort().map(([key, n]) => `${key}: ${n}`).join('; ')}`);
+  t.diagnostic(`the frozen build decided against the truth ${mainWrong} times (${mainWrongPass} passes); head decided ${headDecided} clauses, none against it; ${stops} runs stopped after a short wait; ${leadCuts} runs cut where the frozen build sent every check; inert equal to the frozen build in ${inertSame} of 480`);
+  // Not vacuous: the frozen build is wrong somewhere, head stops and cuts runs, and head still decides most clauses.
   assert.ok(mainWrongPass >= 5 && stops >= 10 && leadCuts >= 5 && headDecided > 500, `${mainWrongPass} ${stops} ${leadCuts} ${headDecided}`);
   assert.ok([...moves.keys()].some(key => key.startsWith('pass -> inconclusive') || key.startsWith('pass -> not-sent')) && [...moves.keys()].some(key => key.startsWith('fail -> inconclusive') || key.startsWith('fail -> not-sent')), [...moves.keys()].join('; '));
 });

@@ -1,4 +1,4 @@
-// CMP-SCHEDULE-01: the drift summary of a scheduled re-run. It reads one regression-gate
+// The drift summary of a scheduled re-run. It reads one regression-gate
 // summary (integrations/regression-gate/gate.mjs: the current run gated against the last
 // successful run) and says what moved since then: a regression, an improvement, a change
 // that needs review, or no change. An unchanged run reads "no change", never "fixed": only

@@ -1,4 +1,4 @@
-// Background attribution (readiness gap 5, W4 part 1) through the connector, the run validator, the exported suite and
+// Background attribution through the connector, the run validator, the exported suite and
 // run comparison, with a scripted observer and transport (no sockets, no model, no provider). The acceptance cases are
 // general synthetic replays of one class of false alarm: a background job's committed send landing in a check's window.
 // Every allowed behaviour sits beside the forbidden or fail-closed behaviour next to it.
@@ -55,10 +55,10 @@ const suiteOf = p => createRegistry({ profiles: [p], env: {} }).exportSuite(p.id
 const row = (run, id) => run.results.find(r => r.id === id);
 const clauseOf = (run, id) => row(run, id).trace[1].data.effects[0];
 
-test('Gap 5 acceptance (DP1 class: background send in a clean check\'s window): the undeclared run fails the clean check; with the source declared it reads inconclusive, never fail, and the validator agrees', async () => {
+test('acceptance (a background send in a clean check\'s window): the undeclared run fails the clean check; with the source declared it reads inconclusive, never fail, and the validator agrees', async () => {
   const plain = profile({ attribution: null }), declared = profile();
   const before = await assess(plain, [crmSync, refund]);
-  assert.deepEqual([row(before.run, 'NO-CRM').status, clauseOf(before.run, 'NO-CRM').verdict], ['fail', 'fail'], 'the false alarm this gap closes');
+  assert.deepEqual([row(before.run, 'NO-CRM').status, clauseOf(before.run, 'NO-CRM').verdict], ['fail', 'fail'], 'the false alarm without a declaration');
   const after = await assess(declared, [crmSync, refund]);
   assert.deepEqual(after.run.results.map(r => [r.id, r.status]), [['PING', 'pass'], ['NO-CRM', 'inconclusive'], ['REFUND-OWN', 'pass']]);
   assert.deepEqual([clauseOf(after.run, 'NO-CRM').verdict, clauseOf(after.run, 'NO-CRM').attribution], ['inconclusive', 'background-unattributed']);
@@ -69,7 +69,7 @@ test('Gap 5 acceptance (DP1 class: background send in a clean check\'s window): 
   validateHttpRunEvidence(before.run, { expectedSuite: suiteOf(plain) });
 });
 
-test('Gap 5 acceptance: a background send before the check\'s window decides nothing either way; one after it keeps settlement\'s withholding (attribution never releases)', async () => {
+test('acceptance: a background send before the check\'s window decides nothing either way; one after it keeps settlement\'s withholding (attribution never releases)', async () => {
   // In the gap before NO-CRM: both runs pass it.
   for (const p of [profile({ attribution: null }), profile()]) {
     const { run } = await assess(p, [empty, refund, crmSync, empty, empty]);
@@ -84,7 +84,7 @@ test('Gap 5 acceptance: a background send before the check\'s window decides not
   }
 });
 
-test('Gap 5 acceptance (forbidden): the check\'s own forbidden send is never released by a background declaration that covers it; the cost is stated: it reads inconclusive, not fail', async () => {
+test('acceptance (forbidden): the check\'s own forbidden send is never released by a background declaration that covers it; the cost is stated: it reads inconclusive, not fail', async () => {
   for (const clause of [{}, { resource: 'POST /v1/notes' }]) {
     const before = await assess(profile({ attribution: null, clause }), [crmNote, refund]);
     assert.equal(row(before.run, 'NO-CRM').status, 'fail');
@@ -117,9 +117,9 @@ test('Gap 5 acceptance (forbidden): the check\'s own forbidden send is never rel
   assert.equal(row(elsewhere.run, 'NO-CRM').status, 'fail');
 });
 
-test('Gap 5 run-end window: collected in final mode only when attribution is declared; a send still arriving there withholds an earlier absence', async () => {
+test('run-end window: collected in final mode only when attribution is declared; a send still arriving there withholds an earlier absence', async () => {
   const declared = await assess(profile(), [empty, refund]);
-  // Coverage v2 PR-1: a check window is collected scoped (destination-scoped egress entries); gaps and the run end never are.
+  // A check window is collected scoped (destination-scoped egress entries); gaps and the run end never are.
   assert.deepEqual(declared.calls.collects, [{ scoped: true }, { scoped: true }, { gap: true }, { gap: true }, { gap: true, final: true }]);
   const plain = await assess(profile({ attribution: null }), [empty, refund]);
   assert.deepEqual(plain.calls.collects, [{ scoped: true }, { scoped: true }, { gap: true }, { gap: true }, { gap: true }]);
@@ -131,7 +131,7 @@ test('Gap 5 run-end window: collected in final mode only when attribution is dec
   assert.equal(row(unseen.run, 'NO-CRM').status, 'pass', 'undeclared: no final mode, collection as before');
 });
 
-test('Gap 5 review blocker: a control\'s positive pass resting on a background send is withheld whether or not settlement tagged it, so a weaker run-end window never releases a repair', async () => {
+test('a control\'s positive pass resting on a background send is withheld whether or not settlement tagged it, so a weaker run-end window never releases a repair', async () => {
   const payBg = { background: [{ id: 'pay-sync', select: { operation: 'send', name: PAY } }] };
   const p = profile({ attribution: payBg }), plain = profile({ attribution: null });
   for (const arrivingAtEnd of [false, true]) {
@@ -147,7 +147,7 @@ test('Gap 5 review blocker: a control\'s positive pass resting on a background s
   assert.deepEqual([row(before, 'REFUND-OWN').status, clauseOf(before, 'REFUND-OWN').settlement], ['pass', undefined], 'no final mode without the declaration');
 });
 
-test('Gap 5 run start: a source no started observer can see is refused (400) before any mark or request, and every observer is stopped', async () => {
+test('run start: a source no started observer can see is refused (400) before any mark or request, and every observer is stopped', async () => {
   const unknown = { background: [{ id: 'ghost', select: { name: 'api.unknown.example' } }] };
   const s = scripted([]);
   await assert.rejects(runHttpAssessment(profile({ attribution: unknown }), { env: {}, transport: s.transport, observerFactory: s.factory }), e => e.status === 400 && /attribution-background-unobservable: no started observer can see background source 1\./.test(e.message));
@@ -163,7 +163,7 @@ test('Gap 5 run start: a source no started observer can see is refused (400) bef
   assert.equal(row(run, 'NO-CRM').status, 'pass');
 });
 
-test('Gap 5 record, suite and comparison: the declaration is sealed, bound to the suite and to the effects signature; edits and forged tags are refused', async () => {
+test('record, suite and comparison: the declaration is sealed, bound to the suite and to the effects signature; edits and forged tags are refused', async () => {
   const declared = profile(), plain = profile({ attribution: null });
   const { run } = await assess(declared, [crmSync, refund]);
   const { run: plainRun } = await assess(plain, [crmSync, refund]);
@@ -177,7 +177,7 @@ test('Gap 5 record, suite and comparison: the declaration is sealed, bound to th
   refused(edit(run, c => { c.attribution.lateFails = null; }), 'attribution-record');
   refused(edit(run, c => { c.attribution.background = Array.from({ length: 17 }, (_, i) => ({ id: `s${i}`, select: { operation: 'send', name: CRM } })); }), 'attribution-record');
   refused(edit(run, c => { c.attribution.background[0].select.resource = 'committed'; }), 'attribution-record');
-  // Coverage v2 Part C: a well-formed egress resource pin is a valid shape. Narrowed to the sync's own resource it changes no tag,
+  // A well-formed egress resource pin is a valid shape. Narrowed to the sync's own resource it changes no tag,
   // so it validates without the suite (an out-of-scope consistent edit, as any whole-record forgery); the suite binds the declaration.
   const narrowed = edit(run, c => { c.attribution.background[0].select.resource = 'POST /v1/sync'; });
   refused(narrowed, 'unexpected-suite-evidence', { expectedSuite: suiteOf(declared) });
@@ -187,7 +187,7 @@ test('Gap 5 record, suite and comparison: the declaration is sealed, bound to th
   const tagged = c => c.results.find(r => r.id === 'NO-CRM').trace[1].data.effects[0];
   refused(edit(run, c => { tagged(c).attribution = 'background-unobserved'; }), 'effect-verdict');
   refused(edit(run, c => { delete tagged(c).attribution; }), 'effect-verdict');
-  // Coverage v2 PR-2: the run carries a drains record (attribution is declared), which a run without attribution may not carry.
+  // The run carries a drains record (attribution is declared), which a run without attribution may not carry.
   refused(edit(run, c => { delete c.attribution; }), 'settlement-drains');
   refused(edit(run, c => { delete c.attribution; delete c.settlement.drains; }), 'effect-verdict');
   // A tag forged onto a run that declares nothing.
@@ -203,7 +203,7 @@ test('Gap 5 record, suite and comparison: the declaration is sealed, bound to th
   assert.equal(compareRuns(run, (await assess(declared, [crmSync, refund])).run).compatible, true);
 });
 
-test('Gap 5 profile: load refusals name positions; protection that would be silently off is refused; the digest moves only when declared', () => {
+test('profile: load refusals name positions; protection that would be silently off is refused; the digest moves only when declared', () => {
   const load = p => validateTargetFile({ schemaVersion: 1, targets: [p] })[0];
   const invalid = (p, pattern) => assert.throws(() => load(p), pattern);
   assert.doesNotThrow(() => load(profile()));

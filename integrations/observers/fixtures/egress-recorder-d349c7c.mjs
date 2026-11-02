@@ -1,4 +1,4 @@
-// Frozen copy of scopehaven/integrations/observers/egress-recorder.mjs at d349c7c (main before readiness edge E1; imports re-pointed), for the E1 differential compat test. Tests only.
+// Frozen copy of scopehaven/integrations/observers/egress-recorder.mjs from before forwarding (imports re-pointed), for the differential compat test. Tests only.
 // Egress recorder: a loopback sink for the application's outbound HTTP
 // (configuration and routing modes: src/egress-rules.mjs). It answers every
 // request itself and never forwards, so nothing the app sends during a test

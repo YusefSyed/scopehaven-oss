@@ -1,4 +1,4 @@
-// Supabase identity rules (NC2 item 3) over a local Supabase stack (supabase start), with an owned app on 127.0.0.1 in
+// Supabase identity rules over a local Supabase stack (supabase start), with an owned app on 127.0.0.1 in
 // front of the stack's PostgREST and synthetic users. Skipped unless the same variables as pg-actor.live.test.mjs name a
 // disposable local stack (never a hosted project). Each test creates its own tables, policies and users and removes them.
 //

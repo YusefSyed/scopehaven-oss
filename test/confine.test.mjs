@@ -1,4 +1,4 @@
-// Confined launch (FIX-01 option 2): the launch file, the plan and what it refuses, the sandbox profile, the record and its
+// Confined launch: the launch file, the plan and what it refuses, the sandbox profile, the record and its
 // binding to a run, the routing tier it gives absence passes, and the --confine CLI path. The record and tier tests use an
 // injected transport and sink (no socket). The launch tests start owned loopback processes under macOS sandbox-exec and are
 // skipped where it cannot run (Linux, or inside another sandbox, which it cannot nest in); nothing leaves the machine.
@@ -137,7 +137,7 @@ test('the plan allows each declared sink and the allowlist, and refuses a provid
 });
 
 test('the profile refuses every outbound connection except the listed loopback ports (never every loopback port)', () => {
-  // tcp4: sandbox-exec names no single address, and plain "ip" would also allow a squatter on [::1] at a sink's port (FIX-02).
+  // tcp4: sandbox-exec names no single address, and plain "ip" would also allow a squatter on [::1] at a sink's port.
   assert.equal(confinementProfile(TAG, [40997, 40996, 40996]), `(version 1)\n(allow default)\n(deny network-outbound (with message "${TAG}"))\n(allow network-outbound (remote tcp4 "localhost:40996"))\n(allow network-outbound (remote tcp4 "localhost:40997"))\n`);
   assert.equal(confinementProfile(TAG, []), `(version 1)\n(allow default)\n(deny network-outbound (with message "${TAG}"))\n`);
   assert.match(zeroEgressProfile('t'), /localhost:\*/, 'zero-egress allows every loopback port, which none of the loopback bypasses would notice');
@@ -297,7 +297,7 @@ test('a confined application reaches its sink port and nothing else, nor do its 
     const pid = handle.child.pid;
     assert.deepEqual([await get(appPort, `/try?port=${sinkPort}`), await get(appPort, `/try?port=${otherPort}`), await get(appPort, `/child?port=${sinkPort}`), await get(appPort, `/child?port=${otherPort}`)],
       ['connected', 'EPERM', 'connected', 'EPERM']);
-    // A squatter on the other loopback family at the sink's own port (FIX-02), started after the self-test: still refused by the rule.
+    // A squatter on the other loopback family at the sink's own port, started after the self-test: still refused by the rule.
     if (hasIpv6Loopback) {
       await new Promise((resolve, reject) => { squatter.once('error', reject); squatter.listen({ port: sinkPort, host: '::1', ipv6Only: true }, resolve); });
       assert.equal(await get(appPort, `/try6?port=${sinkPort}`), 'EPERM');
@@ -529,7 +529,7 @@ test('a confined launch whose application never listens is refused and stopped',
 });
 
 // Owned app for the CLI path: /me, the witness relayed through the proxy sink, an allowed charge through the sink at checkout,
-// and, while summarizing, a charge sent straight to the provider double around the sink (the A-11 shape). Its attempts go to a log file.
+// and, while summarizing, a charge sent straight to the provider double around the sink. Its attempts go to a log file.
 const BYPASS_APP = `import { createServer, request } from 'node:http';
 import { writeFileSync } from 'node:fs';
 const [port, sinkPort, providerPort] = process.argv.slice(2, 5).map(Number), logPath = process.argv[5];
@@ -604,7 +604,7 @@ test('the --confine CLI: a bypass that passes unconfined is refused under confin
       const store = createStore(out); await store.ready;
       return { summary, run: await store.get(summary.id), attempts: JSON.parse(await readFile(logPath, 'utf8')), received: received.length - before };
     };
-    // Unconfined: the charge reaches the provider around the sink, and the pass is false (the gap FIX-01 option 2 closes).
+    // Unconfined: the charge reaches the provider around the sink, and the pass is false (the gap the confined launch closes).
     const open = await arm('unconfined');
     unconfined.kill(); unconfined = null;
     assert.deepEqual([open.run.results.find(r => r.id === 'NO-CHARGE').status, open.attempts, open.received, Object.hasOwn(open.run, 'confinement')], ['pass', ['200'], 1, false]);
@@ -663,7 +663,7 @@ test('the --confine CLI: a bypass that passes unconfined is refused under confin
   } finally { unconfined?.kill(); witness?.close(); provider.close(); await rm(dir, { recursive: true, force: true }); }
 });
 
-// an earlier review round 2 (R2-n3): under --confine, a run refused because the authorization record's window ended leaves a
+// Under --confine, a run refused because the authorization record's window ended leaves a
 // receipt with that code, as every other failure under --confine does, and saves no run. The launched application holds
 // every response until just past validUntil, so the window ends while the run waits on it. If the CLI took longer than
 // the window just to start (a loaded machine), it refused the record at the start (no receipt: nothing started), and the

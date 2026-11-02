@@ -1,4 +1,4 @@
-// N14 stage 1: the Stripe stand-in, the Stripe read-back observer and the verdicts on its windows. Loopback only: every server here
+// Stage 1: the Stripe stand-in, the Stripe read-back observer and the verdicts on its windows. Loopback only: every server here
 // listens on 127.0.0.1 and every request goes to it; the fake-provider tests use an in-memory transport and open no socket. Keys are
 // synthetic, made per test at run time.
 import test from 'node:test';

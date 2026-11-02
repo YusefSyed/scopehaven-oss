@@ -1,4 +1,4 @@
-// App-log admissions, PR-1c-1 (APP-LOG-1C-DESIGN.md items a, b and e): rule fields read from the line through a closed word map,
+// App-log admissions: rule fields read from the line through a closed word map,
 // effect.only judged on the part of the clause the log can read (an entry only when it is provably none of the rest), and a
 // background source's exact egress resource kept where both sides name it the same way. Each only lets an admission read more of
 // the application's own log; every output is still the input verdict or fail. Pure tests over synthetic lines and windows: no
@@ -41,7 +41,7 @@ const pin = (op, operand) => ({ source: 'http-egress', operation: 'send', name: 
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // (a) Fields read from the line through a closed word map.
-test('a: a word map validates; a word under two values, a log-field pointer, an unbounded map and a secret-shaped value are refused', () => {
+test('a word map validates; a word under two values, a log-field pointer, an unbounded map and a secret-shaped value are refused', () => {
   valid(LOG());
   const withField = field => LOG({ rules: [{ action: 'm', operation: 'send', vocabulary: 'egress', name: MAIL, resource: 'POST /v1/messages', fields: { '/template': field } }] });
   refused(withField({ from: '/t', values: { a: ['x'], b: ['x'] } }), /listed under one value only/, 'one word, two values');
@@ -55,7 +55,7 @@ test('a: a word map validates; a word under two values, a log-field pointer, an 
   refused(withField({ from: '/t', values: { a: ['x'] }, const: 'a' }), /"fields" maps/, 'const and from together');
 });
 
-test('a: the reader captures a listed word\'s selector value; any other word, a missing pointer or a non-scalar captures nothing', () => {
+test('the reader captures a listed word\'s selector value; any other word, a missing pointer or a non-scalar captures nothing', () => {
   const captured = obj => readAppLogLine(line({ event: 'message.sent', ...obj }), CFG).effects[0].captured;
   assert.deepEqual(captured({ params: { template: 'TicketUpdate' } }), { status: 'captured', values: { '/template': { type: 'string', value: 'ticket_update' } } });
   assert.deepEqual(captured({ params: { template: 7 } }), { status: 'captured', values: { '/template': { type: 'string', value: 'legacy_code' } } }, 'an integer word');
@@ -67,7 +67,7 @@ test('a: the reader captures a listed word\'s selector value; any other word, a 
   assert.deepEqual(readAppLogLine(line({ event: 'digest.sent' }), CFG).effects[0].captured, { status: 'captured', values: { '/template': { type: 'string', value: 'ticket_update' } } });
 });
 
-test('a: a line-read field decides equals and in; an unlisted word, a range or a type mismatch decides nothing', () => {
+test('a line-read field decides equals and in; an unlisted word, a range or a type mismatch decides nothing', () => {
   const sent = template => fromLine({ event: 'message.sent', params: { template } });
   assert.deepEqual(admit([clause('effect.none', pin('equals', 'refund_confirmation'))], [sent('refund_confirmation')]), [{ log: 'actions', entries: 1, contradicts: false }]);
   assert.notEqual(admit([clause('effect.none', pin('in', ['refund_confirmation', 'x']))], [sent('refund_confirmation')])[0], null);
@@ -85,7 +85,7 @@ test('a: a line-read field decides equals and in; an unlisted word, a range or a
   assert.deepEqual([d.verdict, d.appLog.finding], ['fail', ADMISSION_FINDING]);
 });
 
-test('a: the validator binds each captured value to its record: one the word map does not name is refused', () => {
+test('the validator binds each captured value to its record: one the word map does not name is refused', () => {
   const records = RECORDS();
   assert.deepEqual(records[0].reads.values[MAIL], { '/template': ['ticket_update', 'refund_confirmation', 'legacy_code'] });
   const ok = W([fromLine({ event: 'message.sent', params: { template: 'refund_confirmation' } })]);
@@ -103,7 +103,7 @@ test('a: the validator binds each captured value to its record: one the word map
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // (b) effect.only on the part of the clause the log can read.
-test('b: distinctFrom validates; an unknown source, the app log, a repeat or one of its own observedAs is refused', () => {
+test('distinctFrom validates; an unknown source, the app log, a repeat or one of its own observedAs is refused', () => {
   const withRule = distinctFrom => LOG({ rules: [{ action: 'd', operation: 'insert', vocabulary: 'named', name: 'discounts', observedAs: ['sql-audit-table'], distinctFrom }] });
   valid(withRule(['provider-feed']));
   refused(withRule(['payments']), /"distinctFrom" lists/, 'unknown');
@@ -117,7 +117,7 @@ test('b: distinctFrom validates; an unknown source, the app log, a repeat or one
   assert.deepEqual(appLogReads(LOG({ rules: [...two.rules, { action: 'd3', operation: 'insert', vocabulary: 'named', name: 'discounts' }] })).distinct, {}, 'a rule without it');
 });
 
-test('b: a selector the log cannot read is dropped only for entries provably not its effect; any other entry is set aside', () => {
+test('a selector the log cannot read is dropped only for entries provably not its effect; any other entry is set aside', () => {
   // The clause allows a provider-feed send the log cannot name (its lines carry a customer id, no address) and expects one message.
   const feedAllow = { source: 'provider-feed', operation: 'send', name: 'customers.example' };
   const only = (allow, expect = [{ select: { source: 'http-egress', operation: 'send', name: MAIL, resource: 'POST /v1/messages' }, count: 1 }]) => ({ kind: 'effect.only', expect, allow, verdict: 'pass', matched: 0, basis: 'b', custody: 'independent', authoritative: true, counts: {} });
@@ -145,13 +145,13 @@ test('b: a selector the log cannot read is dropped only for entries provably not
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // (e) A background source's exact egress resource.
-test('e: reads.exact names only the names every rule of which is an egress rule with an exact resource', () => {
+test('reads.exact names only the names every rule of which is an egress rule with an exact resource', () => {
   assert.deepEqual(appLogReads(LOG()).exact, [MAIL]);
   const mixed = LOG({ rules: [...LOG().rules, { action: 'mail.logged', operation: 'send', vocabulary: 'named', name: MAIL }] });
   assert.deepEqual(appLogReads(mixed).exact, [], 'a named rule of the same name');
 });
 
-test('e: an exact pin is kept for those names; a "<METHOD> *" pin, a wildcard rule and a named rule set the resource aside', () => {
+test('an exact pin is kept for those names; a "<METHOD> *" pin, a wildcard rule and a named rule set the resource aside', () => {
   const digestSource = { id: 'digest', select: { operation: 'send', name: MAIL, resource: 'POST /v1/batch' } };
   const own = fromLine({ event: 'message.sent', params: { template: 'refund_confirmation' } });
   const job = fromLine({ event: 'digest.sent' });
@@ -170,13 +170,13 @@ test('e: an exact pin is kept for those names; a "<METHOD> *" pin, a wildcard ru
 });
 
 // ---------------------------------------------------------------------------------------------------------------------------
-// Fail-open review fixes (PR-1c-1 review).
+// Fail-open fixes.
 const RECORDER = { id: 'mail', type: 'egress-recorder', port: 47210, routing: 'base-url', destinations: [{ host: MAIL, paths: ['/v1/messages', '/v1/batch'], capture: { pointers: ['/template'] } }, { host: 'hooks.example' }],
   routes: [{ prefix: '/mail/', host: MAIL }, { prefix: '/hooks/', host: 'hooks.example' }, { prefix: '/w/', host: 'witness.scopehaven.invalid' }], witness: { actorId: 'member', method: 'GET', path: '/api/egress-witness', host: 'witness.scopehaven.invalid' }, settleMs: 250 };
 const observed = (log, effects = [{ kind: 'effect.none', select: { source: 'http-egress', operation: 'send', name: MAIL } }]) => validateTargetFile({ schemaVersion: 1, targets: [{ ...target(log), observers: [RECORDER],
   checks: [...target(log).checks, { id: 'STATUS', title: 'status', category: 'Collateral', severity: 'high', actorId: 'member', method: 'POST', path: '/status', body: {}, evidenceRequirement: 'backend', assertions: [{ kind: 'status.equals', expected: 200 }], effects }] }] })[0];
 
-test('review 1: a clause that pins a word-mapped field with a non-string equals or in operand is refused at load', () => {
+test('a clause that pins a word-mapped field with a non-string equals or in operand is refused at load', () => {
   const pinOn = (name, f) => [{ kind: 'effect.none', select: { source: 'http-egress', operation: 'send', name, fields: [{ pointer: '/template', ...f }] } }];
   observed(LOG(), pinOn(MAIL, { equals: 'refund_confirmation' }));
   assert.throws(() => observed(LOG(), pinOn(MAIL, { equals: 7 })), /non-string value/, 'an integer');
@@ -186,7 +186,7 @@ test('review 1: a clause that pins a word-mapped field with a non-string equals 
   observed(LOG(), pinOn(MAIL, { gt: 3 }));
 });
 
-test('review 2: an earlier check\'s field pins are set aside, so its late allowed line is never this check\'s', () => {
+test('an earlier check\'s field pins are set aside, so its late allowed line is never this check\'s', () => {
   // Check 1 forbids refund_confirmation and honestly sends ticket_update; that line lands late in check 2's window, which forbids it.
   const late = fromLine({ event: 'message.sent', params: { template: 'ticket_update' } });
   const earlier = [{ source: 'http-egress', operation: 'send', name: MAIL, fields: [{ pointer: '/template', equals: 'refund_confirmation' }] }];
@@ -195,7 +195,7 @@ test('review 2: an earlier check\'s field pins are set aside, so its late allowe
   assert.equal(admit([clause('effect.none', pin('equals', 'ticket_update'))], [late])[0].entries, 1, 'adjacent: no earlier check');
 });
 
-test('review 3: an egress rule\'s exact path is one the recorder declares for its host', () => {
+test('an egress rule\'s exact path is one the recorder declares for its host', () => {
   const ruleAt = resource => LOG({ rules: [{ action: 'm', operation: 'send', vocabulary: 'egress', name: MAIL, resource, observedAs: ['http-egress'] }] });
   observed(ruleAt('POST /v1/batch'));
   observed(ruleAt('POST *'));
@@ -203,7 +203,7 @@ test('review 3: an egress rule\'s exact path is one the recorder declares for it
   assert.throws(() => observed(LOG({ rules: [{ action: 'h', operation: 'send', vocabulary: 'egress', name: 'hooks.example', resource: 'POST /x' }] })), /do not declare/, 'a destination with no paths');
 });
 
-test('review 4: distinctFrom never names the source that records the rule\'s own kind of send', () => {
+test('distinctFrom never names the source that records the rule\'s own kind of send', () => {
   refused(LOG({ rules: [{ action: 'm', operation: 'send', vocabulary: 'egress', name: MAIL, resource: 'POST *', distinctFrom: ['http-egress'] }] }), /records its own kind of send/);
   const mail = distinctFrom => LOG({ fields: { ...LOG().fields, target: '/to' }, rules: [{ action: 'e', operation: 'send', vocabulary: 'mail', domains: [{ domain: 'customers.example' }], distinctFrom }] });
   refused(mail(['provider-feed']), /records its own kind of send/);
@@ -211,7 +211,7 @@ test('review 4: distinctFrom never names the source that records the rule\'s own
   valid(mail(['sql-audit-table']));
 });
 
-test('review 5: names are data: "__proto__" pollutes nothing and "constructor" reads no inherited property', () => {
+test('names are data: "__proto__" pollutes nothing and "constructor" reads no inherited property', () => {
   const odd = LOG({ rules: [{ action: 'p', operation: 'insert', vocabulary: 'named', name: '__proto__', fields: { '/x': { const: 'y' } }, distinctFrom: ['provider-feed'] },
     { action: 'c', operation: 'insert', vocabulary: 'named', name: 'constructor' }] });
   const reads = appLogReads(odd);
@@ -222,7 +222,7 @@ test('review 5: names are data: "__proto__" pollutes nothing and "constructor" r
   assert.deepEqual(admit([only, clause('effect.none', { source: 'sql-audit-table', operation: 'insert', name: 'constructor' })], [entry], {}, odd), [null, null]);
 });
 
-test('review 6: mail to an undeclared domain carries no captured record; capture and name bounds hold at load', () => {
+test('mail to an undeclared domain carries no captured record; capture and name bounds hold at load', () => {
   const mail = LOG({ fields: { ...LOG().fields, target: '/to' }, rules: [{ action: 'e', operation: 'send', vocabulary: 'mail', domains: [{ domain: 'customers.example' }], fields: { '/template': { from: '/t', values: { welcome: ['welcome'] } } } }] });
   const read = to => readAppLogLine(line({ event: 'e', to, t: 'welcome' }), compileAppLog(mail)).effects[0];
   assert.equal(read('a@customers.example').captured.values['/template'].value, 'welcome');
@@ -233,7 +233,7 @@ test('review 6: mail to an undeclared domain carries no captured record; capture
   refused(wide, /at most 256 distinct names/);
 });
 
-test('review 7: the validator holds a record\'s reads to what appLogReads writes and to its scope', () => {
+test('the validator holds a record\'s reads to what appLogReads writes and to its scope', () => {
   const ok = RECORDS();
   assert.ok(validAppLogRecords(ok));
   const edit = mutate => { const r = structuredClone(ok); mutate(r[0].reads, r[0]); return validAppLogRecords(r); };

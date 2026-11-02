@@ -1,4 +1,4 @@
-// Coverage in every export (NC1 item 3). From the run alone: for each actor with a boundary check, whether a required allowed-use
+// Coverage in every export. From the run alone: for each actor with a boundary check, whether a required allowed-use
 // control ran as that actor; an actor with none is a gap, shown in red, because a fix that refuses that actor everything would
 // read as a fix. From the operator's files (--coverage-inventory, --coverage-contract, --coverage-targets): the pre-run coverage
 // report of integrations/coverage-report. Coverage is presentation only: no verdict, count, comparison, gate outcome or hash moves.
@@ -18,7 +18,7 @@ import { renderSummary } from '../src/report-summary.mjs';
 import { residualDocument } from '../src/residual.mjs';
 import { exportRun, main, COVERAGE_INPUTS, COVERAGE_PROFILE_WARNING } from '../src/export-cli.mjs';
 import { createStore } from '../src/store.mjs';
-import { coverageReport, coverageLines, R9_WARNING, COVERAGE_SCOPE } from '../integrations/coverage-report/coverage.mjs';
+import { coverageReport, coverageLines, DECLARED_INTENT_WARNING, COVERAGE_SCOPE } from '../integrations/coverage-report/coverage.mjs';
 
 // Two actors. ops has a boundary check and a required allowed-use control; guest has a boundary check and, in the defective twin
 // profile, no control at all. The fixed twin gives guest a required control. Neither actor has credentials, so no key is read. One
@@ -36,7 +36,7 @@ const gapRun = await assess(), gapAgain = await assess(), fixedRun = await asses
 const synthetic = await runAssessment('demo-vulnerable');
 const fullCoverage = () => { const report = coverageReport({ inventory, contract: contract(), target: profile() }); return { report, warnings: [], lines: coverageLines(report) }; };
 // The operator's files for the full report: an inventory of the four requests, and a stated contract (or one read from the
-// application's own declarations, which carries the R9 warning).
+// application's own declarations, which carries the declared-intent warning).
 const inventory = { schema: 'scopehaven-coverage-inventory/1', applicationId: 'coverage-app', tenants: ['t1'], roles: ['member'], members: { t1: ['member'] },
   operations: [{ id: 'GET /me', surface: 'api', method: 'GET', path: '/me', auth: 'session', tenantScoped: false }, { id: 'GET /agent/orders', surface: 'api', method: 'GET', path: '/agent/orders', auth: 'session', tenantScoped: false },
     { id: 'GET /agent/tickets', surface: 'api', method: 'GET', path: '/agent/tickets', auth: 'session', tenantScoped: false }, { id: 'DELETE /agent/tickets', surface: 'api', method: 'DELETE', path: '/agent/tickets', auth: 'session', tenantScoped: false }], datastores: [] };
@@ -63,7 +63,7 @@ async function workspace(t) {
     slashTargets: await write('slash-targets.json', { schemaVersion: 1, targets: [{ ...profile(), origin: 'http://127.0.0.1:9/' }] }),
     movedTargets: await write('moved-targets.json', { schemaVersion: 1, targets: [{ ...profile(), checks: [...profile().checks, check('OPS-LATER', 'medium', 'ops', '/agent/later')] }] }) };
   const flags = (which = 'targets', basis = 'contract') => ({ coverageInventory: paths.inventory, coverageContract: paths[basis], coverageTargets: paths[which] });
-  // Library calls sign only when asked (PR 1), so these exports carry no envelope and no stamp.
+  // Library calls sign only when asked, so these exports carry no envelope and no stamp.
   const exportText = async (name, options) => { await exportRun({ outputFile: join(out, name), dataDir: data, ...options }); return readFile(join(out, name), 'utf8'); };
   return { root, data, out, store, saved, paths, flags, exportText };
 }
@@ -119,7 +119,7 @@ test('an actor without a required allowed-use control is red in the HTML and lis
   assert.ok((await w.exportText('gap.html', { runId: w.saved.gap.id, format: 'html' })).includes(GAP_LINE));
 });
 
-test('with the inventory, contract and targets the exports carry the full pre-run report, its scope note and the R9 warning; without them the section says what it needs', async t => {
+test('with the inventory, contract and targets the exports carry the full pre-run report, its scope note and the declared-intent warning; without them the section says what it needs', async t => {
   const w = await workspace(t);
   const without = await w.exportText('plain.html', { runId: w.saved.gap.id, format: 'html' });
   assert.ok(without.includes(`<h3>Pre-run coverage report</h3><p>${COVERAGE_NEEDS_FILES.replace(/'/g, '&#39;')}</p>`)); assert.ok(!without.includes('Coverage report for coverage-app'));
@@ -127,11 +127,11 @@ test('with the inventory, contract and targets the exports carry the full pre-ru
   assert.ok(withFiles.includes('<h3>Pre-run coverage report</h3><ul><li>Coverage report for coverage-app (coverage-target). Coverage, not findings:'), 'the report, from coverageLines');
   assert.ok(withFiles.includes(`<li>${COVERAGE_SCOPE.replace(/'/g, '&#39;')}</li>`), 'the scope note'); assert.ok(withFiles.includes('Suite reconciliation: 3 drafted and 1 declared not applicable of 4 suite checks (equal).'));
   assert.ok(withFiles.includes('Forbidden side: stated-deny cells with a forbidden check'));
-  assert.ok(!withFiles.includes(COVERAGE_NEEDS_FILES.replace(/'/g, '&#39;'))); assert.ok(!withFiles.includes('Warning: The stated intent'), 'a stated contract carries no R9 warning'); assert.ok(!withFiles.includes(COVERAGE_PROFILE_WARNING.replace(/'/g, '&#39;')));
+  assert.ok(!withFiles.includes(COVERAGE_NEEDS_FILES.replace(/'/g, '&#39;'))); assert.ok(!withFiles.includes('Warning: The stated intent'), 'a stated contract carries no declared-intent warning'); assert.ok(!withFiles.includes(COVERAGE_PROFILE_WARNING.replace(/'/g, '&#39;')));
   assert.ok(withFiles.includes(GAP_LINE), 'the run-alone part is still there');
-  // A contract read from the application's own declarations: the R9 warning, as coverageLines prints it.
+  // A contract read from the application's own declarations: the declared-intent warning, as coverageLines prints it.
   const declared = await w.exportText('declared.html', { runId: w.saved.gap.id, format: 'html', ...w.flags('targets', 'declared') });
-  assert.ok(declared.includes(`<li>Warning: ${R9_WARNING.replace(/'/g, '&#39;')}</li>`));
+  assert.ok(declared.includes(`<li>Warning: ${DECLARED_INTENT_WARNING.replace(/'/g, '&#39;')}</li>`));
   // A profile written non-canonically is digested as the validator normalizes it, like the run's: no warning.
   const slash = await w.exportText('slash.html', { runId: w.saved.gap.id, format: 'html', ...w.flags('slashTargets') });
   assert.ok(!slash.includes(COVERAGE_PROFILE_WARNING.replace(/'/g, '&#39;'))); assert.ok(slash.includes('Coverage report for coverage-app (coverage-target).'));

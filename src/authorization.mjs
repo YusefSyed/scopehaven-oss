@@ -1,4 +1,4 @@
-// CMP-ROE-01: a per-target authorization record, checked before any request is sent to a
+// A per-target authorization record, checked before any request is sent to a
 // target the operator configured, and stamped on the run it authorized.
 //
 // A record (scopehaven-authorization/1) says who allowed testing what, and until when:
@@ -7,7 +7,7 @@
 //   origins      every endpoint the run may contact: the target's origin and each observer endpoint
 //                it reaches (http://127.0.0.1:PORT for HTTP, the forwarder's port for a forwarded
 //                staging target; tcp://127.0.0.1:PORT for a database observer), or a remote target's
-//                exact https://host[:port] origin (H1 step 3)
+//                exact https://host[:port] origin
 //   addresses    optional, a remote target only: the non-public IP addresses its host may resolve to
 //   identities   the principalIds of the test accounts it covers
 //   validFrom, validUntil   ISO 8601 UTC instants; the window is [validFrom, validUntil)
@@ -45,7 +45,7 @@ const INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3}
 export const MAX_WINDOW_DAYS = 366;
 const FIELDS = ['schema', 'id', 'target', 'origins', 'identities', 'validFrom', 'validUntil', 'signer', 'signedAt', 'rulesOfEngagement', 'forwarded', 'addresses', 'sha256'];
 const OPTIONAL = ['rulesOfEngagement', 'forwarded', 'addresses'];
-// An endpoint a record may list: a loopback one, or (H1 step 3) a remote target's https origin, written as its origin.
+// An endpoint a record may list: a loopback one, or a remote target's https origin, written as its origin.
 const endpointValid = o => typeof o === 'string' && ((ORIGIN.test(o) && Number(ORIGIN.exec(o)[1]) <= 65535) || remoteOriginOf(o) === o);
 // A forwarder's destination: an http or https origin with a host and no credentials, path, query or fragment,
 // written exactly as its origin (lower case, no default port).
@@ -55,7 +55,7 @@ const destinationOrigin = value => {
   return ['https:', 'http:'].includes(url.protocol) && url.hostname !== '' && !url.username && !url.password && url.origin === value;
 };
 // A record instant in whole milliseconds, or NaN unless it is a real calendar instant: no 02-30 rolled over to March,
-// no hour 24 (L3). Exported for the other readers of a record's instants (the GitHub Action's wait, roe check --at).
+// no hour 24. Exported for the other readers of a record's instants (the GitHub Action's wait, roe check --at).
 export function instantMs(value) {
   const m = typeof value === 'string' ? INSTANT.exec(value) : null;
   if (!m) return NaN;
@@ -93,7 +93,7 @@ export function validateAuthorization(input) {
   if (![record.target.id, record.target.applicationId].every(v => typeof v === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(v))) fail('authorization-invalid', '"target" names a profile id and applicationId');
   if (!Array.isArray(record.origins) || !record.origins.length || record.origins.length > 16 || new Set(record.origins).size !== record.origins.length
     || !record.origins.every(endpointValid)) fail('authorization-invalid', '"origins" lists 1-16 distinct endpoints: literal loopback ones (http://127.0.0.1:PORT, or tcp://127.0.0.1:PORT for a database observer) or a remote target\'s https://host[:port]');
-  // addresses (H1 step 3): the non-public addresses (loopback, private, link-local, metadata, ...) a remote target's host may
+  // addresses (a remote target only): the non-public addresses (loopback, private, link-local, metadata, ...) a remote target's host may
   // resolve to for this run. Without them, a remote host that resolves to any such address is refused (src/remote-target.mjs).
   if (Object.hasOwn(record, 'addresses') && (!Array.isArray(record.addresses) || !record.addresses.length || record.addresses.length > 16 || new Set(record.addresses).size !== record.addresses.length
     || !record.addresses.every(a => isIpAddress(a) && a === a.toLowerCase()))) fail('authorization-invalid', '"addresses" lists 1-16 distinct IP addresses');
@@ -119,7 +119,7 @@ export function validateAuthorization(input) {
 
 // Observer types that contact no endpoint: they read a local file or listen on loopback for the
 // app to reach them. http-audit reaches an HTTP endpoint and the database snapshots a TCP one, with
-// their own credentials (F3). Any other type is refused: the check cannot say what it contacts.
+// their own credentials. Any other type is refused: the check cannot say what it contacts.
 const CONTACT_FREE = Object.freeze(['otel', 'sqlite-audit', 'sqlite-snapshot', 'mcp-log', 'audit-file', 'smtp-sink']);
 const trimSlash = origin => typeof origin === 'string' ? origin.replace(/\/$/, '') : origin;
 // Every loopback endpoint a run of this profile contacts, as the record lists them.
@@ -149,7 +149,7 @@ export function checkAuthorization(input, profile, { now, alsoContacts = [] } = 
   const record = validateAuthorization(input);
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) fail('authorization-clock', 'the check needs the current time');
   if (record.target.id !== profile?.id || record.target.applicationId !== profile?.applicationId) fail('authorization-target', 'the record covers another target or application');
-  // An operator-forwarded target (H1 step 2) runs only under a record that names where its forwarder sends traffic, and
+  // An operator-forwarded target runs only under a record that names where its forwarder sends traffic, and
   // a record that names a forwarder covers only a target declared forwarded: the two must agree.
   const forwardedTarget = profile?.targetContext === 'operator-forwarded';
   if (forwardedTarget && !Object.hasOwn(record, 'forwarded')) fail('authorization-forwarded', 'an operator-forwarded target needs a record that names the forwarder\'s destination ("forwarded")');
@@ -166,8 +166,8 @@ export function checkAuthorization(input, profile, { now, alsoContacts = [] } = 
   return authorizationStamp(record);
 }
 
-// The window, checked again immediately before every request a run sends and every observer call it makes (the
-// decisions from earlier reviews, m1 and R2-M1), and once more immediately before the run is saved or stamped:
+// The window, checked again immediately before every request a run sends and every observer call it makes, and once
+// more immediately before the run is saved or stamped:
 // check() throws authorization-window-ended once the current time is outside [validFrom, validUntil), and keeps
 // throwing; ended() says whether it ever did. Every entry point refuses a run whose guard ended or whose final check
 // fails (exit 2, or a 403 on the dashboard), and saves and stamps nothing. Times are whole milliseconds: an instant's ISO
@@ -213,8 +213,8 @@ export const guardObserverFactory = (factory, check) => (configs, options) => fa
 // request or observer call can surface as any error), otherwise its own.
 export const windowRefusal = (window, error) => window?.ended() ? new AuthorizationError(WINDOW_ENDED, 'the record\'s window ended during the run: nothing was sent after it ended, and the run is not saved or stamped') : error;
 export const authorizationStamp = record => Object.freeze({ schema: AUTHORIZATION_SCHEMA, id: record.id, sha256: record.sha256 });
-// What the run's transport needs from a checked record (H1 step 3): the non-public addresses it authorizes a remote host to resolve to.
-// The grant behind it (PR455-REVIEW m1) is made only here, from a record that validates, and names the record's origins:
+// What the run's transport needs from a checked record: the non-public addresses it authorizes a remote host to resolve to.
+// The grant behind it is made only here, from a record that validates, and names the record's origins:
 // runHttpAssessment refuses a remote target unless the remote option carries a grant whose origins name the target's origin
 // (remoteGrantOf), so a library caller cannot dial a remote host with no record. The grant rides on a module-private symbol,
 // which an object spread copies, so a caller (a test) can add its resolver and CA beside it; the addresses the connector
@@ -237,7 +237,7 @@ export const isAuthorizationStamp = value => object(value) && Object.keys(value)
   && typeof value.id === 'string' && ID.test(value.id) && typeof value.sha256 === 'string' && HEX64.test(value.sha256);
 
 // Which targets need a record: every one that is not a built-in fixture (the synthetic demos).
-// Anything else, an unknown kind or no entry at all, needs one: the check fails closed (L2).
+// Anything else, an unknown kind or no entry at all, needs one: the check fails closed.
 export const BUILT_IN_KINDS = Object.freeze(['owned-demo']);
 // Refund exemption is restricted to the exact owned IDs; a prefix or caller kind
 // cannot convert a configured HTTP profile into an owned fixture. Registry reserves them.

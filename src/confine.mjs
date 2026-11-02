@@ -1,4 +1,4 @@
-// Confined launch (FIX-01 option 2): ./scopehaven assess --target <id> --confine <launch.json> starts the application
+// Confined launch: ./scopehaven assess --target <id> --confine <launch.json> starts the application
 // under OS confinement whose only network ways out are the target's declared sinks and a recorded allowlist of loopback
 // ports, runs the assessment, stops the application and seals what it allowed and refused into the run
 // (src/confinement-record.mjs). With the route as the application's only way out, a send around it is refused by the
@@ -175,7 +175,7 @@ export const interfaceAddress = () => Object.values(networkInterfaces()).flat().
 //            kernel (EPERM) and the listener saw nothing; 'connected' when it got through; 'error' when the probe could not run
 //            (sandbox-exec cannot apply a profile inside another sandbox).
 //   otherFamily  with otherFamilyPort (an allowed port): { host: '::1', port, outcome } for a connection to [::1] at that port
-//            (FIX-02; at a sink port the listener there is normally the sink itself): 'refused', 'connected', 'error', or
+//            (at a sink port the listener there is normally the sink itself): 'refused', 'connected', 'error', or
 //            'unavailable' (the machine has no IPv6 loopback, so nothing can listen there either).
 //   interfaceAddress  with otherFamilyPort, on a machine with a non-loopback IPv4 address: { host, port, outcome } for a connection
 //            to that address at the allowed port, nothing listening: 'admitted' (ECONNREFUSED: the rule let it try, as it does

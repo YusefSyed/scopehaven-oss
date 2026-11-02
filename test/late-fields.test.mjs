@@ -1,4 +1,4 @@
-// LATE-FIELDS: a late scoped egress entry that is exactly one completed after-witness request carries that request's ledger seq
+// A late scoped egress entry that is exactly one completed after-witness request carries that request's ledger seq
 // and captured record (egress-recorder/4). An effect.only clause reads such an entry as covered toward a pass when the record
 // definitely matches an allowed selector that pins nothing beyond source, operation, name, resource and fields. Each newly decided
 // case sits beside the refused case next to it: pure decisions over synthetic admitted windows, the recorder over real loopback
@@ -49,11 +49,11 @@ test('1. lift: a late note whose own captured text is an allowed reminder lifts 
   assert.equal(lifted.verdict, 'pass', lifted.basis);
   assert.match(lifted.basis, /did not attribute fits an allowed selector and no expected one/);
   assert.equal(verdictOf(only(), [scoped(charge(), [late(text('Your refund was sent.'))])]), 'missing', 'a text outside the allowed set');
-  assert.equal(verdictOf(only(), [scoped(charge(), [late(undefined)])]), 'missing', 'main: the entry without its record (fix C refuses a fields pin)');
+  assert.equal(verdictOf(only(), [scoped(charge(), [late(undefined)])]), 'missing', 'as before: the entry without its record (the late-entry lift refuses a fields pin)');
   // equals and a form reading on a host declared that way lift too; the same form reading on a JSON-only host is refused (test 7).
   assert.equal(verdictOf(only({ allow: [{ ...sel(DESK, NOTE), fields: [{ pointer: '/text', equals: REMINDERS[0] }] }] }), [scoped(charge(), [late(text(REMINDERS[0]))])]), 'pass');
   assert.equal(verdictOf(only(), [scoped(charge(), [late(text({ type: 'text', value: REMINDERS[2] }))], { scope: FORM })]), 'pass', 'a form text value');
-  // Fix C's own lift is unchanged: an allow on name and resource alone lifts the entry with or without its record.
+  // The late-entry lift itself is unchanged: an allow on name and resource alone lifts the entry with or without its record.
   for (const captured of [undefined, text('anything at all')]) assert.equal(verdictOf(only({ allow: [sel(DESK, NOTE)] }), [scoped(charge(), [late(captured)])]), 'pass');
 });
 
@@ -82,7 +82,7 @@ test('3. allow keys: an actor, upstream, outcome or traceId pin never lifts; onl
   for (const extra of [{ upstream: 'applied' }, { outcome: 'committed' }, { actor: 'svc' }, { traceId: 'trace-1' }]) assert.equal(onlyCoverageFor(w, { expects, allows: [noteAllow(extra)] }), 'partial', JSON.stringify(extra));
   assert.equal(onlyCoverageFor(w, { expects, allows: [noteAllow()] }), 'complete');
   assert.equal(onlyCoverageFor(w, { expects, allows: [{ ...noteAllow(), source: 'smtp-capture' }] }), 'partial', 'another source');
-  // A name-free allow never lifts (effect.only refuses it at load; fix C's rule needs a name too).
+  // A name-free allow never lifts (effect.only refuses it at load; the late-entry lift needs a name too).
   const { name: _name, ...nameless } = noteAllow();
   assert.equal(onlyCoverageFor(w, { expects, allows: [nameless] }), 'partial', 'no name');
 });
@@ -148,10 +148,10 @@ test('8. the cross-check: every sealed event of the instance and seq agrees with
 
 // ---------------------------------------------------------------------------
 // Condition 5: the lift is toward a pass only. Over a grid of clauses and shared windows, each window W is judged against its
-// main-shaped twin S (the same entries without seq and captured, as egress-recorder/3 writes them): a result that is not pass is
+// earlier-shaped twin S (the same entries without seq and captured, as egress-recorder/3 writes them): a result that is not pass is
 // deep-equal to S's, a pass on S is the same pass on W, every core clause reads alike, and a lifted pass also passes with the late
-// request seen in the window. (A scratch run against a frozen copy of main's src/effect-events.mjs checks S against main itself.)
-test('9. differential: every result but a lifted pass is deep-equal to the main-shaped window\'s, and a lift is never more lenient than the send seen', () => {
+// request seen in the window. (A scratch run against a frozen copy of an earlier src/effect-events.mjs checks S against that build itself.)
+test('9. differential: every result but a lifted pass is deep-equal to the earlier-shaped window\'s, and a lift is never more lenient than the send seen', () => {
   const clauses = [only(), only({ allow: [noteAllow({ actor: 'svc' })] }), only({ allow: [sel(DESK, NOTE)] }), only({ allow: [noteAllow(), sel(BILL, REFUND)] }),
     only({ expect: [sel(BILL, CHARGE), sel(DESK)] }), only({ expect: [] }), only({ countBy: 'idempotency-key' }), only({ allow: [{ ...sel(DESK, NOTE), fields: [{ pointer: '/text', equals: REMINDERS[0] }] }] })];
   const eventSets = [() => charge(), () => [...charge(), ...charge()], () => [ev(BILL, REFUND)], () => [], () => [...charge(), ev(DESK, NOTE, { captured: text(REMINDERS[0]) })],
@@ -301,7 +301,7 @@ test('11. end to end: a late reminder note lets an effect.only pass stand under 
   // FIRST's witness unit comes before LATE's charge: a seq no sealed event carries (used by the binding forgery below).
   const r = await run(t, [check('FIRST', '/quiet', { effects: [{ kind: 'effect.none', select: sel(DESK) }] }), check('LATE', '/remind', clause), check('NEXT', '/quiet', { effects: [{ kind: 'effect.none', select: sel(BILL) }] })]);
   const row = r.run.results.find(x => x.id === 'LATE');
-  assert.equal(r.run.observers[0].collector.label, 'egress-recorder/13', 'LATE-FIELDS came in /4; verified signature headers moved it to /5, object-route target flags to /6, in-doubt R0 transport records to /7, the R1 request feed to /8, R2 read-back to /9, FIX-02\'s two loopback binds to /10, FIX-04\'s aliases and sibling hosts to /11, the drain\'s quiet recheck to /12, FIX-08\'s cross-recorder destinations to /13');
+  assert.equal(r.run.observers[0].collector.label, 'egress-recorder/13', 'late fields came in /4; verified signature headers moved it to /5, object-route target flags to /6, in-doubt transport records to /7, the request feed to /8, read-back to /9, the two exclusive loopback binds to /10, declared aliases and sibling hosts to /11, the drain\'s quiet recheck to /12, another recorder\'s destinations to /13');
   const entry = row.trace[1].data.windows[0].scoped?.[0];
   assert.deepEqual([entry?.codes, entry?.captured], [[AFTER], text(REMINDERS[0])], JSON.stringify(row.trace[1].data.windows[0]));
   assert.equal(statusOf(row), 'pass', JSON.stringify(row.assertions));
@@ -313,7 +313,7 @@ test('11. end to end: a late reminder note lets an effect.only pass stand under 
   // The entry's text changed to another allowed reminder: the verdict would not move, but its gap event disagrees.
   const disagree = reseal(r.run, (_f, fx) => { fx.trace[1].data.windows[0].scoped[0].captured = text(REMINDERS[1]); });
   assert.throws(() => validateHttpRunEvidence(disagree), e => e.code === 'invalid-run-evidence' && e.detail === 'effect-trace', 'disagreement');
-  // A seq that is not after the window's own events, and a pre-LATE-FIELDS collector label, are refused at binding.
+  // A seq that is not after the window's own events, and a collector label older than /4, are refused at binding.
   // The seq moved before the window's own event, to one no sealed event of the run carries (a witness unit's), so only the binding
   // can refuse it.
   const own = row.trace[1].data.windows[0].events;

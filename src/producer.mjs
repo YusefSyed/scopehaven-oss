@@ -1,4 +1,4 @@
-// The build a run or a signed file names (security review F9): producer.release beside evaluatorHash in a run's core, and in a DSSE
+// The build a run or a signed file names: producer.release beside evaluatorHash in a run's core, and in a DSSE
 // statement's producer. evaluatorHash says which grading rules ran; this says which copy of ScopeHaven ran them, so a reviewer can map
 // a result to a release. { source, version, commit, manifestSha256 }, from the first that answers:
 //   release-manifest  an install's RELEASE-MANIFEST.json (packaging/build-release.mjs): its version and commit, and the file's sha256

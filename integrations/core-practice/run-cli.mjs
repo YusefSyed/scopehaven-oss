@@ -35,7 +35,7 @@ export async function runCase({ kind, build = {}, observers = true, command, nod
     const profile = PROFILES[kind]({ origin: app.origin, sinkPort, observers });
     const config = join(dir, 'targets.json'), out = join(dir, command === 'gate' ? 'gate' : 'runs');
     await writeFile(config, JSON.stringify(manifest(profile)), { mode: 0o600 });
-    // The owned practice app runs under its own synthetic authorization record (CMP-ROE-01; test/authorization.test.mjs pins the refusals).
+    // The owned practice app runs under its own synthetic authorization record (test/authorization.test.mjs pins the refusals).
     const authorization = writeTestAuthorization(join(dir, 'authorization.json'), profile);
     const env = { PATH: '/usr/bin:/bin', SCOPEHAVEN_NODE: node, ...app.env };
     const result = await launch([command, '--config', config, '--target', profile.id, '--out', out, '--authorization', authorization], env);

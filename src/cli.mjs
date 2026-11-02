@@ -54,9 +54,9 @@ else try {
       // and have no twin in the profile. They read inconclusive (selector-unpaired) unless every deciding observer declares the
       // resource for the selector's exact name in its vocabulary at run time and the window is closed for it (the payments
       // double declares its provider host's); this static report cannot see run-time vocabularies, so it lists those pins too.
-      // unguardedAbsences (FIX-07): absences that pin nothing, in a boundary check that expects a success status and has no positive clause, whose actor has
+      // unguardedAbsences: absences that pin nothing, in a boundary check that expects a success status and has no positive clause, whose actor has
       // no required allowed-use control with a positive effect; a do-nothing application would pass them, so they read inconclusive.
-      // forwardedUnpaired (H1 step 2) and remoteUnpaired (step 3): in an operator-forwarded or operator-remote target, boundary
+      // forwardedUnpaired and remoteUnpaired: in an operator-forwarded or operator-remote target, boundary
       // checks with no required control of the same method on the same route; their passes keep the gate from reading clean
       // (src/forwarded-pairing.mjs).
       // twoIdentities: for a target that declares tenantValues, its identities, whether it is single-identity, and each boundary
@@ -81,7 +81,7 @@ else try {
     if (options['--single-identity'] && !singleIdentity) console.error('Note: --single-identity had no effect: the target is not a single-identity target.');
     const mirrorless = kind === 'http-contract' && !singleIdentity && (p => coverageOf(p).tenantScoped && plainMirrors(p) && !reportOf(p).mirrored.length)(profiles.find(p => p.id === options['--target']));
     if (mirrorless) console.error(`Warning: target ${options['--target']} declares tenant-scoped resources but no boundary check was mirrored under its second identity (see --check-config twoIdentities.notMirrored).`);
-    // A configured target runs only under an authorization record that covers it now (CMP-ROE-01): checked before
+    // A configured target runs only under an authorization record that covers it now: checked before
     // anything starts or sends. Built-in fixture targets need none and keep their shape. The owned model tap's upstream
     // (SCOPEHAVEN_MODEL_TAP_UPSTREAM), which this process forwards the application's model calls to, must be covered too.
     const granted = needsAuthorization(entry) ? await authorizeConfigured(profiles.find(p => p.id === options['--target']), options['--authorization'] && resolve(options['--authorization']),
@@ -90,9 +90,9 @@ else try {
     // ends, no further request is sent and no further observer call starts (one already running can finish its reads),
     // and the run is refused (exit 2, authorization-window-ended), never saved or stamped. It is
     // checked once more immediately before the run is saved, so a run that ended at or after validUntil is refused too.
-    // A remote target's transport dials only what the record allows (H1 step 3, src/remote-target.mjs).
+    // A remote target's transport dials only what the record allows (src/remote-target.mjs).
     const authorization = granted?.stamp ?? null, runOptions = granted ? { beforeRequest: granted.window.check, remote: granted.remote } : undefined;
-    // --confine (FIX-01 option 2, src/confine.mjs): ScopeHaven starts the application itself under sandbox-exec, with its declared
+    // --confine (src/confine.mjs): ScopeHaven starts the application itself under sandbox-exec, with its declared
     // sinks (and a recorded allowlist) as its only ways out, and seals the confinement record into the run before it is saved.
     if (options['--confine'] && kind !== 'http-contract') throw new Error('--confine applies to an HTTP contract target from --config.');
     if(kind==='owned-refund-contract') {
@@ -131,7 +131,7 @@ else try {
       }
     } else {
       try { result = await registry.run(options['--target'], runOptions); } catch (error) { throw windowRefusal(granted?.window, error); }
-      // The window once more, immediately before the run is saved and stamped (the rule from an earlier review's round 2).
+      // The window once more, immediately before the run is saved and stamped.
       granted?.window.check();
     }
     const run = await store.save(authorization ? { ...result, authorization } : result), unpaired = unpairedForwardedPasses(run), withheld = channelReadings(run);

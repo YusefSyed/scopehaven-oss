@@ -42,7 +42,7 @@ test('settlement rules: a later matching effect withholds an absence or count pa
   const anon = makeEffect({ source: 'sql-audit-table', observer: { kind: 'sqlite-audit-table', instanceId: 'a' }, seq: 1, operation: 'update', name: 'note.update', outcome: 'committed', actor: null });
   assert.equal(fitsSelector(anon, scoped.select), true);
   assert.deepEqual(findings([rowOf([scoped], [audit], 'control')], [[audit], [{ ...audit, events: [anon] }]]), [['effect-outside-window']]);
-  // effect-ambiguous-attribution (the S4 case): every matched effect also fits an earlier check's selector.
+  // effect-ambiguous-attribution: every matched effect also fits an earlier check's selector.
   assert.deepEqual(findings([rowOf([none(A)], [win()]), rowOf([exists()], [win([send(A)])])]).at(-1), ['effect-ambiguous-attribution']);
   // One matched effect that only this check's selector fits keeps the exists pass.
   assert.deepEqual(findings([rowOf([none(A)], [win()]), rowOf([exists()], [win([send(A), send(B)])])]).at(-1), [null]);
@@ -155,7 +155,7 @@ test('settlement stated limit: an effect committed after the final mark is outsi
   validateHttpRunEvidence(run);
 });
 
-test('settlement S4: an earlier check\'s late effect in a later boundary check\'s window cannot make its unpinned effect.exists pass', async t => {
+test('settlement: an earlier check\'s late effect in a later boundary check\'s window cannot make its unpinned effect.exists pass', async t => {
   // ALICE-DELETE-OWN does nothing in this build; BOB-DELETE-ADMIN-NOTE's late webhook lands in its window.
   const reorder = pin => p => {
     const own = p.checks.find(c => c.id === 'ALICE-DELETE-OWN');
@@ -219,9 +219,9 @@ test('settlement evidence is recomputed: a dropped record, a restored pass, an e
 });
 
 // ---------------------------------------------------------------------------
-// Core batch v2. R2 (review of v1): a deciding observer's later window has to be able to decide absence
-// itself. v1 withheld only on a failed later window, so complete coverage followed by a partial tail kept the pass.
-test('R2: a partial later window of a deciding observer withholds an absence or count pass (settlement-unobserved); a fail stays a fail', () => {
+// A deciding observer's later window has to be able to decide absence
+// itself. An earlier version withheld only on a failed later window, so complete coverage followed by a partial tail kept the pass.
+test('a partial later window of a deciding observer withholds an absence or count pass (settlement-unobserved); a fail stays a fail', () => {
   const A = 'POST /hooks/bob/admin', B = 'POST /hooks/alice/member';
   for (const coverage of ['partial', 'failed']) {
     assert.deepEqual(findings([rowOf([none(A)], [win()])], [[win()], [win([], coverage)]]), [['settlement-unobserved']], `tail ${coverage}`);
@@ -243,7 +243,7 @@ test('R2: a partial later window of a deciding observer withholds an absence or 
   assert.deepEqual(findings([rowOf([deleteNone], [snap('complete')], 'control')], [[snap('complete')], [snap('complete')]]), [[null]]);
 });
 
-// The effect.only settlement rule (lead decision): an effect.only pass is an absence claim, so a matching or offending
+// The effect.only settlement rule: an effect.only pass is an absence claim, so a matching or offending
 // effect recorded after its window (in a later check's window, a gap or the tail) withholds it, and a deciding observer
 // that cannot cover a later window withholds it too.
 const onlySpec = (extra = {}) => ({ kind: 'effect.only', expect: [{ select: sel('POST /hooks/alice/member'), count: 1 }], allow: [], ...extra });
@@ -313,7 +313,7 @@ test('effect.only settlement end to end: a coupon sent after the refund check\'s
   assert.deepEqual([task.status, task.trace[1].data.effects[0].settlement], ['inconclusive', 'effect-outside-window']);
   assert.match(task.assertions.find(a => a.name.startsWith('Observed effect')).actual, /effect-outside-window/);
   assert.equal(nextWindow.results.find(r => r.id === 'COUPON').status, 'pass');
-  // S1-9: the validator recomputes the same finding from the sealed windows, so the authentic record is accepted as it is.
+  // The validator recomputes the same finding from the sealed windows, so the authentic record is accepted as it is.
   assert.doesNotThrow(() => validateHttpRunEvidence(nextWindow, { expectedSuite: suite }));
   // Late in the tail, or a partial tail: withheld; nothing later: the pass stands.
   const tail = await runWith([{ events: [refund] }, { events: [coupon] }, { events: [] }, { events: [] }, { events: [coupon] }]);
@@ -336,9 +336,9 @@ test('effect.only settlement end to end: a coupon sent after the refund check\'s
   assert.throws(() => validateHttpRunEvidence(forged), e => e.code === 'invalid-run-evidence' && e.detail === 'effect-verdict');
 });
 
-// A02 and A03 (review of v1, mutation gaps): the final mark follows the largest settle after the last check,
+// Mutation gaps: the final mark follows the largest settle after the last check,
 // and the sealed record's settle is the largest declared one, whatever the observers' order.
-test('A02: the final mark is taken at least the largest declared settle after the last check\'s end mark', async () => {
+test('the final mark is taken at least the largest declared settle after the last check\'s end mark', async () => {
   const marks = [], p = onlyRunProfile();
   p.checks = p.checks.filter(c => c.id !== 'COUPON'); p.requiredControlIds = ['PING'];
   const run = await runHttpAssessment(p, { env: {}, transport: scriptedTransport, observerFactory: scriptedFactory({ sink: [{ events: [refund] }] }, { marks }) });
@@ -347,7 +347,7 @@ test('A02: the final mark is taken at least the largest declared settle after th
   assert.ok(marks[3] - marks[2] >= 240, `final mark ${Math.round(marks[3] - marks[2])} ms after the last end mark`);
   assert.equal(run.settlement.settleMs, 250);
 });
-test('A03: the settlement record\'s settle is the largest declared, independent of observer order', async () => {
+test('the settlement record\'s settle is the largest declared, independent of observer order', async () => {
   assert.equal(finalSettleMs([{ settleMs: 250 }, { settleMs: 900 }, { settleMs: 300 }]), 900);
   assert.equal(finalSettleMs([{ settleMs: 900 }, { settleMs: 250 }]), 900);
   assert.equal(finalSettleMs([{ settleMs: null }, { settleMs: 300 }]), 300);
@@ -361,9 +361,9 @@ test('A03: the settlement record\'s settle is the largest declared, independent 
   assert.throws(() => validateHttpRunEvidence(edited), e => e.detail === 'settlement-record');
 });
 
-// Core batch v2 review F5: applySettlement settles a pass only. A finding handed in for a fail or an undecided clause
+// applySettlement settles a pass only. A finding handed in for a fail or an undecided clause
 // (which settlementFindings never computes, but a caller or an edited record could hand in) leaves it exactly as decided.
-test('F5: applySettlement withholds a pass only; a fail or an undecided clause handed a finding is left as decided', () => {
+test('applySettlement withholds a pass only; a fail or an undecided clause handed a finding is left as decided', () => {
   const failed = decideEffects([none()], [win([send('r-1')])]);
   assert.equal(failed[0].verdict, 'fail');
   assert.deepEqual(applySettlement(failed, ['effect-outside-window'], 'boundary'), failed);

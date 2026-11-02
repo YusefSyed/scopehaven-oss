@@ -48,13 +48,13 @@ async function runOnce(t, { build, variant, modelMode = 'tool-call', rules = RUL
   return { record, tapLogPath, dir, sequence };
 }
 const verdict = (record, id) => record.verdicts?.find(v => v.id === id)?.status;
-// Custody (SURPASS-CUSTODY-01): MIDTASK-ANY-01 (high) is decided only by the app's own audit table, and no shipped observer held
+// Custody: MIDTASK-ANY-01 (high) is decided only by the app's own audit table, and no shipped observer held
 // outside the app sees the write, so a clean 01 reads inconclusive. These helpers read that row and the record behind it.
 const custodyOf = (record, id) => { const r = record.sequenceRun.results.find(x => x.id === id); return [r.status, r.matched, r.custody, r.custodyReason]; };
 const HELD_01 = ['inconclusive', 0, 'subject-writable', 'subject-writable-custody'];
 const wroteAfterChange = record => record.sequenceRun.windows['changed>end'].some(w => w.events.some(e => e.actor === 'user-1' && e.name === 'note.write' && e.outcome === 'committed'));
 // A test copy, never a verdict: the record with MIDTASK-ANY-01 read as the pass the effect rules reached before custody held it,
-// so the judge's later rules (tool reached, refusal recorded) are still checked on real run data. J4 edits the same verdict to fail.
+// so the judge's later rules (tool reached, refusal recorded) are still checked on real run data. The judge's rules test edits the same verdict to fail.
 const forbiddenAsPass = record => {
   assert.deepEqual(custodyOf(record, 'MIDTASK-ANY-01'), HELD_01, 'only a custody-held clean 01 is restored');
   const copy = JSON.parse(JSON.stringify(record));
@@ -68,7 +68,7 @@ test('MIDTASK-ANY on the stand-in: a start-time-only build commits after the use
   assert.equal(verdict(startOnly.record, 'MIDTASK-ANY-01'), 'fail', JSON.stringify(startOnly.record.sequenceRun.results));
   assert.deepEqual(judgeMidtask(startOnly.record), { reading: 'fail', reason: 'write-after-access-removed' });
   const recheck = await runOnce(t, { build: 'recheck', variant: 'revoke' });
-  // Custody (SURPASS-CUSTODY-01): the re-check build's clean 01 is decided only by the app's audit table, so it and the reading are inconclusive, not pass.
+  // Custody: the re-check build's clean 01 is decided only by the app's audit table, so it and the reading are inconclusive, not pass.
   assert.equal(verdict(recheck.record, 'MIDTASK-ANY-01'), 'inconclusive', JSON.stringify(recheck.record.sequenceRun.results));
   assert.deepEqual(custodyOf(recheck.record, 'MIDTASK-ANY-01'), HELD_01);
   assert.equal(recheck.record.sequenceRun.aborted, null);
@@ -76,7 +76,7 @@ test('MIDTASK-ANY on the stand-in: a start-time-only build commits after the use
   // The records still tell the builds apart: the start-only build wrote after the change, the re-check build did not.
   assert.deepEqual([wroteAfterChange(startOnly.record), wroteAfterChange(recheck.record)], [true, false]);
   assert.deepEqual(judgeMidtask(forbiddenAsPass(recheck.record)), { reading: 'pass', reason: 'tool-refused-and-no-write' });
-  // The inner record is an ordinary sequence-run/2 the shared validator recomputes (M3), and the whole run validates.
+  // The inner record is an ordinary sequence-run/2 the shared validator recomputes, and the whole run validates.
   for (const { record, tapLogPath, sequence } of [startOnly, recheck]) {
     assert.deepEqual(validateSequenceRun(record.sequenceRun, { expectedSequence: sequence }).results.map(r => r.status), record.verdicts.map(v => v.status));
     assert.ok(validateModelPathRun(record, tapLogPath, { expectedSequence: sequence, expectedRules: RULES }));
@@ -107,7 +107,7 @@ test('the tap records the requested and served model of the held call, from traf
   assert.throws(() => validateModelPathRun({ ...record, holds: [] }, tapLogPath), /digest/);
 });
 
-// Each edit the round-1 review re-sealed and found valid (J/p2), on a start-only revoke run that reads fail.
+// Each edit an earlier adversarial review re-sealed and found valid, on a start-only revoke run that reads fail.
 test('the validator recomputes and binds what the judge reads: every re-sealed edit of the review is refused', async t => {
   const { record, tapLogPath, sequence } = await runOnce(t, { build: 'start-only', variant: 'revoke' });
   assert.equal(judgeMidtask(record).reading, 'fail');
@@ -138,10 +138,10 @@ test('the validator recomputes and binds what the judge reads: every re-sealed e
   refuses('record schema edited', r => { r.schema = 'scopehaven-model-path-run/1'; return r; }, 'schema');
   refuses('inner schema /2 -> /1', r => { r.sequenceRun.schema = 'scopehaven-sequence-run/1'; return r; }, 'sequence-run');
   refuses('a hold the gate never saw', r => { r.sequenceRun.gateTimeline = r.sequenceRun.gateTimeline.filter(e => e.type !== 'released'); return r; }, 'gate-timeline');
-  refuses('the gate timeline names a rule the gate does not have (V1)', r => { r.sequenceRun.gateTimeline.find(e => e.type === 'held').ruleId = 'another-rule'; return r; }, 'gate-timeline');
-  refuses('a hold names a rule the gate does not have (V2)', r => { r.sequenceRun.timeline.find(e => e.step === 'held').rule = 'another-rule'; return r; }, 'gate-timeline');
-  refuses('the gate released after the run says it did (V3)', r => { const rel = r.sequenceRun.timeline.find(e => e.step === 'released'); r.sequenceRun.gateTimeline.find(e => e.type === 'released').t = String(BigInt(rel.t) + 1n); return r; }, 'gate-timeline');
-  // The open frame must be the log's first frame (V4): a log re-chained with its open frame moved is not this run's.
+  refuses('the gate timeline names a rule the gate does not have', r => { r.sequenceRun.gateTimeline.find(e => e.type === 'held').ruleId = 'another-rule'; return r; }, 'gate-timeline');
+  refuses('a hold names a rule the gate does not have', r => { r.sequenceRun.timeline.find(e => e.step === 'held').rule = 'another-rule'; return r; }, 'gate-timeline');
+  refuses('the gate released after the run says it did', r => { const rel = r.sequenceRun.timeline.find(e => e.step === 'released'); r.sequenceRun.gateTimeline.find(e => e.type === 'released').t = String(BigInt(rel.t) + 1n); return r; }, 'gate-timeline');
+  // The open frame must be the log's first frame: a log re-chained with its open frame moved is not this run's.
   { let head = CHAIN_START; const moved = frames.map(f => { const { h, ...body } = f; const b = body.kind === 'open' ? { ...body, seq: 999 } : body; head = chainHash(head, b); return { ...b, h: head }; });
     const movedPath = join(dirname(tapLogPath), 'tap-moved.jsonl'); writeFileSync(movedPath, `${moved.map(f => JSON.stringify(f)).join('\n')}\n`);
     assert.throws(() => validateModelPathRun(record, movedPath), e => e instanceof ModelPathError && e.code === 'tap-session', 'open frame moved'); }
@@ -180,17 +180,17 @@ test('a signed run: any edit of the record, its tap log or the app\'s store is r
   const { envelope } = signFiles([{ name: 'access.db', content: readFileSync(join(dir, 'access.db')) }], { privateKey: privatePem, version: '2.0.0' });
   writeFileSync(join(dir, 'run.dsse.json'), envelope);
   assert.throws(() => verifyModelPathRunFiles(dir, { publicKey: publicPem, testKey: true }), e => e.code === 'signature' && /does not cover/.test(e.message), 'partial envelope');
-  // An envelope that also covers a file that is not a run file is refused (V5).
+  // An envelope that also covers a file that is not a run file is refused.
   writeFileSync(join(tapLogPath), readFileSync(tapLogPath, 'utf8').replace(/\n\n$/, '\n'));
   writeFileSync(join(dir, 'notes.txt'), 'not a run file\n');
   const wider = signFiles(['record.json', 'tap.jsonl', 'notes.txt'].map(name => ({ name, content: readFileSync(join(dir, name)) })), { privateKey: privatePem, version: '2.0.0' }).envelope;
   writeFileSync(join(dir, 'run.dsse.json'), wider);
   assert.throws(() => verifyModelPathRunFiles(dir, { publicKey: publicPem, testKey: true }), e => e.code === 'signature' && /does not cover/.test(e.message), 'an extra file');
-  // A run is signed once: an existing envelope is never overwritten (V6).
+  // A run is signed once: an existing envelope is never overwritten.
   assert.throws(() => signModelPathRunFiles(dir, { privateKey: privatePem }), e => e.code === 'EEXIST');
 });
 
-// The consistent forgery of round 2: the write removed from the window, the verdicts recomputed, both digests re-sealed.
+// The consistent forgery: the write removed from the window, the verdicts recomputed, both digests re-sealed.
 function forgeWithoutWrite(record) {
   const forged = JSON.parse(JSON.stringify(record)), s = forged.sequenceRun;
   for (const w of s.windows['changed>end']) w.events = w.events.filter(e => e.name !== 'note.write');
@@ -231,35 +231,35 @@ test('the judge reads a signed run (M-1): an edit of the task transport validate
   assert.throws(() => judgeSignedRun(dir, { publicKey: publicPem, testKey: true }), e => e.code === 'signature', 'the signature binds it');
 });
 
-test('the judge\'s order and outcome rules (J1, J3, J4) and the default settle (J5)', async t => {
+test('the judge\'s order and outcome rules and the default settle', async t => {
   const { record: revoke } = await runOnce(t, { build: 'recheck', variant: 'revoke' });
   const { record: control } = await runOnce(t, { build: 'recheck', variant: 'control' });
-  // Custody (SURPASS-CUSTODY-01): the re-check build's 01 is decided only by the app's audit table, so the reading is inconclusive, not pass.
+  // Custody: the re-check build's 01 is decided only by the app's audit table, so the reading is inconclusive, not pass.
   assert.deepEqual(judgeMidtask(revoke), { reading: 'inconclusive', reason: 'forbidden:inconclusive' });
   assert.deepEqual(custodyOf(revoke, 'MIDTASK-ANY-01'), HELD_01);
   assert.equal(judgeMidtask(forbiddenAsPass(revoke)).reading, 'pass');
   const clone = r => JSON.parse(JSON.stringify(r));
-  // J1: a control task that fails 5xx at entry (no hold) is not the build refusing allowed use.
+  // A control task that fails 5xx at entry (no hold) is not the build refusing allowed use.
   const crashed = clone(control); crashed.sequenceRun.timeline = crashed.sequenceRun.timeline.filter(e => !['held', 'released'].includes(e.step));
   crashed.sequenceRun.timeline.find(e => e.step === 'response' && e.request === 'task').status = 500;
   assert.equal(judgeMidtask(crashed).reading, 'inconclusive');
   const refused = clone(crashed); refused.sequenceRun.timeline.find(e => e.step === 'response' && e.request === 'task').status = 403;
   assert.deepEqual(judgeMidtask(refused), { reading: 'fail', reason: 'control-task-refused' });
-  // J3: the access change must answer before the changed mark and the release.
+  // The access change must answer before the changed mark and the release.
   const late = clone(revoke), tl = late.sequenceRun.timeline;
   const [answer] = tl.splice(tl.findIndex(e => e.step === 'response' && e.request === 'revoke'), 1); tl.splice(tl.findIndex(e => e.step === 'released') + 1, 0, answer);
   assert.deepEqual(judgeMidtask(late), { reading: 'inconclusive', reason: 'out-of-order' });
-  // J4: a committed forbidden write is a fail even beside a recorded refusal.
+  // A committed forbidden write is a fail even beside a recorded refusal.
   const both = clone(revoke); Object.assign(both.verdicts.find(v => v.id === 'MIDTASK-ANY-01'), { status: 'fail', verdict: 'fail' });
   assert.equal(both.verdicts.find(v => v.id === 'MIDTASK-ANY-04').status, 'pass');
   assert.deepEqual(judgeMidtask(both), { reading: 'fail', reason: 'write-after-access-removed' });
-  // J5: the template waits 1000 ms after the task responds unless told otherwise.
+  // The template waits 1000 ms after the task responds unless told otherwise.
   assert.equal(MIDTASK_SETTLE_MS, 1000);
   const defaulted = midtaskAnySequence({ id: 'settle', variant: 'control', rule: 'model-call', write: WRITE, attempt: ATTEMPT, actors: { user: { principalId: 'user-1', credentialEnv: 'SCOPEHAVEN_TARGET_MP_USER' }, admin: { principalId: 'admin-1', credentialEnv: 'SCOPEHAVEN_TARGET_MP_ADMIN' } }, task: { method: 'POST', path: '/task', body: {} } });
   assert.deepEqual(defaulted.steps.filter(s => 'sleep' in s), [{ sleep: 1000 }]);
 });
 
-test('the redirect guard (G1-G3): every status from 300 to 399 is refused, a foreign Host is refused, and a target can never leave the tap\'s origin', async t => {
+test('the redirect guard: every status from 300 to 399 is refused, a foreign Host is refused, and a target can never leave the tap\'s origin', async t => {
   const model = await startStubModel({ mode: 'redirect' });
   t.after(() => model.stop());
   const frames = [];
@@ -310,7 +310,7 @@ test('any 3xx from the model server, on any route, is refused: the app gets 502 
 
 test('a pass needs the hold before the write and the tool reached after the change; otherwise the run reads inconclusive', async t => {
   const silent = await runOnce(t, { build: 'recheck', variant: 'revoke', modelMode: 'no-tool' });
-  // Custody (SURPASS-CUSTODY-01): 01 is decided only by the app's audit table, so it reads inconclusive and the judge stops at the forbidden check.
+  // Custody: 01 is decided only by the app's audit table, so it reads inconclusive and the judge stops at the forbidden check.
   assert.equal(verdict(silent.record, 'MIDTASK-ANY-01'), 'inconclusive');
   assert.deepEqual(custodyOf(silent.record, 'MIDTASK-ANY-01'), HELD_01);
   assert.equal(judgeMidtask(silent.record).reading, 'inconclusive');
@@ -318,7 +318,7 @@ test('a pass needs the hold before the write and the tool reached after the chan
   assert.equal(verdict(silent.record, 'MIDTASK-ANY-03'), 'fail', 'the tool was never reached');
   assert.match(judgeMidtask(forbiddenAsPass(silent.record)).reason, /^tool-not-reached:/);
   const early = await runOnce(t, { build: 'start-only', variant: 'revoke', writeFirst: true });
-  // Custody (SURPASS-CUSTODY-01): the write landed before the change, so 01's clean window is decided only by the app's audit table and reads inconclusive.
+  // Custody: the write landed before the change, so 01's clean window is decided only by the app's audit table and reads inconclusive.
   assert.equal(verdict(early.record, 'MIDTASK-ANY-01'), 'inconclusive');
   assert.deepEqual(custodyOf(early.record, 'MIDTASK-ANY-01'), HELD_01);
   assert.deepEqual(judgeMidtask(early.record), { reading: 'inconclusive', reason: 'write-before-hold:fail' });
@@ -343,7 +343,7 @@ test('settle: a write committed just after the reply is inside the window; one l
   const soon = await runOnce(t, { build: 'start-only', variant: 'revoke', deferMs: 50 });
   assert.deepEqual(judgeMidtask(soon.record), { reading: 'fail', reason: 'write-after-access-removed' });
   const late = await runOnce(t, { build: 'start-only', variant: 'revoke', deferMs: SETTLE_MS + 400 });
-  // Custody (SURPASS-CUSTODY-01): the late write is outside the window, and the clean window is decided only by the app's audit table, so 01 reads inconclusive.
+  // Custody: the late write is outside the window, and the clean window is decided only by the app's audit table, so 01 reads inconclusive.
   assert.equal(verdict(late.record, 'MIDTASK-ANY-01'), 'inconclusive', 'the late write is outside the window');
   assert.deepEqual(custodyOf(late.record, 'MIDTASK-ANY-01'), HELD_01);
   assert.deepEqual(judgeMidtask(late.record), { reading: 'inconclusive', reason: 'forbidden:inconclusive' });
@@ -353,7 +353,7 @@ test('settle: a write committed just after the reply is inside the window; one l
 
 test('a pass needs the app\'s own refusal: a tool that crashes after running reads inconclusive, never the pass a re-check would earn', async t => {
   const crashed = await runOnce(t, { build: 'start-only', variant: 'revoke', toolCrash: true });
-  // Custody (SURPASS-CUSTODY-01): 01's clean window is decided only by the app's audit table, so it reads inconclusive; the tool-ran control keeps its pass.
+  // Custody: 01's clean window is decided only by the app's audit table, so it reads inconclusive; the tool-ran control keeps its pass.
   assert.deepEqual(['MIDTASK-ANY-01', 'MIDTASK-ANY-03'].map(id => verdict(crashed.record, id)), ['inconclusive', 'pass']);
   assert.deepEqual(custodyOf(crashed.record, 'MIDTASK-ANY-01'), HELD_01);
   assert.deepEqual(judgeMidtask(crashed.record), { reading: 'inconclusive', reason: 'forbidden:inconclusive' });
@@ -368,7 +368,7 @@ test('an access change the app answers but never records is not a change: a late
 
 test('the tool must run after the change: a run recorded only before it is not a pass, even beside a refusal', async t => {
   const early = await runOnce(t, { build: 'recheck', variant: 'revoke', attemptEarly: true, recheckFirst: true });
-  // Custody (SURPASS-CUSTODY-01): 01's clean window is decided only by the app's audit table, so it reads inconclusive; the controls keep their verdicts.
+  // Custody: 01's clean window is decided only by the app's audit table, so it reads inconclusive; the controls keep their verdicts.
   assert.deepEqual(['MIDTASK-ANY-01', 'MIDTASK-ANY-03', 'MIDTASK-ANY-04'].map(id => verdict(early.record, id)), ['inconclusive', 'fail', 'pass']);
   assert.deepEqual(custodyOf(early.record, 'MIDTASK-ANY-01'), HELD_01);
   assert.deepEqual(judgeMidtask(early.record), { reading: 'inconclusive', reason: 'forbidden:inconclusive' });

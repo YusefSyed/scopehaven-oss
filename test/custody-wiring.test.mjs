@@ -1,4 +1,4 @@
-// SURPASS-CUSTODY-01: custody decides HTTP effect verdicts and sequence
+// Custody decides HTTP effect verdicts and sequence
 // assertions. Owned synthetic data only: the HTTP runs use an injected transport
 // and injected observers (no socket, no database, no model, no provider), and
 // the sequence run uses an injected transport and in-memory observers.
@@ -88,7 +88,7 @@ const rowOf = (run, id) => run.results.find(r => r.id === id);
 const effectRows = row => row.assertions.filter(a => /^Observed effect/.test(a.name));
 const BOUNDARY_RE = /tamper-proof|tamperproof|certif|\bsecure\b|guarantee/i;
 
-test('D3: the custody core lives in src, the lineage table in its own module, and both are in the HTTP evaluator identity', async () => {
+test('the custody core lives in src, the lineage table in its own module, and both are in the HTTP evaluator identity', async () => {
   assert.equal(LINEAGE_FROM_EFFECTS, LINEAGE_BY_SOURCE, 'http-effects.mjs re-exports the same table');
   for (const name of ['subjectIntegrityVerdict', 'custodyOf', 'verifyChain', 'anchorOf', 'decidesAbsence', 'CUSTODY_BY_SOURCE', 'clauseCustody']) assert.equal(reExported[name], core[name], name);
   const source = await readFile(new URL('../src/http-connector.mjs', import.meta.url), 'utf8');
@@ -100,7 +100,7 @@ test('D3: the custody core lives in src, the lineage table in its own module, an
   for (const name of ['custody.mjs', 'effect-lineage.mjs']) assert.doesNotMatch(await readFile(new URL(`../src/${name}`, import.meta.url), 'utf8'), /from '\.\/http-effects\.mjs'/, name);
 });
 
-test('D1: a boundary pass decided only by app-store windows is inconclusive; a request-path pass, an exists in a control and a fail are kept', async () => {
+test('a boundary pass decided only by app-store windows is inconclusive; a request-path pass, an exists in a control and a fail are kept', async () => {
   const run = await assess();
   validateHttpRunEvidence(run);
   validateHttpRunEvidence(JSON.parse(JSON.stringify(run)));
@@ -139,7 +139,7 @@ test('D1: a boundary pass decided only by app-store windows is inconclusive; a r
   assert.equal(gate.exitCode, 1); assert.ok(gate.reasons.includes('inconclusive-evidence'), JSON.stringify(gate.reasons));
 });
 
-// Role cases (D1 revised): the application forges the precondition row in front of the guarded action. Its own
+// Role cases: the application forges the precondition row in front of the guarded action. Its own
 // audit table is the only witness, so each boundary check reads inconclusive, never pass.
 for (const [id, what] of [['VERIFY-BEFORE-READ', 'a forged verification row in front of a cross-customer read'],
   ['CONFIRM-ONCE', 'a forged confirmation row in front of the order write'], ['APPROVE-BEFORE-WRITE', 'a forged approval row before a refund write']]) {
@@ -168,14 +168,14 @@ test('role cases: the same forged rows in an allowed-use control keep their verd
   }
 });
 
-test('D2: a degraded row says what could decide it: a request-path observer for a send or a tool call, none for a database write; never how to make the app\'s records independent', async () => {
+test('a degraded row says what could decide it: a request-path observer for a send or a tool call, none for a database write; never how to make the app\'s records independent', async () => {
   const run = await assess();
   const none = effectRows(rowOf(run, 'NO-EDIT'))[0];
-  // Nothing held outside the application sees its database writes, so a database-write clause names no observer (review M2).
+  // Nothing held outside the application sees its database writes, so a database-write clause names no observer.
   assert.equal(none.custodyUpgrade, 'No shipped observer held outside the application sees operation update, name note.update. Decide it through the tool call or outbound send that carries it, if there is one, or accept this row as inconclusive.');
   assert.match(none.actual, /^inconclusive: .*Custody: every observer that decided this keeps a record the application can write, so it cannot support a pass\.$/);
   assert.equal(custodyUpgrade({ operation: 'tool-call', name: 'refund-approve' }), 'Add a hold gate that sees operation tool-call, name refund-approve, or accept this row as inconclusive.');
-  // A request-path observer records no acting principal: naming the actor would be advice that cannot work (review H2 note).
+  // A request-path observer records no acting principal: naming the actor would be advice that cannot work.
   assert.equal(custodyUpgrade({ operation: 'tool-call', name: 'refund', actor: 'mcp-viewer' }), 'Add a hold gate that sees operation tool-call, name refund; it records no acting principal, so it decides this for every actor, not only mcp-viewer, or accept this row as inconclusive.');
   assert.equal(custodyUpgrade({ source: 'sql-audit-table', operation: 'send', name: PAY }), `Add an egress recorder or SMTP sink that sees operation send, name ${PAY} and select it by that observer's source rather than sql-audit-table, or accept this row as inconclusive.`);
   assert.match(custodyUpgrade({ name: { prefix: 'refund.' }, actor: 'member-1' }), /^No shipped observer held outside the application sees name starting refund\., acting principal member-1\./);
@@ -221,7 +221,7 @@ test('saved-run recompute: the validator recomputes custody under the row\'s rol
   const consistent = relabel('ONE-ORDER', ['effect-outside-window']);
   validateHttpRunEvidence(consistent);
   assert.throws(() => validateHttpRunEvidence(consistent, { expectedSuite }), e => e.code === 'unexpected-suite-evidence' || e.detail === 'unexpected-suite-evidence');
-  // A row renamed out of the suite and relabelled a control is refused with the suite (review L5), never judged unbound.
+  // A row renamed out of the suite and relabelled a control is refused with the suite, never judged unbound.
   const renamed = structuredClone(consistent); rowOf(renamed, 'ONE-ORDER').id = 'ONE-ORDER-X';
   assert.throws(() => validateHttpRunEvidence(renamed, { expectedSuite }), e => e.code === 'unexpected-suite-evidence' || e.detail === 'unexpected-suite-evidence');
   // A row whose only clause is an absence proves no allowed use as a control: refused even without the suite. EDIT-SEEN's later
@@ -276,7 +276,7 @@ test('pure rule: degrades only a boundary pass, never upgrades, and judges only 
   assert.equal(decideEffects([{ kind: 'effect.none', select }], [appWindow], { role: 'control' })[0].verdict, 'pass');
 });
 
-// D4: sequences. The audit table is subject-writable; the hold gate is in the request path.
+// Sequences. The audit table is subject-writable; the hold gate is in the request path.
 const SEQ_AUDIT = { kind: 'sqlite-audit-table', instanceId: 'sqlite-audit-app', source: 'sql-audit-table',
   scope: { operations: ['insert', 'update'], names: ['refunds.requested', 'refunds.approved', 'approval.grant'], actorAttribution: 'principal', evidence: 'authoritative' } };
 const SEQ_GATE = { kind: 'hold-gate', instanceId: 'hold-gate-1', source: 'hold-proxy', scope: { operations: ['tool-call'], names: ['refund-approve', 'ungated'], actorAttribution: 'none', evidence: 'authoritative' } };
@@ -297,7 +297,7 @@ const SEQUENCE = { schema: SEQUENCE_SCHEMA, id: 'custody-seq', actors: { agent: 
 const sequenceRun = () => runSequence(SEQUENCE, { origin: 'http://127.0.0.1:9', transport: async () => ({ status: 200 }),
   observers: [seqObserver(SEQ_AUDIT, [{ operation: 'insert', name: 'refunds.requested', actor: 'agent-1' }, { operation: 'insert', name: 'approval.grant', actor: 'agent-1' }]), seqObserver(SEQ_GATE, [])] });
 
-test('D4: sequence assertions apply the same rule by severity, and the run validator recomputes it', async () => {
+test('sequence assertions apply the same rule by severity, and the run validator recomputes it', async () => {
   const run = await sequenceRun();
   const by = Object.fromEntries(run.results.map(r => [r.id, r]));
   assert.deepEqual([by['S-NONE-APP'].status, by['S-NONE-APP'].verdict, by['S-NONE-APP'].custody, by['S-NONE-APP'].custodyReason], ['inconclusive', 'inconclusive', 'subject-writable', CUSTODY_REASON]);
@@ -322,7 +322,7 @@ test('D4: sequence assertions apply the same rule by severity, and the run valid
   assert.equal(decideAssertion({ ...SEQUENCE.assertions[0], severity: 'control' }, windows, null).status, 'pass');
 });
 
-test('D5: custody shows in the HTML report, SARIF, the comparison export and the served dashboard, in plain wording', async t => {
+test('custody shows in the HTML report, SARIF, the comparison export and the served dashboard, in plain wording', async t => {
   const before = await assess(), after = await assess();
   // HTML report.
   const html = renderReport(before);

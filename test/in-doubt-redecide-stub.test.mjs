@@ -1,15 +1,15 @@
-// In-doubt resolution IDR-2, the run-end re-decide stage, exercised with late records (IN-DOUBT-DESIGN-ADDENDUM-R1 1.6, ADDENDUM-R2 m7 and
-// section 9). This build's later resolvers, R1 and R2, apply only in request-feed and read-back windows (test/in-doubt-r1.test.mjs,
+// In-doubt resolution, the run-end re-decide stage, exercised with late records. This build's later resolvers, the request feed (r1)
+// and read-back (r2), apply only in request-feed and read-back windows (test/in-doubt-r1.test.mjs,
 // test/in-doubt-r2.test.mjs). This file installs a
-// stub "rx" that applies to every in-doubt attempt to crm.example that connected (as any later resolver must, ADDENDUM-R1 1.4); its sealed
-// record is a read { result } and its derivation reads that result back (IDR-4: a later resolver seals reads, never bare results, and brings
+// stub "rx" that applies to every in-doubt attempt to crm.example that connected (as any later resolver must); its sealed
+// record is a read { result } and its derivation reads that result back (a later resolver seals reads, never bare results, and brings
 // a derive), through a test-only load hook that rewrites the one marker line of src/in-doubt.mjs in this test process. Nothing else is
 // patched: the connector, the stage and the validator run as built.
-// Checked: the overlay survives markUnfollowed and window copies, and fails closed on an event copy (m7); entry normalization and binding
+// Checked: the overlay survives markUnfollowed and window copies, and fails closed on an event copy; entry normalization and binding
 // refusals; the stage's semantics; parity between the connector side and the validator's recompute over thousands of seeded runs (unfollowed
 // windows, host-suspend-short windows and keyed groups included); only opted-in clauses that read a changed attempt move; degrading any late
-// record never turns a non-pass into a pass; a re-decided verdict is never more lenient than main reading each attempt's strict fate as a
-// proven reply; tampering is refused; and end to end through runHttpAssessment and validateHttpRunEvidence.
+// record never turns a non-pass into a pass; a re-decided verdict is never more lenient than a frozen earlier evaluator reading each
+// attempt's strict fate as a proven reply; tampering is refused; and end to end through runHttpAssessment and validateHttpRunEvidence.
 // Owned synthetic data only. No socket is opened: observers, clocks and transports are injected.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const MARKER = 'const LATER_RESOLVERS = Object.freeze({ r1: R1, r2: R2 });';
-// Design-faithful (ADDENDUM-R1 1.4): it applies only to an in-doubt attempt that connected; one that never connected has only R0.
+// Design-faithful: it applies only to an in-doubt attempt that connected; one that never connected has only r0, the transport record.
 const STUB = "const LATER_RESOLVERS = Object.freeze({ r1: R1, r2: R2, rx: Object.freeze({ applies: e => inDoubtAttempt(e) && e.name === 'crm.example' && e.upstream.transport?.connected === true, "
   + "readValid: r => plain(r) && Object.keys(r).join() === 'result' && RESOLVER_RESULTS.includes(r.result), derive: ({ reads }) => new Map([...reads].map(([e, r]) => [e, { resolver: 'rx', status: 'succeeded', result: r.result }])) }) });";
 const IN_DOUBT = new URL('../src/in-doubt.mjs', import.meta.url).href;
@@ -63,8 +63,8 @@ test('1. the stub later resolver comes from this test\'s load hook only; the sou
   assert.deepEqual(Object.keys(RESOLVER_TABLE), ['r0', 'r1', 'r2', 'rx']);
   assert.equal(typeof RESOLVER_TABLE.rx.read, 'undefined');
   assert.equal(readFileSync(fileURLToPath(IN_DOUBT), 'utf8').split(MARKER).length, 2, 'production source keeps the empty table');
-  // A later resolver applies only to an attempt that connected (ADDENDUM-R1 1.4). At seal time it has no record, which is failed, so a
-  // connected attempt is in doubt; one that never connected has only R0, which refutes it exactly as with no later resolver.
+  // A later resolver applies only to an attempt that connected. At seal time it has no record, which is failed, so a connected attempt
+  // is in doubt; one that never connected has only the transport record (r0), which refutes it exactly as with no later resolver.
   assert.deepEqual([applicableResolvers(send(UP.reset)), applicableResolvers(send(UP.server))], [['r0', 'rx'], ['r0', 'rx']]);
   assert.deepEqual(applicableResolvers(send(UP.refused)), ['r0'], 'never connected');
   assert.deepEqual(applicableResolvers(send(UP.missing)), ['r0'], 'no transport record: not known to have connected');
@@ -72,7 +72,7 @@ test('1. the stub later resolver comes from this test\'s load hook only; the sou
   assert.deepEqual([fateOf(send(UP.reset)), fateOf(send(UP.refused)), fateOf(send(UP.missing))], ['in-doubt', 'refuted', 'in-doubt']);
 });
 
-test('2. ADDENDUM-R2 m7: markUnfollowed only marks the window, so the event-keyed overlay survives; window copies keep it, event copies fail closed', () => {
+test('2. markUnfollowed only marks the window, so the event-keyed overlay survives; window copies keep it, event copies fail closed', () => {
   const reset = send(UP.reset), applied = send(UP.applied);
   const w = win([reset, applied], { coverage: 'partial', reason: C.AFTER, scoped: [{ name: CRM, resource: 'POST /tickets/T-1/close', codes: [C.AFTER] }] });
   admitScoped(w);
@@ -106,13 +106,13 @@ test('3. entries: one record per later resolver that applies, malformed and doub
   assert.deepEqual(lateEntriesFor([w], [entry(reset, { resolver: 'rx', read: { result: 'maybe' } })]), [entry(reset, rec(null, 'record-invalid'))]);
   assert.deepEqual(lateEntriesFor([w], [entry(reset, { resolver: 'rx', status: 'failed', reason: 'Not A Label' })]), [entry(reset, rec(null, 'record-invalid'))]);
   assert.deepEqual(lateEntriesFor([w], [entry(reset, { resolver: 'rx', read: { result: 'refutes' }, extra: 1 })]), [entry(reset, rec('refutes'))], 'normalized to the sealed shape');
-  // PR348-REVIEW minor 5: a later resolver's record is its read; a bare result is never taken, whatever it says.
+  // A later resolver's record is its read; a bare result is never taken, whatever it says.
   assert.deepEqual(lateEntriesFor([w], [entry(reset, eff('refutes'))]), [entry(reset, rec(null, 'record-invalid'))], 'a bare result is a failed record');
   assert.throws(() => bindResolutions([w], [entry(reset, eff('refutes'))]), /resolution-record/, 'and is refused when bound');
   assert.deepEqual(lateEntriesFor([{ ...w }], [entry(reset, rec('refutes'))]), [], 'a window that is not admitted (gate B) takes no record');
   const refuses = (entries, why) => assert.throws(() => bindResolutions([w], entries), /resolution-record/, why);
-  for (const [entries, why] of [[[entry(alt, rec('confirms'))], 'rx does not apply'], [[entry(refused, rec('confirms'))], 'an attempt that never connected has only R0'], [[entry(get, rec('confirms'))], 'a safe method is not in doubt'], [[entry(applied, rec('confirms'))], 'a proven reply'],
-    [[entry(reset, { resolver: 'r0', status: 'succeeded', result: 'refutes' })], 'R0 reads its own event'], [[entry(reset)], 'no record'], [[entry(reset, rec('refutes'), rec('refutes'))], 'one record per resolver'],
+  for (const [entries, why] of [[[entry(alt, rec('confirms'))], 'rx does not apply'], [[entry(refused, rec('confirms'))], 'an attempt that never connected has only r0'], [[entry(get, rec('confirms'))], 'a safe method is not in doubt'], [[entry(applied, rec('confirms'))], 'a proven reply'],
+    [[entry(reset, { resolver: 'r0', status: 'succeeded', result: 'refutes' })], 'r0 reads its own event'], [[entry(reset)], 'no record'], [[entry(reset, rec('refutes'), rec('refutes'))], 'one record per resolver'],
     [[entry(reset, rec('refutes')), entry(reset, rec('confirms'))], 'one entry per attempt'], [[{ ...entry(reset, rec('refutes')), extra: 1 }], 'exact keys'], [[entry(reset, { ...rec('refutes'), note: 'x' })], 'exact record keys'],
     [[{ observer: INST, seq: 99, records: [rec('refutes')] }], 'no such attempt'], [[{ observer: 'other', seq: reset.seq, records: [rec('refutes')] }], 'another observer'], ['x', 'not a list']]) refuses(entries, why);
   bindResolutions([w], [entry(reset, rec('refutes'))]);
@@ -121,7 +121,7 @@ test('3. entries: one record per later resolver that applies, malformed and doub
   assert.throws(() => bindResolutions([{ ...w, events: w.events }], [entry(reset, rec('refutes'))]), /resolution-record/, 'only admitted windows');
   // The validator's binding: absent clears; an empty or reordered list, or any refused entry, is effect-trace.
   bindSealedResolutions([w], [entry(reset, rec('refutes')), entry(server, rec('confirms'))]);
-  assert.deepEqual([fateOf(reset), fateOf(refused), fateOf(server)], ['refuted', 'refuted', 'applied'], 'rx decides the connected attempts; R0 alone the refused one');
+  assert.deepEqual([fateOf(reset), fateOf(refused), fateOf(server)], ['refuted', 'refuted', 'applied'], 'rx decides the connected attempts; r0 alone the refused one');
   assert.throws(() => bindSealedResolutions([w], [entry(server, rec('confirms')), entry(reset, rec('refutes'))]), /effect-trace/, 'not in the order the row seals them');
   assert.throws(() => bindSealedResolutions([w], [entry(refused, rec('refutes'))]), /effect-trace/, 'a sealed record for a never-connected attempt');
   assert.throws(() => bindSealedResolutions([w], []), /effect-trace/);
@@ -130,7 +130,7 @@ test('3. entries: one record per later resolver that applies, malformed and doub
   assert.deepEqual(sealedResolutions([w]), []);
 });
 
-test('4. the stage: a late refutation or confirmation decides a clause again; no record, a failed or silent one keeps it in doubt; a never-connected attempt keeps R0\'s refutation; other clauses are untouched', () => {
+test('4. the stage: a late refutation or confirmation decides a clause again; no record, a failed or silent one keeps it in doubt; a never-connected attempt keeps the transport record\'s refutation; other clauses are untouched', () => {
   const row = (effects, events, kind) => ({ effects, claims: [], readings: [], role: 'boundary', windows: [win(events, kind ?? {})] });
   const decide = r => decideEffects(r.effects, r.windows, { role: r.role });
   const stage = (r, supplied) => redecideResolved([r], supplied)[0];
@@ -152,7 +152,7 @@ test('4. the stage: a late refutation or confirmation decides a clause again; no
     const failed = stage(r, [entry(reset, rec(null, 'read-not-run'))]);
     assert.deepEqual([verdicts(failed), failed[0].resolution.attempts[0].reason], [['missing', 'missing'], 'read-not-run']);
     assert.deepEqual(verdicts(stage(r, [entry(reset, rec('silent'))])), ['missing', 'missing']); }
-  // A never-connected attempt keeps R0's refutation from seal time; a late record for it is dropped, and the row is unchanged.
+  // A never-connected attempt keeps the transport record's refutation from seal time; a late record for it is dropped, and the row is unchanged.
   { const refused = send(UP.refused), r = row([count(0), EXISTS], [refused]);
     assert.deepEqual(verdicts(decide(r)), ['pass', 'fail']);
     assert.equal(stage(r, [entry(refused, rec('confirms'))]), null);
@@ -185,7 +185,7 @@ function connectorSide(c, supplied) {
 const validatorSide = (c, trace) => recomputeEffectTrace(JSON.parse(JSON.stringify(trace)), undefined, [C.recordOf(c)], { role: c.role, unfollowed: C.unfollowedOf(c) });
 const RUNS = 3000;
 
-test('5a. PR348-REVIEW minor 1: a late record on a keyed send that is not outcome-judged moves effect.only\'s replay hint, so the clause is flagged', () => {
+test('5a. a late record on a keyed send that is not outcome-judged moves effect.only\'s replay hint, so the clause is flagged', () => {
   // Four closes under one key fold: #1 reset (connected) with key 1, another body and a sub-path target, so not outcome-judged; #2 and #4 the
   // same applied keyed send; #3 applied with no key. Refuting #1 late drops it from the key group, so #2 and #4 collapse and the hint changes.
   const sub = { exact: false, query: false }, exact = { exact: true, query: false };
@@ -202,7 +202,7 @@ test('5a. PR348-REVIEW minor 1: a late record on a keyed send that is not outcom
 
 test('5. parity: for every seeded run the validator recomputes the connector\'s verdicts, rows, records and backend reading (unfollowed, host-suspend-short and keyed included); only clauses that read a changed attempt move', t => {
   const n = { runs: 0, clauses: 0, changed: 0, redecided: 0, moved: 0, gained: 0, complete: 0, partial: 0, scoped: 0, unfollowed: 0, short: 0, keyed: 0 };
-  // Seed 55001 at 6,000 runs held PR348-REVIEW minor 1's case (run 4745: an unflagged effect.only whose replay hint moved).
+  // Seed 55001 at 6,000 runs holds test 5a's case (run 4745: an unflagged effect.only whose replay hint moved).
   for (const [seed, runs] of [[20261016, RUNS], [55001, 6000], [55002, RUNS], [66001, RUNS]]) for (let i = 0, g = C.rng(seed); i < runs; i++) {
     const c = C.randomCase(g), side = connectorSide(c, c.supplied);
     const again = validatorSide(c, side.trace);
@@ -246,7 +246,7 @@ test('6. property: removing or failing any late record never turns a non-pass in
   assert.ok(checked > 5000 && fullOnly > 100, `exercised: ${checked} opted-in clauses, ${fullOnly} passes only with every record`);
 });
 
-test('7. property: a re-decided verdict is never more lenient than the strict combination: every re-decided pass and fail is one main (8eaa589) gives reading each attempt\'s strict fate as a proven reply', t => {
+test('7. property: a re-decided verdict is never more lenient than the strict combination: every re-decided pass and fail is one the frozen earlier evaluator gives reading each attempt\'s strict fate as a proven reply', t => {
   const g = C.rng(4711);
   const MAIN = { scoped: [admitScoped, main.events.admitScoped], inDoubt: [main.inDoubt.admitInDoubt] };
   let passes = 0, fails = 0, equal = 0, compared = 0;
@@ -254,7 +254,7 @@ test('7. property: a re-decided verdict is never more lenient than the strict co
     const c = C.randomCase(g), side = connectorSide(c, c.supplied);
     if (!side.changed) continue;
     // Each attempt as the strict combination left it: confirmed as a proven 201, refuted as a proven declared 409, in doubt as unknown;
-    // no transport record anywhere, so main's R0 decides nothing on its own.
+    // no transport record anywhere, so the frozen evaluator's r0 decides nothing on its own.
     const fates = new Map(side.windows[0].events.map(e => [e.seq, inDoubtAttempt(e) ? fateOf(e) : null]));
     const oracleUp = s => { const f = fates.get(s.seq); const { transport: _t, ...up } = C.UP[s.outcome]; return f === 'applied' ? C.UP.applied : f === 'refuted' ? C.UP.rejected : f === 'in-doubt' ? C.UP.missing : up; };
     const w = C.buildWindow(c, { mark: MAIN, upstreamOf: oracleUp });
@@ -325,7 +325,7 @@ test('9. end to end: a late refutation or confirmation is decided again before s
   assert.deepEqual([ok.status, ok.backendEvidence], ['pass', 'observed']);
   // A run cut before the run-end read (no record) and a read that failed: in doubt in both the connector and the validator.
   for (const reads of [() => [], lateFor(() => rec(null, 'read-not-run'))]) assert.deepEqual(clauseVerdicts(rowOf(await runOf(p, recorderFactory([events], { reads })))), ['missing', 'missing']);
-  // A record for a host the later resolver does not cover, or for R0, binds nothing and seals nothing.
+  // A record for a host the later resolver does not cover, or for r0, binds nothing and seals nothing.
   const noise = rowOf(await runOf(p, recorderFactory([events], { reads: sent => sent.map(e => ({ seq: e.seq, records: [{ resolver: 'r0', status: 'succeeded', result: 'refutes' }, ...(e.name === ALT ? [rec('confirms')] : [])] })) })));
   assert.equal(Object.hasOwn(noise.trace[1].data, 'resolutions'), false);
 });
@@ -338,9 +338,9 @@ test('10. end to end: an unfollowed window, a keyed group, a host-suspend-short 
   assert.deepEqual([u.trace[1].data.windows[0].coverage, Boolean(u.trace[1].data.windows[0].scoped), clauseVerdicts(u)], ['partial', true, ['pass', 'missing']], 'unfollowed: read window-wide, a count cannot be decided');
   // Keyed group: an exact same-key retry, both attempts reset. Both refuted late: nothing applied, so nothing-expected passes, and so does
   // expected-once (effect.only's count is a maximum: presence is effect.exists's or effect.count's job). The first refuted and the retry confirmed: the applied retry stands and nothing-expected fails; expected-once
-  // passes: the key collapse (src/idempotency.mjs keyedSends) reads a refuted attempt as a declared rejection and, since IDR-4, a confirmed
+  // passes: the key collapse (src/idempotency.mjs keyedSends) reads a refuted attempt as a declared rejection and a confirmed
   // one as applied, as a proven applied reply reads (it read unknown, so missing, while no confirming resolver existed).
-  // The task's effect.only clauses pin nothing and it has no positive clause, so a required allowed-use twin guards them (FIX-07); the
+  // The task's effect.only clauses pin nothing and it has no positive clause, so a required allowed-use twin guards them; the
   // twin's applied close (under its own key, as the keyed destination records every send) is the first window, and the resolver reads
   // the task's two in-doubt attempts.
   const kp = profileOf([[KEYED_ONLY([]), KEYED_ONLY([{ select: CLOSE_SEL, count: 1 }])]], { keyed: true, twin: [EXISTS], requiredTwin: true });
@@ -354,7 +354,7 @@ test('10. end to end: an unfollowed window, a keyed group, a host-suspend-short 
   const both = rowOf(await runOf(unguarded, recorderFactory([keyed], { reads: sent => sent.map(e => ({ seq: e.seq, records: [rec('refutes')] })) })));
   assert.deepEqual([clauseVerdicts(both), both.trace[1].data.effects.map(e => e.pairing)], [['inconclusive', 'inconclusive'], ['allowed-use-not-declared', 'allowed-use-not-declared']]);
   // Settlement and pairing read the stage's output. A control twin applies the close; the task's own attempt is refuted late, so exactly-0
-  // passes and main's positive-match pairing finds its twin; with no twin, pairing holds that re-decided pass; without the record it is
+  // passes and the positive-match pairing finds its twin; with no twin, pairing holds that re-decided pass; without the record it is
   // missing. The validator recomputes the gaps, the pairing and every row.
   const paired = await runOf(profileOf([[count(0)]], { twin: [EXISTS] }), recorderFactory([() => [send(UP.applied)], () => [send(UP.reset)]], { reads: lateFor(() => rec('refutes')) }));
   assert.deepEqual([clauseVerdicts(rowOf(paired, 'TWIN')), clauseVerdicts(rowOf(paired)), rowOf(paired).status, rowOf(paired).backendEvidence], [['pass'], ['pass'], 'pass', 'observed']);
@@ -362,7 +362,7 @@ test('10. end to end: an unfollowed window, a keyed group, a host-suspend-short 
   assert.deepEqual([clauseVerdicts(unpaired), Object.hasOwn(unpaired.trace[1].data.effects[0], 'pairing')], [['inconclusive'], true], 'no twin: pairing holds the re-decided pass');
   const unread = await runOf(profileOf([[count(0)]], { twin: [EXISTS] }), recorderFactory([() => [send(UP.applied)], () => [send(UP.reset)]]));
   assert.deepEqual(clauseVerdicts(rowOf(unread)), ['missing']);
-  // Host suspend left the settle short (#343): the window reads partial with host-suspend-wait-short; a late refutation cannot pass an
+  // Host suspend left the settle short: the window reads partial with host-suspend-wait-short; a late refutation cannot pass an
   // absence there, a late confirmation still decides presence; the validator recomputes both.
   const WALL0 = Date.parse('2026-10-16T00:00:00.000Z');
   const virtual = () => {
@@ -394,11 +394,11 @@ test('11. end to end: tampering with a sealed late record, the re-decide flag or
   refused(reseal(d => { delete d.resolutions; }), 'dropped');
   refused(reseal(d => { delete d.effects[0].resolution.redecided; }), 'the re-decide flag');
   refused(reseal(d => { d.effects[1].verdict = 'pass'; }), 'a verdict');
-  refused(reseal(d => { d.resolutions[0].records.push({ resolver: 'r0', status: 'succeeded', result: 'confirms' }); }), 'an R0 record');
+  refused(reseal(d => { d.resolutions[0].records.push({ resolver: 'r0', status: 'succeeded', result: 'confirms' }); }), 'an r0 record');
   const unsealed = structuredClone(run); rowOf(unsealed).trace[1].data.resolutions[1].records[0].result = 'confirms'; refused(unsealed, 'the evidence digest');
 });
 
-// --- Identity option B (actor-identity/6) reads the late records too (PR348-REVIEW minor 2) ------------------------------------------
+// --- Identity option B (actor-identity/6) reads the late records too -----------------------------------------------------------------
 // The test/http-identity-rests-on.test.mjs fixture, with its host forwarded (crm.example, which the stub covers): the failed control I1 opts in (agent-write over a
 // partial window) and its one send was reset after the connect. In doubt, that send could be a commit by an unknown actor, so I1's failure is
 // not admitted and X, which rests on N4, stays withheld. Refuted late, the send is no commit at all, so the gap-only missing is admitted and X
@@ -454,7 +454,7 @@ test('12. identity option B: a failed control admitted only through a late refut
   assert.equal(inDoubt.results.find(r => r.id === 'X').status, 'inconclusive', 'withheld: the send in doubt could be an unknown actor\'s commit');
 });
 
-test('13. a late record for a send in a settlement gap binds nothing: only check-window attempts take records (gap sends keep R0 alone), and the run validates', async () => {
+test('13. a late record for a send in a settlement gap binds nothing: only check-window attempts take records (gap sends keep the transport record alone), and the run validates', async () => {
   const p = profileOf([[EXISTS], [EXISTS]]);
   // Gap 0 is before the first check, gap 1 between the checks, gap 2 the run-end tail: a reset close in the middle gap, between the checks.
   const run = await runOf(p, recorderFactory([() => [send(UP.reset)], () => [send(UP.applied)]], { gaps: [() => [], () => [send(UP.reset)]], reads: lateFor(() => rec('confirms')) }));
@@ -463,16 +463,17 @@ test('13. a late record for a send in a settlement gap binds nothing: only check
   const sealed = run.results.filter(r => r.trace?.[1]).flatMap(r => r.trace[1].data.resolutions ?? []);
   assert.deepEqual(sealed.map(x => x.seq), [rowOf(run).trace[1].data.windows[0].events[0].seq], 'only the first check\'s own attempt is sealed');
   assert.equal(Object.hasOwn(run.settlement.gaps[1].windows[0], 'resolutions'), false);
-  // TASK1 passes on its own confirmed attempt. TASK2's pass is then read by settlement against the gap send (still in doubt, R0 alone),
+  // TASK1 passes on its own confirmed attempt. TASK2's pass is then read by settlement against the gap send (still in doubt, the transport record alone),
   // and the validator recomputes that reading too (runOf validated the run).
   assert.deepEqual(clauseVerdicts(rowOf(run)), ['pass']);
 });
 
-// --- With #344 (suspend-aware lead-in and stop): a sleep-partial window and a stopped check -------------------------------------------
+// --- With the suspend-aware lead-in and stop: a sleep-partial window and a stopped check -----------------------------------------------
 // TASK1's settle is cut by a host sleep the budget cannot restore: its window reads partial (host-suspend-wait-short) and the run stops, so
 // TASK2 is not sent (host-suspend-run-stopped). The stage keeps the stopped row as it is (no window, no attempt, no record), and on the
-// sleep-partial window a late refutation is read exactly as R0's: it decides no pass and no operation, as R0 (PR348-REVIEW-FINAL N-a: a
-// keyed effect.only can still reach the fail main and R0 reach, when a refuted member leaves its key group). A late confirmation is read
+// sleep-partial window a late refutation is read exactly as the transport record's: it decides no pass and no operation, as that record
+// (a keyed effect.only can still reach the fail an earlier evaluator and the transport record reach, when a refuted member leaves its key
+// group). A late confirmation is read
 // as a proven applied reply would be on that window: a recorded application decides presence (exists passes, and effect.only, which
 // expects nothing, fails), while a count still needs complete coverage.
 test('14. a sleep-partial window decides nothing through a late refutation, and a check the run stopped stays without a window, attempt or record', async () => {
@@ -502,7 +503,7 @@ test('14. a sleep-partial window decides nothing through a late refutation, and 
   }
 });
 
-// Suspend follow-ups (F4d) beside the stage: without a timing plan a settle the spare budget could not restore goes on into the time kept
+// Suspend follow-ups beside the stage: without a timing plan a settle the spare budget could not restore goes on into the time kept
 // for later checks (its windows' record carries reserveMs), and the run stops after it either way. The stage reads no suspend record, so a
 // window restored that way is re-decided exactly as an awake window and as one the spare budget restored, and the check the run stopped
 // has no window, attempt or record. TASK2's own window holds no send, so nothing after TASK1 can settle TASK1's clauses differently.

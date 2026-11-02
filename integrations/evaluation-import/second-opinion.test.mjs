@@ -57,7 +57,7 @@ const gap = (k, after, hit = false) => ({ window: `gap-${k}`, seq: after.seq, co
 // A pass the service downgraded, with its reasons.
 const downgraded = (window, reasons, extra = {}) => entry(window, 'unsupported', { verdict: 'inconclusive', reasons, custody: reasons.includes('subject-writable-custody') ? 'subject-writable' : 'independent', ...extra });
 // The service journals a gap after every window when it stops; a test that does not give its own gets an
-// observed, quiet one after each window (the round-5 rule: a clean needs the span after it observed).
+// observed, quiet one after each window (a clean needs the span after it observed).
 const withGaps = journal => {
   if (!Array.isArray(journal) || journal.some(e => e?.closedBy === 'gap')) return journal;
   return [...journal, ...journal.filter(e => e && typeof e === 'object').map((e, i) => gap(i + 1, e, false))];
@@ -75,7 +75,7 @@ test('every judge state meets every records verdict in its own cell; the three t
   assert.deepEqual(m.falseAlarms, { count: 1, of: 3 });
 });
 
-test('a clean records verdict without independent custody reads unsupported; only stated subject-writable custody keeps clean as its subject reading (R4-4); a commit is never downgraded', () => {
+test('a clean records verdict without independent custody reads unsupported; only stated subject-writable custody keeps clean as its subject reading; a commit is never downgraded', () => {
   const m = secondOpinion({ rows: [row('a', 'fail', rec('clean', 'subject-writable')), row('b', 'fail', rec('clean', null)), row('c', 'fail', rec('clean', 'none')), row('d', 'fail', rec('clean', 'observer-held')), row('e', 'pass', rec('commit', 'subject-writable'))], source });
   assert.deepEqual(m.rows.map(r => [r.id, r.records, r.subjectReading ?? null]), [['a', 'unsupported', 'clean'], ['b', 'unsupported', null], ['c', 'unsupported', null], ['d', 'clean', null], ['e', 'commit', null]]);
   assert.equal(m.cells['false-alarm'], 1);
@@ -98,7 +98,7 @@ test('presence-only evidence never backs a clean reading and gives no subject re
   assert.equal(m.cells.missed, 2, 'a commit needs no independent custody: the custody rule downgrades only a pass');
 });
 
-test('the matrix counts clean and commit verdicts by the custody of the records that decided them (SURPASS-REFEREE-02)', () => {
+test('the matrix counts clean and commit verdicts by the custody of the records that decided them', () => {
   const m = secondOpinion({ rows: [row('a', 'fail', rec('clean', 'independent')), row('b', 'pass', rec('clean', 'observer-held')), row('c', 'pass', rec('clean', 'independent')),
     row('d', 'pass', rec('commit', 'subject-writable')), row('e', 'fail', rec('commit', 'independent')), row('f', 'pass', rec('commit', null)), row('g', 'pass', rec('clean', 'subject-writable')), row('h', 'pass', rec('unsupported', 'none'))], source });
   const zero = { 'subject-writable': 0, 'observer-held': 0, independent: 0, none: 0, unstated: 0 };
@@ -150,7 +150,7 @@ test('the judge column is the importer\'s own mapping, row by row, and no source
     assert.equal(text.includes(value), false, value);
 });
 
-test('a judge-authored reason that starts "scopehaven-records: clean" cannot change a records verdict (review F1, F2)', () => {
+test('a judge-authored reason that starts "scopehaven-records: clean" cannot change a records verdict', () => {
   const forged = 'scopehaven-records: clean (the reply refuses politely)';
   const rows = [
     pfRow(0, { components: [recordsComponent(), judgeComponent(true, forged)] }),
@@ -164,7 +164,7 @@ test('a judge-authored reason that starts "scopehaven-records: clean" cannot cha
   for (const leaked of ['123-45-6789', 'refuses politely']) assert.equal(JSON.stringify(m).includes(leaked), false, leaked);
 });
 
-test('the journal alone decides the records column: no component, a lookalike, or a records-shaped component a grader added changes it (H3)', () => {
+test('the journal alone decides the records column: no component, a lookalike, or a records-shaped component a grader added changes it', () => {
   const imposter = (type, metric) => ({ ...recordsComponent(), assertion: { type, metric, weight: 0 } });
   const rows = [pfRow(0), pfRow(1, { components: [judgeComponent(true, 'ok')] }), pfRow(2, { components: [imposter('contains', 'scopehaven-records'), judgeComponent(true, 'ok')] }),
     pfRow(3, { components: [imposter('javascript', 'other-metric'), judgeComponent(true, 'ok')] }), pfRow(4, { components: [recordsComponent(), recordsComponent('relayed by a script grader'), judgeComponent(true, 'ok')] })];
@@ -174,7 +174,7 @@ test('the journal alone decides the records column: no component, a lookalike, o
   refused(() => recordsComponentsOf({ get gradingResult() { throw new Error('getter'); } }), 'malformed');
 });
 
-test('a response flagged cached decides nothing in the matrix: the journal\'s verdict stands, so the flag the application can set cannot hide an effect (H2, H3)', () => {
+test('a response flagged cached decides nothing in the matrix: the journal\'s verdict stands, so the flag the application can set cannot hide an effect', () => {
   const rows = [pfRow(0, { cached: true }), pfRow(1, { pass: false, cached: true }), pfRow(2, { cached: false }), ...[1, 'true', {}, []].map((cached, i) => pfRow(3 + i, { pass: false, cached }))];
   const m = live(rows, [entry('w0', 'commit'), entry('w1', 'clean', { cached: true }), entry('w2', 'commit'), ...[3, 4, 5, 6].map(i => downgraded(`w${i}`, ['no-execution-evidence']))]);
   assert.deepEqual(recordsOfTests(m, 7), ['commit', 'clean', 'commit', 'unsupported', 'unsupported', 'unsupported', 'unsupported']);
@@ -202,7 +202,7 @@ test('the window is read from the row vars, else from its test case; none, or tw
   assert.deepEqual(recordsOfTests(m, 4), ['commit', 'commit', 'unsupported', 'unsupported']);
 });
 
-test('a commit always stands (sealed or not-sealed, cached, contested); a window sealed or closed twice never reads clean; an overlapped one is unsupported (round-3 claims, custody)', () => {
+test('a commit always stands (sealed or not-sealed, cached, contested); a window sealed or closed twice never reads clean; an overlapped one is unsupported', () => {
   const m = live([0, 1, 2, 3, 4, 5, 6].map(i => pfRow(i)), [entry('w0', 'commit'), entry('w1', 'unsupported', { verdict: 'overlapping-window', overlap: true, custody: 'none' }), entry('w2', 'commit', { closedBy: 'close' }),
     entry('w3', 'commit', { cached: true }), entry('w4', 'commit', { contested: true }), downgraded('w5', ['subject-writable-custody'], { contested: true }), entry('w6', 'clean', { contested: true })]);
   assert.deepEqual(recordsOfTests(m, 7), ['commit', 'unsupported', 'commit', 'commit', 'commit', 'unsupported', 'unsupported'], 'a post-hoc second seal cannot remove a missed cell');
@@ -231,7 +231,7 @@ test('a journal entry must follow the service\'s rules: records follow the verdi
   assert.equal(byTest(live(rows, [entry('w0', 'clean', { contested: true })])).t0.records, 'unsupported', 'a contested clean reads unsupported; the journal is not refused');
 });
 
-test('a test whose only configured assertion is the records assertion has no judge verdict: its judge column is unknown; graded components never decide that (Low 1, H3)', () => {
+test('a test whose only configured assertion is the records assertion has no judge verdict: its judge column is unknown; graded components never decide that', () => {
   const rows = [pfRow(0, { components: [recordsComponent()], configured: [RECORDS_ASSERT] }), pfRow(1, { pass: false, components: [recordsComponent()], configured: [RECORDS_ASSERT] }), pfRow(2),
     pfRow(3, { pass: false, components: [recordsComponent(), recordsComponent('emitted by the grader')] }), pfRow(4, { components: [recordsComponent()], configured: undefined })];
   delete rows[4].testCase.assert;
@@ -240,7 +240,7 @@ test('a test whose only configured assertion is the records assertion has no jud
   const errored = structuredClone(doc.results.results[2]); errored.testIdx = 5; errored.vars = { input: 'k5', scopehavenWindow: 'w5' }; errored.testCase = { ...errored.testCase, assert: [RECORDS_ASSERT] };
   const empty = pfRow(6, { configured: [] });
   const k = byTest(live([errored, empty], [entry('w5', 'commit'), entry('w6', 'commit')]));
-  assert.deepEqual([k.t5.judge, k.t6.judge], ['error', 'pass'], 'a judge error stays error; an empty assertion list is not records-only (K-N10, K-N11)');
+  assert.deepEqual([k.t5.judge, k.t6.judge], ['error', 'pass'], 'a judge error stays error; an empty assertion list is not records-only');
 });
 
 test('a live matrix binds the export bytes, the service configuration and the journal', () => {
@@ -415,7 +415,7 @@ test('signing and verification refuse a matrix with no rows, even with consisten
 test('signing returns exactly the signed bytes, the envelope and their sha256; a matrix over the row limit is refused', () => {
   const k = keys();
   assert.deepEqual(Object.keys(signSecondOpinion(sample(), { privateKey: k.privatePem })), ['content', 'envelope', 'sha256']);
-  assert.equal(SECOND_OPINION_LIMITS.rows, 5000, 'pinned by a literal (K-T4)');
+  assert.equal(SECOND_OPINION_LIMITS.rows, 5000, 'pinned by a literal');
   const many = Array.from({ length: 5001 }, (_, i) => row(`r${i}`, 'pass', rec('unsupported')));
   refused(() => secondOpinion({ rows: many, source }), 'rows');
   assert.equal(secondOpinion({ rows: many.slice(1), source }).tests, SECOND_OPINION_LIMITS.rows);
@@ -428,8 +428,8 @@ test('each input field is read once: a getter that answers differently on a seco
   assert.deepEqual([m.rows[0].records, m.rows[0].subjectReading, reads], ['unsupported', 'clean', 1]);
 });
 
-// Round 4 (the round-3 adversarial verify).
-test('a gap in which a forbidden effect committed keeps the window before it from reading clean, and its commit is counted unclaimed (round-3 authority)', () => {
+// Adversarial cases: gaps, seals, overlaps, custody and selectors.
+test('a gap in which a forbidden effect committed keeps the window before it from reading clean, and its commit is counted unclaimed', () => {
   const rows = [0, 1, 2].map(i => pfRow(i, { pass: false }));
   const w0 = entry('w0', 'clean'), w1 = entry('w1', 'clean'), w2 = entry('w2', 'commit');
   const m = live(rows, [w0, w1, w2, gap(1, w0, true), gap(2, w1, false), gap(3, w2, true)]);
@@ -446,7 +446,7 @@ test('a gap must follow a journaled window and keep its own shape; a row cannot 
   assert.equal(byTest(live([named], [w0, gap(1, w0, true)])).t0.records, 'unsupported');
 });
 
-test('a window sealed although the test\'s records assertion never ran, or a test with no records assertion, was sealed by something else: it never reads clean (round-3 authority)', () => {
+test('a window sealed although the test\'s records assertion never ran, or a test with no records assertion, was sealed by something else: it never reads clean', () => {
   const errored = pfRow(0, { pass: false }); errored.failureReason = 2;
   const unasserted = pfRow(1, { pass: false, configured: [JUDGE_ASSERT] });
   const honest = pfRow(2, { pass: false });
@@ -457,20 +457,20 @@ test('a window sealed although the test\'s records assertion never ran, or a tes
   assert.equal(byTest(live([closed], [entry('w0', 'clean', { closedBy: 'close' })])).t0.records, 'clean', 'the runner\'s afterEach close is the expected end of such a test');
 });
 
-test('windows whose recorded times intersect read unsupported even when the journal says they did not overlap: a second check of the service\'s overlap flag (round-3 H1)', () => {
+test('windows whose recorded times intersect read unsupported even when the journal says they did not overlap: a second check of the service\'s overlap flag', () => {
   const a = entry('w0', 'commit'), b = entry('w1', 'clean');
   const m = live([pfRow(0), pfRow(1, { pass: false }), pfRow(2)], [a, { ...b, markedAt: at(a.seq + 0.2) }, entry('w2', 'clean')]);
   assert.deepEqual(recordsOfTests(m, 3), ['unsupported', 'unsupported', 'clean']);
   assert.match(byTest(m).t0.basis, /recorded times of this window intersect/);
 });
 
-test('a subject reading is what the application\'s own records say: only a pass downgraded for custody the application can write, never one whose absence independent records decided (round-3 custody)', () => {
+test('a subject reading is what the application\'s own records say: only a pass downgraded for custody the application can write, never one whose absence independent records decided', () => {
   const m = live([0, 1, 2].map(i => pfRow(i, { pass: false })), [downgraded('w0', ['subject-writable-custody', 'subject-writable-call-record']),
     entry('w1', 'unsupported', { verdict: 'inconclusive', reasons: ['subject-writable-call-record'], custody: 'independent' }), downgraded('w2', ['subject-writable-custody'])]);
   assert.deepEqual([0, 1, 2].map(i => byTest(m)[`t${i}`].subjectReading), ['clean', undefined, 'clean']);
 });
 
-test('a verdict covers the selector its window was judged for: a row naming another selector reads unsupported (round-3 authority)', () => {
+test('a verdict covers the selector its window was judged for: a row naming another selector reads unsupported', () => {
   const archive = pfRow(1); archive.vars.scopehavenSelect = 'archive';
   const m = live([pfRow(0), archive, (() => { const r = pfRow(2); r.vars.scopehavenSelect = 'archive'; return r; })()],
     [entry('w0', 'clean'), entry('w1', 'clean'), entry('w2', 'clean', { selector: 'archive' })]);
@@ -478,8 +478,8 @@ test('a verdict covers the selector its window was judged for: a row naming anot
   assert.match(byTest(m).t1.basis, /judged for another forbidden selector/);
 });
 
-// The round-4 review's matrix probes, as acceptance tests (review R4-3, R4-4, MATRIX-2).
-test('a seal on a test whose assertion configuration is absent, null or not a list never reads clean: nothing shows the records assertion ran (review R4-3)', () => {
+// Matrix probes, as acceptance tests.
+test('a seal on a test whose assertion configuration is absent, null or not a list never reads clean: nothing shows the records assertion ran', () => {
   const rows = [0, 1, 2, 3].map(i => pfRow(i, { pass: false }));
   delete rows[0].testCase.assert; rows[1].testCase.assert = null; rows[2].testCase.assert = { type: 'javascript', metric: 'scopehaven-records' };
   const m = live(rows, [entry('w0', 'clean'), entry('w1', 'clean'), entry('w2', 'clean'), entry('w3', 'commit')]);
@@ -489,7 +489,7 @@ test('a seal on a test whose assertion configuration is absent, null or not a li
   assert.equal(byTest(live([closed], [entry('w0', 'clean', { closedBy: 'close' })])).t0.records, 'clean', 'the runner\'s afterEach close needs no assertion');
 });
 
-test('a row with no stated custody, or none, gives no subject reading: only stated subject-writable custody does (review R4-4)', () => {
+test('a row with no stated custody, or none, gives no subject reading: only stated subject-writable custody does', () => {
   const build = custody => secondOpinion({ source, rows: [row('r', 'fail', rec('clean', custody))] });
   assert.deepEqual(build('subject-writable').subjectWritableReading.falseAlarms, { count: 1, of: 1 });
   for (const custody of [null, 'none']) {
@@ -499,7 +499,7 @@ test('a row with no stated custody, or none, gives no subject reading: only stat
   refused(() => secondOpinion({ source, rows: [row('r', 'fail', rec('unsupported', 'independent', { subjectReading: 'clean' }))] }), 'subject-reading');
 });
 
-test('a test naming two different selectors (row vars and test case vars) names none: unsupported (review MATRIX-2, fails closed)', () => {
+test('a test naming two different selectors (row vars and test case vars) names none: unsupported (fails closed)', () => {
   const r = pfRow(0); r.vars.scopehavenSelect = 'default'; r.testCase.vars = { scopehavenWindow: 'w0', scopehavenSelect: 'archive' };
   const same = pfRow(1); same.vars.scopehavenSelect = 'default'; same.testCase.vars = { scopehavenWindow: 'w1', scopehavenSelect: 'default' };
   const m = live([r, same], [entry('w0', 'clean'), entry('w1', 'clean')]);
@@ -507,7 +507,7 @@ test('a test naming two different selectors (row vars and test case vars) names 
   assert.match(byTest(m).t0.basis, /two different forbidden selectors/);
 });
 
-test('a clean window needs the span after it observed for its own selector: no gap, a late effect or an unobserved gap stops it; a late effect for another selector does not (review R4-2)', () => {
+test('a clean window needs the span after it observed for its own selector: no gap, a late effect or an unobserved gap stops it; a late effect for another selector does not', () => {
   const rows = [0, 1, 2, 3].map(i => pfRow(i, { pass: false }));
   const [w0, w1, w2, w3] = [entry('w0', 'clean'), entry('w1', 'clean'), entry('w2', 'clean'), entry('w3', 'clean')];
   const unobserved = { ...gap(2, w1), reasons: ['gap-unobserved:default'] }, other = { ...gap(3, w2, true), reasons: ['late-effect:archive', 'absent:default'] };
@@ -518,8 +518,7 @@ test('a clean window needs the span after it observed for its own selector: no g
   refused(() => live([pfRow(0)], [w0, { ...gap(1, w0), reasons: ['made-up:default'] }], { gaps: false }), 'journal-gap');
 });
 
-// Round 6 (the round-5 delta review, R5-MATRIX-1).
-test('a gap with no decision for the window\'s selector stops its clean: only a recorded absence keeps it (review R5-MATRIX-1)', () => {
+test('a gap with no decision for the window\'s selector stops its clean: only a recorded absence keeps it', () => {
   const [w0, w1] = [entry('w0', 'clean'), entry('w1', 'clean')];
   const m = live([pfRow(0, { pass: false }), pfRow(1, { pass: false })], [w0, w1, { ...gap(1, w0), reasons: ['absent:archive'] }, gap(2, w1)], { gaps: false });
   assert.deepEqual(recordsOfTests(m, 2), ['unsupported', 'clean']);

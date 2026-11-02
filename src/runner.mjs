@@ -11,7 +11,7 @@ import { declaredEffect, declaredClaim } from './http-effects.mjs';
 import { restsOnAdmissions, ADMISSION_FINDING } from './app-log-verdicts.mjs';
 import { validateConversationRun, conversationShapeSignature, CONVERSATION_ORIGIN } from './conversation-native.mjs';
 import { evaluateCheck, complete, events, SCENARIO_INPUTS, TARGET_BIND_KINDS } from './evaluator-synthetic.mjs';
-// Operator-forwarded and remote runs (H1 steps 2 and 3): a boundary pass with no passing same-route required control, read as the gate reads it.
+// Operator-forwarded and remote runs: a boundary pass with no passing same-route required control, read as the gate reads it.
 import { unpairedForwardedPasses, unpairedReasonOf } from './forwarded-pairing.mjs';
 import { channelReadings, CHANNEL_UNOBSERVED, CHANNEL_UNACCOUNTED, CHANNELS_UNDECLARED } from './channels.mjs';
 
@@ -309,7 +309,7 @@ function withModelAttribution(baseline, candidate, comparison) {
   if (![baseline, candidate].some(run => MODEL_SERVED_ORIGINS.includes(run?.evidenceOrigin))) return comparison;
   const shapes = [baseline, candidate].map(run => identityShape(run?.modelIdentity));
   // The repair label is withheld only where one could stand (compatible, controls passing); an
-  // incompatible or controls-failed pair keeps its own label (an earlier review, L1).
+  // incompatible or controls-failed pair keeps its own label.
   const notRecorded = malformed => malformed.length
     ? { ...comparison, restorationLabel: comparison.compatible && comparison.controlsPass ? MODEL_UNREADABLE_LABEL : comparison.restorationLabel, modelAttribution: { state: 'not-recorded', note: MODEL_NOT_RECORDED, malformed, coreRestorationLabel: comparison.restorationLabel } }
     : { ...comparison, modelAttribution: { state: 'not-recorded', note: MODEL_NOT_RECORDED } };
@@ -389,7 +389,7 @@ export function compareRuns(baseline, candidate, { httpEvidence = true } = {}) {
   const baselineRowUnproven = before => perCheckIdentity(baseline) ? rowIdentityUnproven(before) : baselineUnproven.has(before.trace?.[0]?.data?.actorId);
   if (compatible && (perCheckIdentity(baseline) ? baseline.results.some(rowIdentityUnproven) : baselineUnproven.size)) reasons.push("The baseline run did not prove every actor's login; those actors' rows are unverified.");
   // A forwarded candidate's boundary pass with no passing same-route required control (src/forwarded-pairing.mjs) could be the
-  // forwarder answering that route itself (review K1), and a remote one (H1 step 3) a gateway in front of the target. The gate is
+  // forwarder answering that route itself, and a remote one a gateway in front of the target. The gate is
   // not clean on it (forwarded-pass-unpaired, remote-pass-unpaired), so the comparison credits it neither as a repair nor as a
   // preserved pass: it reads unverified (candidate-forwarded-pass-unpaired, candidate-remote-pass-unpaired).
   const candidateUnpaired = new Set(unpairedForwardedPasses(candidate)), unpairedReason = `candidate-${unpairedReasonOf(candidate.targetContext)}`;
@@ -410,7 +410,7 @@ export function compareRuns(baseline, candidate, { httpEvidence = true } = {}) {
     if (compatible && baselineChannels.has(before.id) && before.status === 'pass' && after?.status !== 'fail') return { id: before.id, title: before.title, before: before.status, after: after?.status || 'inconclusive', transition: (summary.unverified++, 'unverified'), transitionReason: baselineChannels.get(before.id) };
     if (compatible && restsOnAdmissions(before) && after?.status !== 'fail') return { id: before.id, title: before.title, before: before.status, after: after?.status || 'inconclusive', transition: (summary.unverified++, 'unverified'), transitionReason: 'baseline-fail-app-admitted' };
     if (compatible && restsOnAbsence(before) && after?.status !== 'fail') return { id: before.id, title: before.title, before: before.status, after: after?.status || 'inconclusive', transition: (summary.unverified++, 'unverified'), transitionReason: 'baseline-fail-absent-field' };
-    // Later outcomes (provider-feed/6, ADDENDUM-R1 B2): a baseline row the later-outcome stage lowered (its provider later failed the send,
+    // Later outcomes (provider-feed/6): a baseline row the later-outcome stage lowered (its provider later failed the send,
     // or the horizon was not clear) is credited as repaired only when each such clause now passes with every matched send's provider having
     // signed a success on a clear horizon (laterStrength "succeeded"). A fail-to-pass row resting on anything weaker, such as a bounce that
     // simply landed after the run, reads unverified.

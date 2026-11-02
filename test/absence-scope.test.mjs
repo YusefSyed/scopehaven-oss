@@ -1,5 +1,5 @@
-// The stated scope of an absence pass an egress recorder or SMTP sink decided (FIX-01 option 1 and FIX-05's wording), and the
-// limitation line for mail through the recorder only (FIX-03). Wording only: no verdict, status, count, digest or comparison reads
+// The stated scope of an absence pass an egress recorder or SMTP sink decided, with its wording, and the
+// limitation line for mail through the recorder only. Wording only: no verdict, status, count, digest or comparison reads
 // it. Injected transport and sink: no socket, no provider.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -50,7 +50,7 @@ test('the scope module is wording only: outside the HTTP evaluator hash, and no 
   const connector = await src('http-connector.mjs');
   assert.doesNotMatch(/const evaluatorHash = digest\(\(await Promise\.all\(\[([^\]]+)\]/.exec(connector)[1], /absence-scope/);
   for (const name of ['http-connector.mjs', 'contracts.mjs', 'http-effects.mjs', 'effect-events.mjs', 'http-pairing.mjs', 'http-settlement.mjs', 'custody.mjs']) assert.doesNotMatch(await src(name), /absence-scope/, name);
-  // The confinement record (FIX-01 option 2) is read for the tier only; test/confine.test.mjs keeps it outside every verdict module too.
+  // The confinement record (the --confine launch) is read for the tier only; test/confine.test.mjs keeps it outside every verdict module too.
   assert.deepEqual([...(await src('absence-scope.mjs')).matchAll(/^import .* from '([^']+)';$/gm)].map(m => m[1]), ['./custody.mjs', './confinement-record.mjs']);
 });
 
@@ -129,7 +129,7 @@ test('the stated scope reads only routed windows that decided a passing absence;
   for (const verdict of ['fail', 'inconclusive']) assert.deepEqual(absenceScopeEntries(sealed([window('http-egress')], [none(verdict)]), run), [], verdict);
   assert.deepEqual(absenceScopeEntries(sealed([window('provider-feed')], [{ ...none('pass'), select: { ...CHARGE, source: 'provider-feed' } }]), run), [], 'a provider record is not a routed window');
   assert.equal(absenceScopeEntries(sealed([window('http-egress')], [{ kind: 'effect.only', expect: [], allow: [], operations: ['send'], verdict: 'pass', matched: 0, counts: {} }]), run)[0].note.includes('carried no send outside the declared set'), true);
-  // A row that did not pass lists nothing, though its clause passed: it was withheld for another reason (PR382-REVIEW nit 5).
+  // A row that did not pass lists nothing, though its clause passed: it was withheld for another reason.
   assert.deepEqual(absenceScopeEntries(sealed([window('http-egress')], [none('pass')], 'inconclusive'), run), []);
   assert.deepEqual(absenceScopeEntries({ status: 'pass', trace: 'x' }, run), []);
   assert.deepEqual(absenceScopeEntries(null, null), []);

@@ -1,4 +1,4 @@
-// W1: declared body-field capture (src/body-fields.mjs) and the three-valued `fields` selector
+// Declared body-field capture (src/body-fields.mjs) and the three-valued `fields` selector
 // (src/effect-events.mjs), with its consumers: effect.only, settlement and pairing. Pure: no I/O.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +10,7 @@ import { fitsSelector, settlementFindings } from '../src/http-settlement.mjs';
 import { selectorPairs, showsPin, PINNED_KEYS } from '../src/http-pairing.mjs';
 import { decideEffects, validateDeclaredEffect, declaredObserverRecord, bindSealedWindows } from '../src/http-effects.mjs';
 import { checkAssertion } from '../integrations/sequences/sequence.mjs';
-// Coverage v2: every egress recorder record carries its collector identity.
+// Every egress recorder record carries its collector identity.
 import { COLLECTOR_RECORDS } from '../src/collector-identity.mjs';
 
 const PAY = 'payments.example.test';
@@ -26,7 +26,7 @@ const windowOf = (events, { withCapture = true, coverage = 'complete' } = {}) =>
 const select = fields => ({ source: 'http-egress', operation: 'send', name: PAY, fields });
 const amount = (op, value) => [{ pointer: '/amount', [op]: value }];
 
-test('W1 capture is opt-in: a destination without capture keeps digests only, and its config has no capture', () => {
+test('capture is opt-in: a destination without capture keeps digests only, and its config has no capture', () => {
   const cfg = validateEgressConfig({ port: 47000, destinations: [{ host: PAY }] });
   assert.equal(Object.hasOwn(cfg.destinations[0], 'capture'), false);
   const e = send(undefined);
@@ -35,7 +35,7 @@ test('W1 capture is opt-in: a destination without capture keeps digests only, an
   assert.deepEqual(declaredObserverRecord([{ id: 'sink', type: 'egress-recorder', destinations: [{ host: PAY }] }]), [{ id: 'sink', type: 'egress-recorder', settleMs: null, collector: COLLECTOR_RECORDS['egress-recorder'] }]);
 });
 
-test('W1 deny-list: secret-like keys are refused even when declared, also as interior tokens and in any case or separator', () => {
+test('deny-list: secret-like keys are refused even when declared, also as interior tokens and in any case or separator', () => {
   for (const pointer of ['/password', '/user/Password', '/api_key', '/apiKey', '/x-api-key', '/auth/token', '/refresh_token', '/Authorization', '/cookie', '/sessionId', '/card/last4', '/card_number', '/cvv', '/CVC',
     '/pan', '/pin', '/ssn', '/sin', '/iban', '/account_number', '/accountNumber', '/client_secret', '/private_key', '/accessKey', '/credentials/0', '/passphrase', '/bearer']) {
     assert.throws(() => validatePointer(pointer), /secret-like key/, pointer);
@@ -45,7 +45,7 @@ test('W1 deny-list: secret-like keys are refused even when declared, also as int
   for (const pointer of ['/amount', '/currency', '/ticket_id', '/items/0/sku', '/template', '/recipient_count', '/pages', '/sinceDays', '/opinion']) assert.doesNotThrow(() => validatePointer(pointer), pointer);
 });
 
-test('W1 declaration bounds: no whole-body pointer, 1 to 16 pointers per destination, 64 per recorder, maxBytes within bounds and maxBodyBytes', () => {
+test('declaration bounds: no whole-body pointer, 1 to 16 pointers per destination, 64 per recorder, maxBytes within bounds and maxBodyBytes', () => {
   const bad = (cap, pattern, extra = {}) => assert.throws(() => validateEgressConfig({ port: 47000, destinations: [{ host: PAY, capture: cap }], ...extra }), pattern);
   bad({ pointers: [''] }, /whole body is never captured/);
   bad({ pointers: ['amount'] }, /starting with "\/"/);
@@ -65,7 +65,7 @@ test('W1 declaration bounds: no whole-body pointer, 1 to 16 pointers per destina
   assert.deepEqual(validateCaptureDeclaration({ pointers: ['/a'] }, 4096), { pointers: ['/a'], maxBytes: 4096 });
 });
 
-test('W1 captureBody: declared scalar fields only, typed; every unreadable body says why and keeps no values', () => {
+test('captureBody: declared scalar fields only, typed; every unreadable body says why and keeps no values', () => {
   const ok = read({ amount: 25, currency: 'cad', ticket_id: 'T-1', note: 'never stored', meta: { channel: 'web' } });
   assert.deepEqual(ok, { status: 'captured', values: { '/amount': { type: 'number', value: 25 }, '/currency': { type: 'string', value: 'cad' }, '/ticket_id': { type: 'string', value: 'T-1' }, '/meta/channel': { type: 'string', value: 'web' } } });
   assert.ok(!JSON.stringify(ok).includes('never stored'), 'an undeclared field is never kept');
@@ -92,7 +92,7 @@ test('W1 captureBody: declared scalar fields only, typed; every unreadable body 
   for (const s of CAPTURE_STATUSES.filter(x => x !== 'captured')) assert.doesNotThrow(() => validateCaptured({ status: s, values: {} }));
 });
 
-test('W1 secret-shaped values are redacted and never stored, whatever the key; ordinary ids are kept', () => {
+test('secret-shaped values are redacted and never stored, whatever the key; ordinary ids are kept', () => {
   for (const value of ['eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abc', 'sk_live_51Habc', 'rk_test_123', 'Bearer abc.def', '-----BEGIN PRIVATE KEY-----', 'a'.repeat(40), 'f'.repeat(32), 'QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo+/abc']) {
     assert.equal(secretShaped(value), true, value);
     assert.deepEqual(read({ ticket_id: value }).values['/ticket_id'], { type: 'unusable', reason: 'redacted' });
@@ -101,7 +101,7 @@ test('W1 secret-shaped values are redacted and never stored, whatever the key; o
   for (const value of ['T-000123', '550e8400-e29b-41d4-a716-446655440000', 'refund approved for order 42', 'cad']) assert.equal(secretShaped(value), false, value);
 });
 
-test('W1 events: captured is optional, http-egress only, shape-checked; old events still validate', () => {
+test('events: captured is optional, http-egress only, shape-checked; old events still validate', () => {
   const values = { '/amount': { type: 'number', value: 25 } };
   assert.doesNotThrow(() => validateEffect(send({ status: 'captured', values })));
   assert.doesNotThrow(() => validateEffect(send(undefined)));
@@ -114,7 +114,7 @@ test('W1 events: captured is optional, http-egress only, shape-checked; old even
   assert.throws(() => validateEffect({ ...send(undefined), captured: { status: 'bogus', values: {} } }), /captured/);
 });
 
-test('W1 fields selector: opt-in only; sequences, verdict services and collateral refuse it; an exact name is required', () => {
+test('fields selector: opt-in only; sequences, verdict services and collateral refuse it; an exact name is required', () => {
   const s = select(amount('equals', 25));
   assert.throws(() => validateSelector(s), /selector-fields-unsupported/);
   assert.doesNotThrow(() => validateSelector(s, 'x', { fields: true }));
@@ -128,7 +128,7 @@ test('W1 fields selector: opt-in only; sequences, verdict services and collatera
   assert.throws(() => checkAssertion({ id: 'a', from: 'm1', to: 'm2', title: 't', severity: 'high', effect: { kind: 'effect.exists', select: s } }, message => { throw new Error(message); }), /selector-fields-unsupported/, 'a sequence assertion refuses fields');
 });
 
-test('W1 three-valued matching: base keys first, then match / no / unknown; type mismatch is unknown, never no', () => {
+test('three-valued matching: base keys first, then match / no / unknown; type mismatch is unknown, never no', () => {
   const c = v => send({ status: 'captured', values: { '/amount': v, '/currency': { type: 'string', value: 'cad' }, '/ticket_id': { type: 'absent' }, '/meta/channel': { type: 'null', value: null } } });
   const e25 = c({ type: 'number', value: 25 }), e250 = c({ type: 'number', value: 250 }), str = c({ type: 'string', value: '250' });
   assert.equal(matchState(e25, select(amount('equals', 25))), 'match');
@@ -150,7 +150,7 @@ test('W1 three-valued matching: base keys first, then match / no / unknown; type
   assert.equal(fieldState(undefined, { pointer: '/amount', equals: 1 }), 'unknown');
 });
 
-test('W1 windowSees: a field selector is visible only where capture of every pointer it uses is declared for that name', () => {
+test('windowSees: a field selector is visible only where capture of every pointer it uses is declared for that name', () => {
   assert.equal(windowSees(windowOf([]), select(amount('equals', 25))), true);
   assert.equal(windowSees(windowOf([], { withCapture: false }), select(amount('equals', 25))), false);
   assert.equal(windowSees(windowOf([]), select([{ pointer: '/amout', equals: 25 }])), false, 'a pointer typo is unobservable, never absent');
@@ -159,7 +159,7 @@ test('W1 windowSees: a field selector is visible only where capture of every poi
   assert.throws(() => validateScope({ ...scope(), capture: { [PAY]: ['/password'] } }), /scope-capture/);
 });
 
-test('W1 effect clauses: decided match passes or fails; unknown is missing; undeclared capture is unobservable', () => {
+test('effect clauses: decided match passes or fails; unknown is missing; undeclared capture is unobservable', () => {
   const v = n => ({ status: 'captured', values: { '/amount': { type: 'number', value: n }, '/currency': { type: 'string', value: 'cad' }, '/ticket_id': { type: 'absent' }, '/meta/channel': { type: 'absent' } } });
   const exists25 = { kind: 'effect.exists', select: select(amount('equals', 25)) }, none25 = { kind: 'effect.none', select: select(amount('equals', 25)) };
   const count25 = { kind: 'effect.count', expected: 1, select: select(amount('equals', 25)) };
@@ -187,7 +187,7 @@ test('W1 effect clauses: decided match passes or fails; unknown is missing; unde
   assert.equal(verdict(none25, [], { coverage: 'partial' }), 'missing');
 });
 
-test('W1 effect.only: an unreadable judged send holds a pass at missing and is never offending; a decided offender still fails', () => {
+test('effect.only: an unreadable judged send holds a pass at missing and is never offending; a decided offender still fails', () => {
   const v = n => ({ status: 'captured', values: { '/amount': { type: 'number', value: n }, '/currency': { type: 'absent' }, '/ticket_id': { type: 'absent' }, '/meta/channel': { type: 'absent' } } });
   const only = { kind: 'effect.only', expect: [{ select: { ...select(amount('lte', 50)), resource: 'POST /v1/refunds' } }], allow: [], operations: ['send'] };
   const judge = events => judgeOnly(only, [windowOf(events)], { fields: true });
@@ -199,7 +199,7 @@ test('W1 effect.only: an unreadable judged send holds a pass at missing and is n
   assert.throws(() => judgeOnly(only, [windowOf([])]), /selector/, 'without the option, fields are refused');
 });
 
-test('W1 settlement and pairing: an unreadable later send fits the selector; a fields pin needs a twin with the same fields', () => {
+test('settlement and pairing: an unreadable later send fits the selector; a fields pin needs a twin with the same fields', () => {
   const s = select(amount('equals', 25));
   assert.equal(fitsSelector(send(undefined), s), true, 'unknown fits, as an unknown actor does');
   assert.equal(fitsSelector(send({ status: 'captured', values: { '/amount': { type: 'number', value: 250 } } }), s), false);
@@ -219,7 +219,7 @@ test('W1 settlement and pairing: an unreadable later send fits the selector; a f
   assert.deepEqual(selectorPairs(target).get('B')[0].pins, { fields: [{ checkId: 'C', effect: 0 }] });
 });
 
-test('W1 sealed windows: the scope must publish exactly the declared capture, and captured records exactly its pointers', () => {
+test('sealed windows: the scope must publish exactly the declared capture, and captured records exactly its pointers', () => {
   const declared = [{ id: 'sink', type: 'egress-recorder', settleMs: 250, capture: { [PAY]: capture.pointers } }];
   const v = { status: 'captured', values: Object.fromEntries(capture.pointers.map(p => [p, { type: 'absent' }])) };
   const sealed = w => [{ ...w, settleMs: 250, lineage: { observer: 'http-egress-recorder', independence: 'request-path' } }];
@@ -230,7 +230,7 @@ test('W1 sealed windows: the scope must publish exactly the declared capture, an
   assert.throws(() => bindSealedWindows(sealed(windowOf([send(partial)])), declared), /effect-trace/, 'a captured record with fewer pointers');
 });
 
-test('W1 field-blind observers: one that sees the base effect but cannot read the fields holds an absence at missing, never pass', () => {
+test('field-blind observers: one that sees the base effect but cannot read the fields holds an absence at missing, never pass', () => {
   const blindScope = (pointers) => ({ operations: ['send'], names: [PAY], actorAttribution: 'none', evidence: 'authoritative', ...(pointers ? { capture: { [PAY]: pointers } } : {}) });
   const win = (instanceId, events, pointers, coverage = 'complete') => ({ source: 'http-egress', instanceId, scope: blindScope(pointers), coverage, reason: coverage === 'complete' ? null : 'egress-witness-not-received', events });
   const otherObserver = { kind: 'http-egress-recorder', instanceId: 'rec-b' };
@@ -265,7 +265,7 @@ test('W1 field-blind observers: one that sees the base effect but cannot read th
   assert.deepEqual(settlementFindings([row], [[], [win('rec-b', [])]]), [[null]]);
 });
 
-test('W1 deny-list covers compound keys and run-together words; secret and identifier shaped values are redacted', () => {
+test('deny-list covers compound keys and run-together words; secret and identifier shaped values are redacted', () => {
   for (const pointer of ['/customer_ssn', '/ssn_last4', '/customerSSN', '/SSNLast4', '/social_security_number', '/socialInsuranceNumber', '/pan_number', '/panNumber', '/user_pin', '/pinCode', '/pin_code', '/sin_number', '/pwd', '/pass', '/passcode', '/passport_no',
     '/otp', '/otpCode', '/totp', '/mfa_code', '/cc_number', '/ccNum', '/account_no', '/acct_number', '/acctNo', '/routing_number', '/security_code', '/auth', '/authCode', '/oauth', '/cvv2', '/customerssn', '/userpin'])
     assert.throws(() => validatePointer(pointer), /secret-like key/, pointer);
@@ -281,8 +281,8 @@ test('W1 deny-list covers compound keys and run-together words; secret and ident
   assert.deepEqual(read({ amount: 25 }).values['/amount'], { type: 'number', value: 25 });
 });
 
-// Review round 2 (fbe615b): deny-list spellings, NFKC folding, value separators, the safe-integer bound and path scope.
-test('W1 deny-list: password, session, signing, one-time-code, bank and identity spellings are refused; NFKC folds before the check', () => {
+// Deny-list spellings, NFKC folding, value separators, the safe-integer bound and path scope.
+test('deny-list: password, session, signing, one-time-code, bank and identity spellings are refused; NFKC folds before the check', () => {
   for (const pointer of ['/pw', '/user_pswd', '/sid', '/csrf', '/xsrfValue', '/jwt', '/key', '/signingKey', '/hmac', '/signature', '/securityAnswer', '/2fa_code', '/totp', '/mfaCode', '/otpCode', '/otc', '/bankAccount', '/ccn', '/national_id', '/taxId', '/tin',
     '/dob', '/dateOfBirth', '/recovery_code', '/sortCode', '/seed_phrase',
     '/\uff50\uff41\uff53\uff53\uff57\uff4f\uff52\uff44', // fullwidth "password": NFKC folds it to ASCII, then the deny-list refuses it
@@ -295,7 +295,7 @@ test('W1 deny-list: password, session, signing, one-time-code, bank and identity
     assert.doesNotThrow(() => validatePointer(pointer), pointer);
 });
 
-test('W1 value redaction: card runs and nine-digit identifiers with any one separator, embedded runs, folded and non-ASCII digits', () => {
+test('value redaction: card runs and nine-digit identifiers with any one separator, embedded runs, folded and non-ASCII digits', () => {
   for (const value of ['4242.4242.4242.4242', '4242/4242/4242/4242', '4242\u20134242\u20134242\u20134242', '4242_4242_4242_4242', 'order 12 4242 4242 4242 4242', 'card 4242424242424242 exp 12', '\uff14\uff12\uff14\uff12\uff14\uff12\uff14\uff12\uff14\uff12\uff14\uff12\uff14\uff12\uff14\uff12',
     '123-45-6789', '123 45 6789', '123.45.6789', '123/45-6789', '123456789', 'id 123456789 ok', '\uff22\uff45\uff41\uff52\uff45\uff52 abc', 'sk\uff3flive\uff3f51H',  '\u0664\u0662', '12345678901234567890']) {
     assert.equal(secretShaped(value), true, value);
@@ -307,7 +307,7 @@ test('W1 value redaction: card runs and nine-digit identifiers with any one sepa
   assert.equal(secretShaped(123456789), false, 'a nine-digit JSON number (an amount in cents) is not redacted');
 });
 
-test('W1 safe integers: the bound is Number.MAX_SAFE_INTEGER, not 2^53', () => {
+test('safe integers: the bound is Number.MAX_SAFE_INTEGER, not 2^53', () => {
   assert.deepEqual(read({ amount: 9007199254740991 }).values['/amount'], { type: 'number', value: 9007199254740991 });
   assert.deepEqual(read({ amount: 2 ** 53 }).values['/amount'], { type: 'unusable', reason: 'number-unsafe' });
   assert.deepEqual(read('{"amount":9007199254740993}').values['/amount'], { type: 'unusable', reason: 'number-unsafe' }, 'rounds to 2^53 when parsed');
@@ -316,7 +316,7 @@ test('W1 safe integers: the bound is Number.MAX_SAFE_INTEGER, not 2^53', () => {
   assert.throws(() => validateCaptured({ status: 'captured', values: { '/amount': { type: 'number', value: 2 ** 53 } } }), /captured-value/);
 });
 
-test('W1 path scope: a destination that declares capture declares paths; path-undeclared is a valid empty status', () => {
+test('path scope: a destination that declares capture declares paths; path-undeclared is a valid empty status', () => {
   assert.throws(() => validateEgressConfig({ port: 47000, destinations: [{ host: PAY, capture: { pointers: ['/amount'] } }] }), /declares "paths"/);
   assert.throws(() => validateEgressConfig({ port: 47000, destinations: [{ host: PAY, paths: [], capture: { pointers: ['/amount'] } }] }), /declares "paths"/);
   assert.doesNotThrow(() => validateEgressConfig({ port: 47000, destinations: [{ host: PAY, paths: ['/v1/refunds'], capture: { pointers: ['/amount'] } }] }));

@@ -1,4 +1,4 @@
-// SURPASS-PASSK-01: read-only collection of saved trials for a pass^k column.
+// Read-only collection of saved trials for a pass^k column.
 // Pages the core store's history, keeps the runs whose trialIdentity matches the
 // primary's (never the primary itself) and loads each through store.get, which
 // checks the record against its own sha256 seal (consistency, not authentication;

@@ -37,7 +37,7 @@ test('canary-sink declarations: the shared { id, valueEnv } plus owner and allow
     [{ id: 'x', valueEnv: 'SCOPEHAVEN_TARGET_X', owner: { team: 'a' } }, 'owner'], [{ id: 'x', valueEnv: 'SCOPEHAVEN_TARGET_X', owner: { tenant: 'a', role: 'b' } }, 'owner'],
     [{ id: 'x', valueEnv: 'SCOPEHAVEN_TARGET_X', allow: ['API.pay.example'] }, 'allow'], [{ id: 'x', valueEnv: 'SCOPEHAVEN_TARGET_X', allow: ['*'] }, 'allow'],
     [{ id: 'x', valueEnv: 'SCOPEHAVEN_TARGET_X', allow: ['https://api.pay.example'] }, 'allow'], [{ id: 'x', valueEnv: 'SCOPEHAVEN_TARGET_X', allow: ['a.example', 'a.example'] }, 'allow'],
-    // The owner's name must be a string (an earlier review, finding 7): an array or a number that prints like a name is refused.
+    // The owner's name must be a string: an array or a number that prints like a name is refused.
     [{ id: 'x', valueEnv: 'SCOPEHAVEN_TARGET_X', owner: { tenant: ['acme'] } }, 'owner'], [{ id: 'x', valueEnv: 'SCOPEHAVEN_TARGET_X', owner: { role: 42 } }, 'owner'],
   ];
   // Failure messages name the case by position, never the declaration (one carries a value).
@@ -49,7 +49,7 @@ test('canary-sink destinations: exact names, or "*.suffix" for names under it (n
   const allow = ['api.pay.example', '*.crm.example'];
   assert.deepEqual(['api.pay.example', 'eu.crm.example', 'a.b.crm.example', 'crm.example', 'api.pay.example.evil', 'xapi.pay.example', null, ''].map(d => destinationAllowed(d, allow)), [true, true, true, false, false, false, false, false]);
   // A unit that went to a name strictly under the destination (exact: false) is allowed only by a wildcard naming the destination
-  // or an ancestor of it, never by an exact entry (review finding 2).
+  // or an ancestor of it, never by an exact entry.
   assert.deepEqual(['api.pay.example', 'crm.example', 'eu.crm.example', 'pay.example', 'evilcrm.example', null].map(d => destinationAllowed(d, allow, { exact: false })), [false, true, true, false, false, false]);
 });
 
@@ -138,7 +138,7 @@ test('canary-sink judgement: an unknown destination fails a canary that may go n
   const s = scanner();
   const r = judgeCanaries({ scanner: s, windows: [win([unit(null, { canary: 'tenant-a', channel: 'verbatim' }, { canary: 'tenant-b', channel: 'verbatim' })])], required: ['egress-recorder'] });
   assert.deepEqual(r.canaries.map(c => [c.outcome, c.reason ?? null, c.findings.map(f => f.destination)]), [['inconclusive', 'destination-unknown', ['*']], ['fail', null, ['*']]]);
-  // A destination that is not a host name is unknown, never under a wildcard (review finding 5).
+  // A destination that is not a host name is unknown, never under a wildcard.
   for (const odd of ['.crm.example', 'a..crm.example', 'evil.example/.crm.example', 'EU.crm.example', 'eu.crm.example.']) {
     const j = judgeCanaries({ scanner: s, windows: [win([unit(odd, { canary: 'tenant-a', channel: 'verbatim' })])], required: ['egress-recorder'] });
     assert.deepEqual([j.canaries[0].outcome, j.canaries[0].reason, j.canaries[0].findings[0].destination], ['inconclusive', 'destination-unknown', '*'], odd);
@@ -169,7 +169,7 @@ test('canary-sink scanner: a view it could not read in full says so (complete: f
   assert.deepEqual(s.scan({ where: 'http-body', text: `short ${A}` }).complete, true);
 });
 
-// Review finding 4: a per-decoding budget of 48 forms was used up by ordinary words and ids, so a 1 KiB webhook body never
+// A per-decoding budget of 48 forms was used up by ordinary words and ids, so a 1 KiB webhook body never
 // read as fully scanned. Budgets now count characters, and a repeated word or id is read once.
 test('canary-sink scanner: ordinary webhook bodies read as fully scanned, and the same body with a canary in it fails (twins)', () => {
   const s = scanner();
@@ -210,7 +210,7 @@ test('canary-sink judgement: missing evidence never passes (no window, partial, 
   const { drained, ...undrained } = win([]);
   assert.equal(judgeCanaries({ scanner: s, windows: [undrained], required: ['egress-recorder'] }).canaries[0].reason, 'not-drained:egress-recorder');
   assert.equal(judgeCanaries({ scanner: s, windows: [win([{ destination: 'api.pay.example', canaries: [] }])], required: ['egress-recorder'] }).canaries[0].reason, 'scan-incomplete:egress-recorder');
-  // A window whose scanner did not hold the canary never stands for it (review finding 3).
+  // A window whose scanner did not hold the canary never stands for it.
   const onlyA = judgeCanaries({ scanner: s, windows: [win([], { scannedCanaries: ['tenant-a'] })], required: ['egress-recorder'] });
   assert.deepEqual(onlyA.canaries.slice(0, 2).map(c => [c.outcome, c.reason ?? null]), [['pass', null], ['inconclusive', 'not-scanned:egress-recorder']]);
   assert.equal(judgeCanaries({ scanner: s, windows: [win([], { scannedCanaries: undefined })], required: ['egress-recorder'] }).canaries[0].reason, 'not-scanned:egress-recorder');
@@ -236,7 +236,7 @@ test('canary-sink with the DNS stub: a canary looked up under an undeclared name
       return fromDnsWindow(await stub.collect(from, await stub.mark()), stub);
     };
     // tenant-a may go to api.pay.example (exact) and under crm.example (*.crm.example). The stub records a lookup under a declared
-    // name that declares subdomains by that name, exact: false (review finding 2): under crm.example the wildcard allows it.
+    // name that declares subdomains by that name, exact: false: under crm.example the wildcard allows it.
     const allowed = await window(() => quiet(r.resolve4(`${A}.eu.crm.example`)));
     assert.deepEqual([allowed.units.map(u => [u.destination, u.exact]), judgeCanaries({ scanner: s, windows: [allowed], required: ['dns-stub'] }).outcome], [[['crm.example', false]], 'pass']);
     // Its twin under api.pay.example: the exact entry names api.pay.example itself, not a name under it, so the lookup fails. (The
@@ -313,7 +313,7 @@ test('canary-sink sharedMatch equals the shared matchValue (hit and channel) on 
     const prepared = [[null, group.map(text => ({ text, folded: foldForMatch(text), skeleton: skeletonFold(text) }))]];
     const fast = sharedMatch(prepared, { value, folded: foldForMatch(value), skeleton: skeletonFold(value) });
     const shared = matchValue(group, value, SKELETON_KIND);
-    // The message names positions only: the texts and the values are canaries (review finding 8).
+    // The message names positions only: the texts and the values are canaries.
     assert.deepEqual(fast ? fast.channel : null, shared.hit ? shared.channel : null, `text ${i} with value ${v}`);
     compared++;
   }
@@ -340,7 +340,7 @@ test('canary-sink decodings are bounded: short runs are not decoded, and forms a
   assert.deepEqual(CANARY_SINK_REASONS, ['scan-too-large', 'scan-capped']);
 });
 
-// The shared module's value rule (review rounds 2 and 3): a value a person would type, or one with a character outside printable
+// The shared module's value rule: a value a person would type, or one with a character outside printable
 // ASCII, is refused with the shared reason and judges inconclusive, never pass.
 test('canary-sink scanner: the shared value rule refuses typed and non-ASCII values, which judge inconclusive', () => {
   const env2 = { ...env, SCOPEHAVEN_TARGET_TYPED: 'ORDER-1290', SCOPEHAVEN_TARGET_STEPS: 'abcd1234wxyz5678', SCOPEHAVEN_TARGET_CR: `${A}\r`, SCOPEHAVEN_TARGET_ACCENT: `${A.slice(0, -1)}é` };
@@ -401,7 +401,7 @@ test('canary-sink coverage: a unit the shared module could not examine in full n
   for (const [i, [u, reason]] of [[{ ...unit('api.pay.example'), reason: 'corpus-too-deep' }, 'corpus-too-deep'], [{ ...unit('api.pay.example'), scanned: false, reason: `leaked ${A}` }, 'scan-incomplete'],
     [{ ...unit('api.pay.example'), scanned: false, reason: 'value-low-entropy' }, 'scan-incomplete'], [{ ...unit('api.pay.example'), reason: null }, null]].entries()) {
     const j = judged([u]);
-    // The message names the case by position: one reason carries a value (review finding 8).
+    // The message names the case by position: one reason carries a value.
     assert.deepEqual(j.canaries[0].reason ?? null, reason === null ? null : `${reason}:egress-recorder`, `reason case ${i + 1}`);
     assert.ok(!JSON.stringify(j).includes(A));
   }
@@ -410,10 +410,10 @@ test('canary-sink coverage: a unit the shared module could not examine in full n
   for (const r of [zipped, twice]) assert.ok(r.reasons.every(x => CANARY_REASONS.includes(x)) && r.hits.every(h => (h.layers ?? []).every(l => CANARY_ENCODINGS.includes(l))));
 });
 
-// Review finding 1: bytes the sink decodes out of invisible characters (variation selectors, zero-width binary, whitespace
+// Bytes the sink decodes out of invisible characters (variation selectors, zero-width binary, whitespace
 // bits) were only matched as text, so compressed bytes there read as a clean full scan. They now go to the shared reading too:
-// compressed or binary bytes give the shared reason, and a value under a shared encoding in them is found (finding 3's first case,
-// base64 hidden in tag characters or zero-width binary, with it).
+// compressed or binary bytes give the shared reason, and a value under a shared encoding in them is found (for example,
+// base64 hidden in tag characters or zero-width binary).
 const hide = {
   selectors: bytes => [...bytes].map(b => String.fromCodePoint(b < 16 ? 0xfe00 + b : 0xe0100 + b - 16)).join(''),
   'zero-width': bytes => [...bytes].map(b => b.toString(2).padStart(8, '0').replace(/0/g, '\u200b').replace(/1/g, '\u200c')).join(''),
@@ -458,7 +458,7 @@ test('canary-sink known limits: rot13 or reversal combined with an encoding is n
     const r = s.scan({ where: 'http-body', text: `id=${text}` });
     assert.deepEqual([r.hits, r.complete], [[], true], label);
   }
-  // The reviewer's DNS case: rot13 of the hex of tenant-b as one label of an undeclared name.
+  // A DNS case: rot13 of the hex of tenant-b as one label of an undeclared name.
   assert.deepEqual(s.scan({ where: 'dns-qname', labels: [rot13(hex(B)), 'drop', 'example'], name: `${rot13(hex(B))}.drop.example` }), { hits: [], complete: true, reasons: [] });
 });
 

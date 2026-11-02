@@ -1,5 +1,5 @@
-// Fast-loop fix W2 merged with main 5e3e7f2 (W1 declared body fields, W3 claim rules): the integration points where a
-// W2 rule has to cover what W1 and W3 added. Pure decisions over synthetic windows, profile validation and scripted
+// Run correlation beside declared body fields and claim rules: the integration points where a correlation rule has to
+// cover what body fields and claim rules added. Pure decisions over synthetic windows, profile validation and scripted
 // runs. No model, no provider and no network: the transport and observers are scripted.
 // Every allowed behaviour below sits beside the forbidden or fail-closed behaviour next to it.
 import test from 'node:test';
@@ -26,11 +26,11 @@ function profileOf({ correlation = { header: 'traceparent' }, settlement = { mod
 const valid = profile => validateTargetFile({ schemaVersion: 1, targets: [profile] });
 const invalid = (profile, pattern) => assert.throws(() => valid(profile), pattern);
 
-test('W2 x W3 (contract): a correlated target refuses a claim selector with a traceId an egress recorder could see', () => {
+test('correlation and claim rules (contract): a correlated target refuses a claim selector with a traceId an egress recorder could see', () => {
   for (const select of [{ ...paySel, traceId: APP }, { operation: 'send', name: PAY, traceId: APP }]) {
     invalid(profileOf({ checks: [claimCheck('CLAIM', select)] }), /correlation-token-not-selectable/);
     invalid(profileOf({ settlement: { mode: 'run' }, checks: [claimCheck('CLAIM', select)] }), /correlation-token-not-selectable/);
-    // Allowed, adjacent: the same claim rule on a target without correlation (main behaviour).
+    // Allowed, adjacent: the same claim rule on a target without correlation.
     assert.doesNotThrow(() => valid(profileOf({ correlation: null, settlement: null, observers: [sinkObserver({ destinations: [{ host: PAY, paths: ['/v1/refunds'] }] })], checks: [claimCheck('CLAIM', select)] })));
   }
   // Allowed, adjacent: a claim selector without a traceId, and one whose source an egress recorder never reports.
@@ -38,7 +38,7 @@ test('W2 x W3 (contract): a correlated target refuses a claim selector with a tr
   assert.doesNotThrow(() => valid(profileOf({ checks: [claimCheck('CLAIM', { source: 'otel-genai', operation: 'send', name: PAY, traceId: APP })] })));
 });
 
-test('W2 x W3 (contract): the per-check barrier total counts checks with claim rules, as the connector bars them', () => {
+test('correlation and claim rules (contract): the per-check barrier total counts checks with claim rules, as the connector bars them', () => {
   const claims = n => Array.from({ length: n }, (_, i) => claimCheck(`CLAIM-${i}`, paySel));
   const effects = n => Array.from({ length: n }, (_, i) => effectCheck(`EFFECT-${i}`));
   const slow = [sinkObserver({ settleMs: 30000 })];
@@ -63,7 +63,7 @@ function scripted() {
   });
   return { transport, factory, sent };
 }
-test('W2 x W3 (connector): the run budget includes the barrier after a check with claim rules, as after an effect check', async () => {
+test('correlation and claim rules (connector): the run budget includes the barrier after a check with claim rules, as after an effect check', async () => {
   // settle 600 ms and a 900 ms base budget: each observed check takes its settle plus its barrier (about 1200 ms), so the
   // second observed check is sent only when the budget counts the first check's barrier and its own.
   const limits = { ...HTTP_LIMITS, runTimeoutMs: 900 };
@@ -91,7 +91,7 @@ const rowOf = (effects, windows) => ({ effects: decideEffects(effects, windows, 
 const R = 'POST /v1/refunds', C = 'POST /v1/coupons';
 const small = { ...paySel, resource: R, fields: [{ pointer: '/amount', lt: 100 }] };
 
-test('W2 x W1 (settlement): an effect.only pass with a fields selector names effect-correlated-late for a late own-token send outside its set', () => {
+test('correlation and body fields (settlement): an effect.only pass with a fields selector names effect-correlated-late for a late own-token send outside its set', () => {
   const onlyFields = { kind: 'effect.only', expect: [{ select: { ...paySel, resource: C }, count: 1 }], allow: [small], sources: ['http-egress'] };
   const rows = () => [rowOf([onlyFields], [win([ev(C, T(0))])])];
   assert.equal(rows()[0].effects[0].verdict, 'pass');
@@ -104,7 +104,7 @@ test('W2 x W1 (settlement): an effect.only pass with a fields selector names eff
   assert.deepEqual(settlementFindings(rows(), [[win()], [win([ev(R, null, amount(500))])]]), [['effect-outside-window']]);
 });
 
-test('W2 x W1 (settlement): a late own-token send whose fields decide the clause names effect-correlated-late; unreadable fields only withhold', () => {
+test('correlation and body fields (settlement): a late own-token send whose fields decide the clause names effect-correlated-late; unreadable fields only withhold', () => {
   const noneSmall = { kind: 'effect.none', select: small };
   const rows = () => [rowOf([noneSmall], [win()])];
   assert.equal(rows()[0].effects[0].verdict, 'pass');
@@ -121,7 +121,7 @@ test('W2 x W1 (settlement): a late own-token send whose fields decide the clause
   assert.deepEqual(settlementFindings(rows(), [[win()], [blind]]), [['effect-outside-window']]);
 });
 
-test('W2 x W3 (exported text matches the code): the per-check limitation and the docs name checks with effects or claim rules', async () => {
+test('correlation and claim rules (exported text matches the code): the per-check limitation and the docs name checks with effects or claim rules', async () => {
   const { readFile } = await import('node:fs/promises');
   const { fileURLToPath } = await import('node:url');
   const { correlationLimitation } = await import('../src/http-scope-text.mjs');

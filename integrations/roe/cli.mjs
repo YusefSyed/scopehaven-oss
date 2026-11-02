@@ -1,4 +1,4 @@
-// The authorization record's two operator steps (CMP-ROE-01); it sends no request.
+// The authorization record's two operator steps; it sends no request.
 //
 //   node integrations/roe/cli.mjs seal DRAFT.json OUT.json
 //     Adds the integrity checksum (sha256) to a filled-in draft, validates it and writes a new file
@@ -60,7 +60,7 @@ export async function main(argv, { stdout = process.stdout, stderr = process.std
       // --at is read as the record's own instants are: a real calendar instant (an invalid one is authorization-clock).
       const now = options['--at'] === undefined ? new Date() : new Date(instantMs(options['--at']));
       const stamp = checkAuthorization(record, profile, { now, alsoContacts: [ownedTapConfig(env)?.upstream].filter(upstream => upstream !== undefined) });
-      // The Action's wait contacts --wait-url before the run, so the record must cover its origin too (an earlier review round 2, R2-m1).
+      // The Action's wait contacts --wait-url before the run, so the record must cover its origin too.
       if (options['--wait-url'] !== undefined) {
         let waitOrigin;
         try { waitOrigin = `http://127.0.0.1:${parseLoopbackUrl(options['--wait-url']).port}`; }
@@ -79,6 +79,6 @@ export async function main(argv, { stdout = process.stdout, stderr = process.std
   }
 }
 // Run as a script, compared by real path: under a symlinked path (on macOS /var is a link to /private/var) the module's
-// URL is the real one, and a string comparison would skip main and exit 0 without checking anything (R2-n2).
+// URL is the real one, and a string comparison would skip main and exit 0 without checking anything.
 const invokedDirectly = () => { try { return realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; } };
 if (process.argv[1] && invokedDirectly()) process.exitCode = await main(process.argv.slice(2));

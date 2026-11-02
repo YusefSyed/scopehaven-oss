@@ -1,4 +1,4 @@
-// The declared-channel rule's wiring (N11): the profile key is validated and digested (src/contracts.mjs), the connector copies
+// The declared-channel rule's wiring: the profile key is validated and digested (src/contracts.mjs), the connector copies
 // it into the run (src/http-connector.mjs), the gate reads its reasons and assess exits 1 on a withheld pass. Owned synthetic
 // data only: injected transport and observers, except the assess test, which runs the CLI as a child process against an owned
 // app and a real egress recorder on loopback. No database, model or provider.

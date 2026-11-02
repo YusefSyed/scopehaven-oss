@@ -1,8 +1,8 @@
-// Judged late effects, part 1 (settlement re-judge; src/http-settlement.mjs, opt-in by the target's settlement
+// Judged late effects (settlement re-judge; src/http-settlement.mjs, opt-in by the target's settlement
 // "outsideWindow": "judge"). Pure decisions over synthetic windows and scripted end-to-end runs (injected transport and
 // observers, a virtual clock where one is needed): no socket, no database, no model, no provider. Every allowed behaviour sits
-// beside the withheld one next to it. Part 2 (a late countBy release) is not built: keyed counts read as without the declaration,
-// and a countBy effect.only clause is judged with each late candidate as its own application (SETTLE-V3 fix B, test 24).
+// beside the withheld one next to it. A late countBy release is not built: keyed counts read as without the declaration,
+// and a countBy effect.only clause is judged with each late candidate as its own application (test 24).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -59,10 +59,10 @@ const rng = seed => { let state = seed; return n => { state = (state + 0x6d2b79f
 
 // ---------------------------------------------------------------------------
 // 1. Without the declaration every finding is today's. The digest below was computed by running undeclaredTrials (verbatim)
-// against main 4214451, before the judge existed: a change that moves it changes undeclared settlement and needs its own review.
-// Moved once, ab9ed59c -> ba23fa95, by the JSON decimal fail-open fix (its fail-open review): a positive clause resting on another
+// against a build from before the judge existed: a change that moves it changes undeclared settlement and needs its own review.
+// Moved once, ab9ed59c -> ba23fa95, by the JSON decimal fail-open fix: a positive clause resting on another
 // check's token reads effect-correlated-elsewhere before any other correlated or selector finding, since it is the one reason that
-// also withholds a control's pass. Over these trials, against main 5c3b3f6: 0 of the uncorrelated findings change, and 91 of 5,223
+// also withholds a control's pass. Over these trials, against the build before that fix: 0 of the uncorrelated findings change, and 91 of 5,223
 // findings in the run and per-check modes move, every one from another withholding reason to effect-correlated-elsewhere on an
 // effect.exists or effect.count of at least one (71 boundary, only the reason's name; 20 control, a tagged pass now withheld).
 const UNDECLARED_DIGEST = 'ba23fa95f03a163242035e474cb2608bc0d5726a444a8f98de1cbf6a0ef9883f';
@@ -100,7 +100,7 @@ function undeclaredTrials({ settlementFindings: findings, decideEffects: decide,
   return hash(out);
 }
 // END UNDECLARED TRIALS
-test('1. undeclared: 600 generated runs settle exactly as on main before the judge (run level, run mode and per check); declaring it changes some', () => {
+test('1. undeclared: 600 generated runs settle exactly as before the judge (run level, run mode and per check); declaring it changes some', () => {
   const deps = { settlementFindings, decideEffects, makeEffect, digest };
   assert.equal(undeclaredTrials(deps), UNDECLARED_DIGEST);
   assert.equal(undeclaredTrials(deps, { options: {} }), UNDECLARED_DIGEST, 'an empty options object');
@@ -171,7 +171,7 @@ test('2. effect.none stays withheld under the declaration: a decided, a null-act
   const upRow = rowOf([upNone], [win([], 'complete', { scope: fwdScope })], 'control');
   assert.equal(upRow.effects[0].verdict, 'pass');
   assert.deepEqual(judged([upRow], inTail([0], [win([ev(A, { upstream: { outcome: 'unknown', status: null, proven: false } })], 'complete', { scope: fwdScope })])), [['effect-outside-window']], 'unproven');
-  // An exact keyed replay of an earlier send (same key, content and head): dedup never satisfies an absence (G3).
+  // An exact keyed replay of an earlier send (same key, content and head): dedup never satisfies an absence.
   const decl = validateIdempotencyDeclaration({ header: 'idempotency-key' }), keyed = { ...SINK, idempotency: { [HOST]: decl } };
   const first = ev(A, { content: { c: 1 }, idempotency: { status: 'keyed', key: 'a'.repeat(64), fold: 'a'.repeat(64), head: 'b'.repeat(64), firstSeq: seq + 1 } });
   const replayRow = rowOf([none(A)], [win([], 'complete', { scope: keyed })]);
@@ -207,7 +207,7 @@ test('4. an allowed late effect.only send stands with the note; the same run wit
   for (const [where, place] of [['tail', r => inTail(r, [win([ev(B)])])], ['gap after it', r => [[win()], [win([ev(B)])], [win()]]]]) {
     const rows = where === 'tail' ? [passing()] : [passing(), rowOf([none(C)], [win()])];
     const gaps = place(rows);
-    assert.equal(plain(rows, gaps)[0][0], 'effect-outside-window', `${where}: the 2026-10-10 rule without the declaration`);
+    assert.equal(plain(rows, gaps)[0][0], 'effect-outside-window', `${where}: the withholding rule without the declaration`);
     assert.equal(judged(rows, gaps)[0][0], NOTE, where);
   }
   // In the next check's own window, and in a barrier (per check).
@@ -386,7 +386,7 @@ test('16. correlated precedence: an allowed own-token late send gives the note, 
   assert.deepEqual(judged(rows, inTail(rows, [win([ev(B)])]), runMode), [[NOTE, 'effect-correlated-elsewhere']]);
 });
 
-// 17. The W2 property, extended: correlation never makes the judge more permissive than the run-level judge, the judge never
+// 17. The correlated-settlement property, extended: correlation never makes the judge more permissive than the run-level judge, the judge never
 // makes settlement more permissive than without it except on effect.only, and nothing is ever failed.
 test('17. property: correlated judged settlement withholds whatever run-level judged settlement withholds, and the note needs a candidate', () => {
   const seen = new Map(), mark = key => seen.set(key, (seen.get(key) ?? 0) + 1);
@@ -433,7 +433,7 @@ test('18. observedAt is never read: shuffled timestamps give identical judged fi
   assert.doesNotMatch(code, /observedAt|waitedMs|effectHorizonMs|horizon/i);
 });
 
-test('19. gap 5 still withholds: attribution runs on the settled clauses and never skips one that carries the note', () => {
+test('19. background attribution still withholds: attribution runs on the settled clauses and never skips one that carries the note', () => {
   // A background-possible send (actor svc-sync) that could be the effect.none clause's own: background-unattributed, with or
   // without a note handed to the clause.
   const background = [{ id: 'sync', select: { actor: 'svc-sync', operation: 'send', name: HOST } }];
@@ -458,7 +458,7 @@ test('20. a returned-id closure never excuses a candidate: a late send the check
   const row = passing(only({ allow: [B] }), () => [seed]);
   const owned = ev(C, { upstream: { outcome: 'applied', status: 201, proven: true, references: [D] } });
   const gaps = inTail([0], [win([owned])]);
-  // Non-vacuous: E3 would attribute the late send to row 0.
+  // Non-vacuous: closure ownership would attribute the late send to row 0.
   assert.equal(closureOwners([row], gaps, undefined, () => true)(owned), 0);
   assert.deepEqual(judged([row], gaps), [['effect-outside-window']], 'outside the declared set, whoever owns it');
   // Adjacent: an allowed late send stands whatever it refers to, an object of this check's or another's.
@@ -531,7 +531,7 @@ test('4 end to end: the connector stands the allowed late coupon with the note, 
   validateHttpRunEvidence(run, { expectedSuite: suite });
   validateHttpRunEvidence(JSON.parse(JSON.stringify(run)));
   assert.equal(summarizeGate({ candidate: run, expectedSuite: suite }).exitCode, 0);
-  // Without the declaration the same windows withhold TASK (the 2026-10-10 rule), and the record and suite carry no key.
+  // Without the declaration the same windows withhold TASK (the withholding rule), and the record and suite carry no key.
   const q = judgeProfile({ judge: false });
   const plainRun = await runWith(q, [{ events: [refund] }, { events: [coupon] }, { events: [] }, { events: [] }, { events: [] }]);
   assert.deepEqual([task(plainRun).status, task(plainRun).trace[1].data.effects[0].settlement], ['inconclusive', 'effect-outside-window']);
@@ -683,15 +683,15 @@ test('19 end to end: with a background source declared, attribution still withho
 });
 
 // ---------------------------------------------------------------------------
-// 24. effect.only keyed applications (main #294) under the declaration: a clause that declares countBy keeps the 2026-10-10 rule
-// (judging it with its countBy would release a late exact keyed replay, which is part 2), and a declaration only such clauses
+// 24. effect.only keyed applications under the declaration: a clause that declares countBy keeps the withholding rule
+// (judging it with its countBy would release a late exact keyed replay, which is not built), and a declaration only such clauses
 // could use is refused.
 const KEYED = Object.freeze({ ...SINK, idempotency: { [HOST]: validateIdempotencyDeclaration({ header: 'idempotency-key' }) } });
 const keyedOnly = () => ({ ...only({ allow: [B] }), countBy: 'idempotency-key' });
 const NO_KEY = Object.freeze({ status: 'absent', key: null, fold: null, head: 'a'.repeat(64), firstSeq: null });
-// 24 (SETTLE-V3 fix B; #295 kept such a clause on the 2026-10-10 rule): under the declaration a countBy effect.only clause is judged
-// worst case. Its own window's sends keep their keyed collapse (#294); every late candidate is its own send, never collapsed or
-// absorbed, so a late exact keyed replay of its own send is one more application (a late countBy release is part 2, not built).
+// 24 (an earlier build kept such a clause on the withholding rule): under the declaration a countBy effect.only clause is judged
+// worst case. Its own window's sends keep their keyed collapse; every late candidate is its own send, never collapsed or
+// absorbed, so a late exact keyed replay of its own send is one more application (a late countBy release is not built).
 test('24. an effect.only clause with countBy is judged worst case under the declaration: a late allowed send stands; a late exact keyed replay of its own send counts again, never absorbed', () => {
   const key = { status: 'keyed', key: 'e'.repeat(64), fold: 'e'.repeat(64), head: 'f'.repeat(64) };
   const keyedRow = (spec = keyedOnly(), { replayed = false } = {}) => {
@@ -704,7 +704,7 @@ test('24. an effect.only clause with countBy is judged worst case under the decl
   const lateAllowed = () => [win([ev(B, { idempotency: NO_KEY })], 'complete', { scope: KEYED })];
   {
     const { row, firstUse } = keyedRow(), replay = ev(A, { content: { c: 3 }, idempotency: { ...key, firstSeq: firstUse.seq } });
-    // Inside its own window the same replay counts with its application (#294); after the window it is one more application.
+    // Inside its own window the same replay counts with its application; after the window it is one more application.
     assert.equal(judgeOnly(keyedOnly(), [win([firstUse, replay], 'complete', { scope: KEYED })], { fields: true, countBy: true }).verdict, 'pass', 'adjacent: the same replay inside the window');
     assert.deepEqual(judged([row], inTail([0], [win([replay], 'complete', { scope: KEYED })])), [['effect-outside-window']], 'a late exact keyed replay is never absorbed');
     assert.deepEqual(plain([row], inTail([0], [win([replay], 'complete', { scope: KEYED })])), [['effect-outside-window']], 'undeclared: the same');
@@ -733,7 +733,7 @@ test('24. an effect.only clause with countBy is judged worst case under the decl
   assert.equal(countBy, 'idempotency-key');
 });
 
-test('24 load: a declaration whose only effect.only clauses declare countBy now loads (fix B); one with no applicable effect.only clause is still refused', () => {
+test('24 load: a declaration whose only effect.only clauses declare countBy now loads; one with no applicable effect.only clause is still refused', () => {
   const load = p => validateTargetFile({ schemaVersion: 1, targets: [p] })[0];
   const keyedProfile = (also = []) => {
     const p = judgeProfile({ taskEffects: [{ kind: 'effect.only', expect: [{ select: refundSel, count: 1 }], allow: [couponSel], sources: ['http-egress'], countBy: 'idempotency-key' }, ...also] });
@@ -744,11 +744,11 @@ test('24 load: a declaration whose only effect.only clauses declare countBy now 
   const notApplied = keyedProfile(); notApplied.checks[1].applicability = { applies: false, reason: 'Not in this build.' };
   assert.throws(() => load(notApplied), /settlement-judge-unused/, 'adjacent: its only effect.only check does not apply');
   const undeclared = keyedProfile(); delete undeclared.settlement;
-  assert.doesNotThrow(() => load(undeclared), 'without the declaration the keyed clause loads as on main');
+  assert.doesNotThrow(() => load(undeclared), 'without the declaration the keyed clause loads as before');
 });
 
 // ---------------------------------------------------------------------------
-// S1 to S8: the mutation sweep's gaps (review round 1). Each title names the mutant it kills.
+// S1 to S8: gaps a mutation sweep found. Each title names the mutant it kills.
 const elsewhere = e => ({ ...e, observer: { kind: 'http-egress-recorder', instanceId: 'egress-recorder-elsewhere' } });
 
 test('S1. candidates from a later check\'s window and from the gap before it are merged in seq order (kills: candidates not sorted)', () => {
@@ -823,7 +823,7 @@ test('S8. KNOWN-LIMITS states the declaration, its refusal and the note (kills: 
 });
 
 // ---------------------------------------------------------------------------
-// S9 and S10: review round 1, fail-open review MEDIUM 2 and LOW 2.
+// S9 and S10: the comparison signature and the wording.
 test('S9. comparison: a judged run relabelled with the undeclared run\'s profile and target identities never compares with it (the signature carries the declaration)', async () => {
   const q = judgeProfile({ judge: false }), p = judgeProfile();
   const queue = () => [{ events: [refund] }, { events: [coupon] }, { events: [] }, { events: [] }, { events: [] }];

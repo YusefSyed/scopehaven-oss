@@ -326,7 +326,7 @@ test('read-back review: a mark keeps the other rows\' values only within a small
   assert.deepEqual([kept.record.tables[0].rowValues, kept.record.tables[0].rows[1]], ['kept', { key: 'A101', before: { refund_amount: null, status: 'paid' }, after: null }]);
 });
 
-test('read-back review F1: a 64-bit id in a jsonb column is compared digit for digit; the twin that rounds it through a double fails, its fixed twin passes', async t => {
+test('read-back: a 64-bit id in a jsonb column is compared digit for digit; the twin that rounds it through a double fails, its fixed twin passes', async t => {
   const orders = () => ({ table: 'orders', key: 'id', columns: [{ name: 'meta', type: '3802' }], rows: [{ id: 'A100', meta: null }] });
   const body = '{"order_id": 1234567890123456789}';
   const results = {};

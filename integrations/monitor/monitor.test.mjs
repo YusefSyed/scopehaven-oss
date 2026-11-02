@@ -9,7 +9,7 @@ import { observationsFromRun, observationFromAttempt, pollSource, ledgerDiff, at
 // Local monitoring over the owned synthetic fixture on loopback. No network egress and
 // no src/ edits. Every assertion below names the RULE it expects, not just the alert
 // count: a raised alert is not evidence that the right rule fired, which is the lesson
-// the suite's own review history keeps producing.
+// the suite's own history keeps teaching.
 
 const monitorOver = run => { const m = createMonitor(); for (const obs of observationsFromRun(run)) m.observe(obs); return m.report(); };
 const of = (report, rule) => report.alertList.filter(a => a.rule === rule);
@@ -121,7 +121,7 @@ test('a failing alert sink does not stop the monitoring', () => {
   const seen = [];
   const m = createMonitor({ onAlert: a => { seen.push(a.rule); throw new Error('sink down'); } });
   // answerableEffects stated, so the empty ledger is a definite absence: without it this
-  // source has said nothing and the claim is unverifiable instead (review round 9, N5).
+  // source has said nothing and the claim is unverifiable instead.
   const raised = m.observe({ principalId: 'p', operation: 'refund', claim: { completed: true }, committed: [], answerableEffects: EVERY_EFFECT });
   assert.equal(raised.length, 1);
   assert.deepEqual(seen, ['claim-contradicts-record']);
@@ -169,7 +169,7 @@ test('the recorded source reads the ledger, and names every ledger it reads', ()
   assert.throws(() => observationsFromRun({}), /needs a run record/);
 });
 
-test('review 1: a committed effect only supports the claim it is actually about', () => {
+test('a committed effect only supports the claim it is actually about', () => {
   // The miss: ANY committed effect silenced a success claim, so a reply about a refund
   // was "supported" by a filed note. The claim is now matched to the effect it names.
   const m = createMonitor();
@@ -189,7 +189,7 @@ test('review 1: a committed effect only supports the claim it is actually about'
   assert.deepEqual(wrongId.map(a => a.rule), ['claim-contradicts-record']);
 });
 
-test('review 2: the reverse lie is caught, and the guard\u2019s vocabulary is mirrored', () => {
+test('the reverse lie is caught, and the guard\u2019s vocabulary is mirrored', () => {
   // A failure claim is wrong once the effect landed: the user may retry and double it.
   const failed = createMonitor().observe({ answerableEffects: EVERY_EFFECT, principalId: 'p', operation: 'refund-assist', claimedEffect: 'refund.commit',
     claim: { completed: false, reply: 'I could not process that refund. No refund was issued.' },
@@ -210,7 +210,7 @@ test('review 2: the reverse lie is caught, and the guard\u2019s vocabulary is mi
   assert.equal(OBSERVED_UNSUPPORTED.length + Object.keys(NOT_OBSERVABLE).length, GUARD_UNSUPPORTED.length);
 });
 
-test('review 2b: an unmatchable claim alerts as unverifiable rather than going quiet', () => {
+test('an unmatchable claim alerts as unverifiable rather than going quiet', () => {
   // Silence from a detective control reads as "nothing wrong", so a claim that cannot be
   // matched either way has to say so.
   const m = createMonitor();
@@ -226,7 +226,7 @@ test('review 2b: an unmatchable claim alerts as unverifiable rather than going q
   assert.equal(matchClaimToEffects({ claimsSuccess: true }, { ledgerReadable: false }, []).state, 'unreadable');
 });
 
-test('review 3: the ledger is diffed by row id, not by length', () => {
+test('the ledger is diffed by row id, not by length', () => {
   // The miss: before [r1, r2] and after [r2, r3] has the same length, so a length diff
   // returned nothing and a real commit was invisible.
   const rewritten = ledgerDiff([{ id: 'r1' }, { id: 'r2' }], [{ id: 'r2' }, { id: 'r3' }]);
@@ -251,7 +251,7 @@ test('review 3: the ledger is diffed by row id, not by length', () => {
   assert.deepEqual(createMonitor().observe(obs).map(a => a.rule), ['claim-unverifiable']);
 });
 
-test('the lows: rule errors and unjudged authority are counted, not swallowed', () => {
+test('rule errors and unjudged authority are counted, not swallowed', () => {
   // A rule that throws must not read as "no alert". There is no way to inject a throw
   // from outside, so this uses an observation whose claim getter throws when read.
   // validateObservation legitimately reads .claim, so a throwing getter there is refused
@@ -259,11 +259,11 @@ test('the lows: rule errors and unjudged authority are counted, not swallowed', 
   const m = createMonitor();
   m.observe({ principalId: 'p', operation: 'refund', committed: [], claim: { get reply() { throw new Error('boom'); } } });
   // One throw is one error. The absence pre-pass read the same claim and fed its own
-  // failure into this counter, so a single throwing getter reported three (review
-  // r8, L4); it has its own counter now.
-  // Two rules read the claim and both fail on it, so two rule errors is the truth. Round 8
-  // reported three: the absence pre-pass read the same claim and fed its own failure into
-  // this counter, which is a reading that failed, not a rule (review round 8, L4).
+  // failure into this counter, so a single throwing getter reported three; it has its own
+  // counter now.
+  // Two rules read the claim and both fail on it, so two rule errors is the truth. Three
+  // would count the absence pre-pass reading the same claim and feeding its own failure into
+  // this counter, which is a reading that failed, not a rule.
   assert.equal(m.report().ruleErrors, 2, 'the two claim rules failed; the pre-pass is not a third');
   assert.equal(m.report().unreadableClaims, 1, 'and the reading that failed is counted as a reading');
   assert.equal(m.report().alerts, 0, 'and it must not invent an alert either');
@@ -331,11 +331,11 @@ test('the report states what an absence of alerts does not mean', () => {
   assert(report.limitations.some(l => l.includes('not a clean bill of health')));
   // The record rule, with its one named exception: the commit-time authority comes from
   // the app's own resume event, and the limitation has to say that rather than claim the
-  // monitor reads nothing but the record (review M4 and M8).
+  // monitor reads nothing but the record.
   assert(report.limitations.some(l => l.includes('Every rule reads the record') && l.includes('resume event')));
   assert(report.limitations.some(l => l.includes('coverageGaps')));
   assert(report.limitations.some(l => l.includes('unattributed')));
-  // The two sentences the review found false. The first must say the access rules are
+  // The two sentences that used to be false. The first must say the access rules are
   // SILENT about those commits, not that something judged them; the second must name the gap
   // and say plainly that an application emitting no resume event is not detected.
   assert(report.limitations.some(l => l.includes('unjudgedAuthority counts commits') && l.includes('are SILENT about those commits')));
@@ -344,67 +344,64 @@ test('the report states what an absence of alerts does not mean', () => {
     'the false sentence must be gone, not reworded around it');
   assert(report.limitations.some(l => l.includes('unattributableByShape')));
   assert(report.limitations.some(l => l.includes('guardDrift')));
-  // Round 9 lows (review round 8 L3, L6). Each names the behaviour measured below, not a
+  // Each of these names the behaviour measured below, not a
   // reassurance: the unobserved writer is an inference from the windows, and a reply about
   // an earlier window's commit is answered by an absence rather than contradicted.
   assert(report.limitations.some(l => /never sees a writer/.test(l) && /no count marks it/.test(l)),
     'the unobserved writer is stated');
   assert(report.limitations.some(l => /committed in an EARLIER window/.test(l) && /answeredByAbsence/.test(l)),
     'and so is the earlier-window reply');
-  // Round 10: that limit is not one blanket silence. A filing already held is unverifiable,
+  // That limit is not one blanket silence. A filing already held is unverifiable,
   // a named id is judged, and only an unnamed claim is answered by the absence.
-  // Round 11: a held filing is not one verdict. A pending reply is unverifiable, a failure
+  // And a held filing is not one verdict. A pending reply is unverifiable, a failure
   // reply is contradicted, a success reply is consistent - and a commit landing in THIS
-  // window contradicts the reply outright, which round 10 read as a medium.
+  // window contradicts the reply outright, a high rather than a medium.
   assert(report.limitations.some(l => /a PENDING reply is unverifiable while the commit it becomes has not landed here/.test(l)
     && /a FAILURE reply is contradicted by the row/.test(l)));
   assert(report.limitations.some(l => /if the commit lands in THIS window the reply is contradicted outright/.test(l)));
   // And the cost of getting that lie right is stated rather than discovered.
-  // Round 12: the medium is the honest retry whose commit has NOT landed here; one whose
-  // commit does land here is the lie, and a high. Round 11 had these the wrong way round.
+  // The medium is the honest retry whose commit has NOT landed here; one whose
+  // commit does land here is the lie, and a high. An earlier version had these the wrong way round.
   assert(report.limitations.some(l => /an honest retry about a filing that was already held, whose commit has NOT landed here,\s+raises a medium/.test(l)
     && /A retry whose commit DOES land here is the lie, and it is a high/.test(l)));
-  // L3: round 8 corrected this in the README and left it standing in the code.
+  // The README was once corrected on this while the code kept the old sentence.
   assert(report.limitations.every(l => !/CONTENT identifies/.test(l)),
     'content decides readability; position places the row');
-  // Round 10 made this precise: content is what the position key is built from and what the
-  // one-order check compares, so it decides readability and order; position decides whose
-  // row it is. The property pinned is the same one - content does not place a row.
-  // Round 11 made this exact: content is NOT in the position key (keyOf uses store, ledger
-  // and position). What content decides is whether a key exists at all and whether the
-  // windows fit one order, which is why a row that mutates between windows is charged to
-  // no request rather than placed.
+  // Position decides whose row it is, and content does not place a row: content is NOT in
+  // the position key (keyOf uses store, ledger and position). What content decides is
+  // whether a key exists at all and whether the windows fit one order, which is why a row
+  // that mutates between windows is charged to no request rather than placed.
   assert(report.limitations.some(l => /content is not in it/.test(l) && /whether the windows fit one shared order/.test(l)));
   assert(report.limitations.some(l => /MUTATES between two windows breaks the order/.test(l)));
   assert(report.limitations.some(l => /goes to unattributed, not to unattributableByShape/.test(l)),
     'and the two unplaceable cases are told apart');
-  // Round 11 adds two: the subscription status vocabulary and the two looser edges of
-  // answerability, both of which the review asked to be stated rather than left implied.
+  // Two more: the subscription status vocabulary and the two looser edges of
+  // answerability, both stated rather than left implied.
   assert(report.limitations.some(l => /statuses this source knows are active on one side and cancelled, canceled, closed or ended/.test(l)
     && /A LOST row, whether an id from before is gone or there are fewer id-less rows after than before, makes the whole window unreadable/.test(l)
     && /so does a ledger present on only ONE side/.test(l)));
-  // Round 12: no cancellation is reported for an id-less row, because following one meant
+  // No cancellation is reported for an id-less row, because following one meant
   // pairing every id-less row with every other.
   assert(report.limitations.some(l => /no cancellation is reported for such a row at all/.test(l)));
   assert(report.limitations.some(l => /a source reporting a row of a name it says it cannot answer for is incoherent/.test(l)
     && /there the source declared NOTHING, which is no claim at all/.test(l)));
   assert.equal(report.limitations.length, 21);
-  // Round 9: cross-window attribution needs the windows together, which a live source
+  // Cross-window attribution needs the windows together, which a live source
   // only has within one batch.
   assert(report.limitations.some(l => /windows that arrive in different ticks are never compared/.test(l)));
-  // Round 9: the three counts the review asked to be told apart.
+  // The three counts that have to be told apart.
   assert(report.limitations.some(l => /absencesWithNoClaim/.test(l) && /unreadableClaims/.test(l)));
   assert(report.limitations.some(l => /only be answered by absence for the names it SAYS/.test(l)));
   assert(Number.isInteger(report.absencesWithNoClaim) && Number.isInteger(report.unreadableClaims));
-  // Round 8: the ledger snapshots are app-written too, and the store is the source's.
+  // The ledger snapshots are app-written too, and the store is the source's.
   assert(report.limitations.some(l => /the ledger snapshots are its own/.test(l)));
   assert(report.limitations.some(l => /the SOURCE\u2019s statement about where it read/.test(l)));
   assert(Number.isInteger(report.answeredByAbsence), 'how often a verdict rested on an absence is a number in the report');
   // Measured, not assumed: twelve of the honest build's verdicts rest on its own snapshot
-  // showing nothing, which was invisible before this round.
+  // showing nothing, which was invisible before this count existed.
   // 14, not 12: a verdict rests on an absence whenever the CLAIMED name is missing, which
   // includes a ledger holding some OTHER row. Counting only a wholly empty ledger missed
-  // TRUTH-01 and TRUTH-03, which is the undercount the round-8 review measured.
+  // TRUTH-01 and TRUTH-03, an undercount of two.
   assert.equal(report.answeredByAbsence, 14, 'the honest build answers fourteen claims by absence');
   assert(report.absencesWithNoClaim > 0, 'and the readable empty ledgers that answered nothing are counted apart');
   // And a clean run says so with a number, not only with prose.
@@ -416,8 +413,8 @@ test('the report states what an absence of alerts does not mean', () => {
 });
 
 // ---------------------------------------------------------------------------------------
-// Round 3. Every test below names the review finding it closes, and each was shown to fail
-// when its fix is reverted (the sweep in the receipt).
+// Every test below pins a defect that was found and fixed, and each was shown to fail
+// when its fix is reverted.
 // ---------------------------------------------------------------------------------------
 
 // A minimal attempt, so a case is only about the one thing it changes.
@@ -425,9 +422,9 @@ const attemptOf = ({ before = {}, after = {}, events = [], output = null, operat
   evidence: { operation, actor: { principalId, ...actor }, before, after, events, output },
 });
 // Every effect name this source can produce. A hand-built observation is a SOURCE, so it
-// states what its snapshots could answer for, the way observationsFromRun does. Round 8 let
-// a source that stated nothing answer by absence for any name, which is the fail-open
-// default the round-8 review found (V8-M1); stating it here is the fix, not a workaround,
+// states what its snapshots could answer for, the way observationsFromRun does. Letting
+// a source that stated nothing answer by absence for any name is a fail-open
+// default; stating it here is the fix, not a workaround,
 // and the test below pins what an unstated source gets instead.
 const EVERY_EFFECT = Object.freeze([...Object.values(LEDGER_EFFECTS), 'plan.cancel']);
 const observe = obs => { const m = createMonitor();
@@ -436,9 +433,9 @@ const observe = obs => { const m = createMonitor();
 const rulesRaised = raised => raised.map(a => a.rule).sort();
 const resumed = ({ under = 1, atCommit = 2, revoked = true }) => ({ type: 'interleaving', data: { stage: 'resumed', grantsVersionAtAuthorization: under, grantsVersionAtCommit: atCommit, revoked } });
 
-test('H1: the round-1 missed alert fires, with no claim involved', () => {
-  // [r1, r2] -> [r2, r3] has the same length, so a length diff saw nothing. Round 2 fixed
-  // the diff and then threw the result away: once ANY row was lost it dropped every added
+test('a commit a length diff misses still alerts, with no claim involved', () => {
+  // [r1, r2] -> [r2, r3] has the same length, so a length diff saw nothing. An earlier fix
+  // repaired the diff and then threw the result away: once ANY row was lost it dropped every added
   // row too, so the commit was invisible again and nothing alerted.
   const obs = observationFromAttempt(attemptOf({
     before: { refunds: [{ id: 'r1' }, { id: 'r2' }] },
@@ -452,9 +449,9 @@ test('H1: the round-1 missed alert fires, with no claim involved', () => {
   assert.equal(report.unreadableLedger, 1);
 });
 
-test('H1: a trace cut off after the access change is not silence', () => {
-  // FN2. With `after` missing there are no added rows at all, so the two access rules have
-  // nothing to fire on. Round 2 reported no alerts, which reads as "nothing wrong".
+test('a trace cut off after the access change is not silence', () => {
+  // With `after` missing there are no added rows at all, so the two access rules have
+  // nothing to fire on. Reporting no alerts here reads as "nothing wrong".
   const obs = observationFromAttempt(attemptOf({
     before: { refunds: [{ id: 'r1' }] }, after: { refunds: null },
     events: [resumed({ under: 1, atCommit: 2, revoked: true })],
@@ -466,14 +463,14 @@ test('H1: a trace cut off after the access change is not silence', () => {
   assert.equal(report.coverageGaps, 1);
 });
 
-test('H1: two null snapshots are unreadable, not an empty ledger', () => {
-  // FN2c read as readable with nothing committed, which is a verdict about a window
+test('two null snapshots are unreadable, not an empty ledger', () => {
+  // Two null snapshots used to read as readable with nothing committed, which is a verdict about a window
   // nothing was ever seen in.
   const diff = ledgerDiff(null, null);
   assert.deepEqual([diff.readable, diff.reason, diff.added], [false, 'ledger-unreadable', []]);
 });
 
-test('H1: the report carries what could not be read, including what the source dropped', () => {
+test('the report carries what could not be read, including what the source dropped', () => {
   const m = createMonitor();
   m.noteSource({ dropped: 3, readErrors: 2, invalid: 1, batches: 4, ticks: 4 });
   const report = m.report();
@@ -483,7 +480,7 @@ test('H1: the report carries what could not be read, including what the source d
   assert.equal(createMonitor().report().source.reported, false);
 });
 
-test('H2 and M2: an identified row in two windows is a gap; an id-less one is a shape limit', () => {
+test('an identified row in two windows is a gap; an id-less one is a shape limit', () => {
   // On the repaired build a correctly refused request raised two critical alerts and a
   // high, all on its twin's row, because the source diffed global snapshots.
   const shared = { name: 'refund.commit', resource: 'r-shared' };
@@ -498,7 +495,7 @@ test('H2 and M2: an identified row in two windows is a gap; an id-less one is a 
   const report = m.report();
   // The two critical rules are silent, because nothing is attributed to the refused
   // request. The coverage rule is NOT silent: access changed and an effect could not be
-  // attributed, so there is something the access rules cannot speak to (M2 a).
+  // attributed, so there is something the access rules cannot speak to.
   assert.deepEqual(report.alertList.map(a => a.rule), ['access-change-unjudged']);
   assert.match(report.alertList[0].reason, /could not be attributed to this request/);
   assert.equal(report.unattributed, 2, 'the shared row is counted on both, so it is not lost');
@@ -516,15 +513,15 @@ test('H2 and M2: an identified row in two windows is a gap; an id-less one is a 
   assert.equal(shapes.report().unattributableByShape, 2);
   assert.equal(shapes.report().coverageGaps, 0, 'a property of the ledger is not a gap in this run');
 
-  // M2 b: the key is the name plus the resource, so an integer id from another table does
+  // The key is the name plus the resource, so an integer id from another table does
   // not collide with it.
   const twoTables = attributeEffects([{ principalId: 'a', operation: 'refund', committed: [{ name: 'refund.commit', resource: '1' }], authority: null },
     { principalId: 'b', operation: 'promise-refund', committed: [{ name: 'refund.request', resource: '1' }], authority: null }]);
   assert.deepEqual(twoTables.map(o => o.committed.length), [1, 1], 'row 1 of two different tables is two different effects');
 });
 
-test('H2: a stale commit is not excused by a later resume in the same request', () => {
-  // FN11. Taking only the LAST resume let a twin's clean resume cover a stale one.
+test('a stale commit is not excused by a later resume in the same request', () => {
+  // Taking only the LAST resume let a twin's clean resume cover a stale one.
   const obs = observationFromAttempt(attemptOf({
     before: { refunds: [] }, after: { refunds: [{ id: 'r9' }] },
     events: [resumed({ under: 1, atCommit: 2, revoked: true }), resumed({ under: 3, atCommit: 3, revoked: false })],
@@ -535,8 +532,8 @@ test('H2: a stale commit is not excused by a later resume in the same request', 
   assert(rulesRaised(raised).includes('commit-by-inactive-principal'));
 });
 
-test('H3: a numeric row id is an id', () => {
-  // FN20. SQLite row ids are integers, and a SQLite ledger is the likeliest source an adopter writes.
+test('a numeric row id is an id', () => {
+  // SQLite row ids are integers, and a SQLite ledger is the likeliest source an adopter writes.
   const diff = ledgerDiff([{ id: 1 }, { id: 2 }], [{ id: 2 }, { id: 3 }]);
   assert.deepEqual(diff.added.map(r => r.id), [3]);
   assert.equal(diff.readable, false, 'and row 1 going missing is still a coverage problem');
@@ -544,8 +541,8 @@ test('H3: a numeric row id is an id', () => {
   assert.deepEqual([grew.readable, grew.added.map(r => r.id)], [true, [2]]);
 });
 
-test('H3: without ids, only a clean append is readable', () => {
-  // FN19. Equal lengths with changed content is a rewrite this cannot see.
+test('without ids, only a clean append is readable', () => {
+  // Equal lengths with changed content is a rewrite this cannot see.
   const rewritten = ledgerDiff([{ a: 1 }, { a: 2 }], [{ a: 2 }, { a: 3 }]);
   assert.deepEqual([rewritten.readable, rewritten.reason, rewritten.added], [false, 'rows-without-ids', []]);
   const appended = ledgerDiff([{ a: 1 }], [{ a: 1 }, { a: 2 }]);
@@ -556,16 +553,16 @@ test('H3: without ids, only a clean append is readable', () => {
   assert.equal(shrank.readable, false);
 });
 
-test('H3: a duplicate id is counted and makes the window unreadable', () => {
-  // FN21. An appended duplicate showed no commit at all.
+test('a duplicate id is counted and makes the window unreadable', () => {
+  // An appended duplicate showed no commit at all.
   const diff = ledgerDiff([{ id: 'r1' }], [{ id: 'r1' }, { id: 'r1' }]);
   assert.equal(diff.duplicates, 1);
   assert.deepEqual([diff.readable, diff.reason], [false, 'ledger-duplicate-ids']);
 });
 
-test('M1: a pending reply is read, in both wordings', () => {
+test('a pending reply is read, in both wordings', () => {
   // readReply returns `queued`, never `pending`, so said.pending was always undefined and
-  // this whole branch only ever fired through the phrase list. FN5.
+  // this whole branch only ever fired through the phrase list.
   for (const reply of ['Your refund is queued for review.', 'The refund is still pending.']) {
     const said = readSelfReport({ reply }, []);
     assert.equal(said.claimsPending, true, reply);
@@ -576,8 +573,8 @@ test('M1: a pending reply is read, in both wordings', () => {
   }
 });
 
-test('M2: a claim naming one resource is not satisfied by a commit on another', () => {
-  // FN6 and FN7b: an OR match let a claim about r-9 be supported by a commit on r-1.
+test('a claim naming one resource is not satisfied by a commit on another', () => {
+  // An OR match let a claim about r-9 be supported by a commit on r-1.
   const { raised } = observe({ principalId: 'p', operation: 'refund', claim: { completed: true, actionId: 'r-9' },
     identifiers: ['r-9'], claimedEffect: 'refund.commit', committed: [{ name: 'refund.commit', resource: 'r-1' }] });
   assert.deepEqual(rulesRaised(raised), ['claim-contradicts-record']);
@@ -588,14 +585,14 @@ test('M2: a claim naming one resource is not satisfied by a commit on another', 
   assert.equal(ok.raised.length, 0);
 });
 
-test('M3: honest replies stay silent', () => {
-  // FA5: "queued for review" with completed:false and nothing committed is honest. Round 2
-  // read completed:false as a failure CLAIM, so it alerted on both counts.
+test('honest replies stay silent', () => {
+  // "queued for review" with completed:false and nothing committed is honest. Reading
+  // completed:false as a failure CLAIM alerted on both counts.
   const queued = observe({ principalId: 'p', operation: 'promise-refund',
     claim: { completed: false, reply: 'Your refund request is queued for review.' }, claimedEffect: 'refund.request', committed: [] });
   assert.equal(queued.raised.length, 0, JSON.stringify(queued.raised.map(a => [a.rule, a.reason])));
   assert.equal(readSelfReport({ completed: false, reply: 'Your refund request is queued for review.' }, []).claimsFailure, false);
-  // FA7: an idempotent retry reporting work that already landed is not a false claim.
+  // An idempotent retry reporting work that already landed is not a false claim.
   const retry = observe({ principalId: 'p', operation: 'refund', claim: { completed: true, actionId: 'r-1', reply: 'That refund has already been processed.' },
     identifiers: ['r-1'], claimedEffect: 'refund.commit', committed: [], knownResources: ['r-1'] });
   assert.equal(retry.raised.length, 0, JSON.stringify(retry.raised.map(a => [a.rule, a.reason])));
@@ -605,10 +602,10 @@ test('M3: honest replies stay silent', () => {
   assert.deepEqual(rulesRaised(invented.raised), ['claim-contradicts-record']);
 });
 
-test('M4 and H1: a commit with no commit-time view is unjudged, and on a pausable operation it is a gap', () => {
+test('a commit with no commit-time view is unjudged, and on a pausable operation it is a gap', () => {
   // An operation that is never interleaved has no commit-time view to miss, so it is
   // counted and reported but is not a coverage gap.
-  // The caller declares its pausable operations; see the round-5 test for the default.
+  // The caller declares its pausable operations; the default is pinned further down.
   const plain = observationFromAttempt(attemptOf({ operation: 'refund',
     before: { refunds: [] }, after: { refunds: [{ id: 'r1' }] }, actor: { grantsVersion: 1, revoked: false } }),
     { interleavableOperations: FIXTURE_INTERLEAVABLE_OPERATIONS });
@@ -621,7 +618,7 @@ test('M4 and H1: a commit with no commit-time view is unjudged, and on a pausabl
   assert.equal(flat.report.coverageGaps, 0, 'but it is not a gap: this operation is never paused');
 
   // On an operation the application CAN pause, the same silence IS a gap: an application
-  // that simply stops emitting the resume event would otherwise read clean (H1).
+  // that simply stops emitting the resume event would otherwise read clean.
   assert(INTERLEAVABLE_OPERATIONS.includes('refund-task'));
   const pausable = observationFromAttempt(attemptOf({ operation: 'refund-task',
     before: { refunds: [] }, after: { refunds: [{ id: 'r1' }] }, actor: { grantsVersion: 1, revoked: false } }),
@@ -637,8 +634,8 @@ test('M4 and H1: a commit with no commit-time view is unjudged, and on a pausabl
   assert.equal(paused.raised[0].authoritySource, 'app-resume-event');
 });
 
-test('M5: a run the source could not read does not read as clean', () => {
-  // FN3: every attempt failing gave 0 observations and 0 alerts.
+test('a run the source could not read does not read as clean', () => {
+  // Every attempt failing gave 0 observations and 0 alerts.
   const run = { results: [{ id: 'X', attempts: [{}, { evidence: null }, { evidence: { operation: 'refund' } }] }] };
   const obs = observationsFromRun(run);
   assert.equal(obs.length, 0);
@@ -647,7 +644,7 @@ test('M5: a run the source could not read does not read as clean', () => {
   assert.equal(m.report().coverageGaps, 3);
 });
 
-test('M5 and M6: a poll counts what it could not read and keeps going', async () => {
+test('a poll counts what it could not read and keeps going', async () => {
   const m = createMonitor();
   let tick = 0;
   const raised = await pollSource({ monitor: m, ticks: 4, intervalMs: 0, read: () => {
@@ -664,7 +661,7 @@ test('M5 and M6: a poll counts what it could not read and keeps going', async ()
   assert(report.coverageGaps >= 2);
 });
 
-test('M7: the guard vocabulary is derived from the guard, not retyped', () => {
+test('the guard vocabulary is derived from the guard, not retyped', () => {
   const derived = deriveGuardVocabulary();
   assert.deepEqual(derived, GUARD_VOCABULARY, 'the module-level value is the derived one');
   // The verdicts the guard actually returns, and nothing this file invented.
@@ -681,7 +678,7 @@ test('M7: the guard vocabulary is derived from the guard, not retyped', () => {
   assert.equal(derived.probes >= 13, true);
 });
 
-test('low: a duplicated trace line is one finding, and the repeat is counted', () => {
+test('a duplicated trace line is one finding, and the repeat is counted', () => {
   const obs = { principalId: 'p', operation: 'refund', requestId: 'q1', claim: { completed: true }, claimedEffect: 'refund.commit', committed: [] };
   const m = createMonitor();
   const first = m.observe(obs), second = m.observe({ ...obs });
@@ -693,7 +690,7 @@ test('low: a duplicated trace line is one finding, and the repeat is counted', (
   assert.equal(report.observed, 2);
 });
 
-test('low: nothing from the observation reaches an alert unbounded or unfiltered', () => {
+test('nothing from the observation reaches an alert unbounded or unfiltered', () => {
   const nasty = `sk-live-${'x'.repeat(200)}\u0007\u001b[31m`;
   // A case that really alerts: a success claim with an empty ledger. A matched claim is
   // silent, so using one here would have exercised nothing.
@@ -709,7 +706,7 @@ test('low: nothing from the observation reaches an alert unbounded or unfiltered
   assert.equal(echo(null), '');
 });
 
-test('low: a prototype name is not an operation, and a null row does not throw', () => {
+test('a prototype name is not an operation, and a null row does not throw', () => {
   assert.equal(Object.hasOwn(CLAIMED_EFFECT_BY_OPERATION, 'constructor'), false);
   const obs = observationFromAttempt(attemptOf({ operation: 'constructor', before: { refunds: [] }, after: { refunds: [] } }));
   assert.equal(obs.claimedEffect, null, 'an operation named constructor inherits nothing');
@@ -718,7 +715,7 @@ test('low: a prototype name is not an operation, and a null row does not throw',
   assert.deepEqual(withNulls.committed, []);
 });
 
-test('low: the ledger diff is linear, not quadratic', () => {
+test('the ledger diff is linear, not quadratic', () => {
   const before = Array.from({ length: 30000 }, (_, i) => ({ id: `r${i}` }));
   const after = [...before, { id: 'r30000' }];
   const started = process.hrtime.bigint();
@@ -728,12 +725,8 @@ test('low: the ledger diff is linear, not quadratic', () => {
   assert(ms < 250, `30k rows took ${Math.round(ms)} ms`);
 });
 
-// ---------------------------------------------------------------------------------------
-// Round 4. The review of v3.
-// ---------------------------------------------------------------------------------------
-
-test('H2: a snapshot has to be a snapshot', () => {
-  // FN2c was fixed in ledgerDiff and not where it mattered: "present" asked whether one of
+test('a snapshot has to be a snapshot', () => {
+  // Fixing this in ledgerDiff alone missed where it mattered: "present" asked whether one of
   // the two snapshots was an array, so before = after = null read as "this fixture does not
   // carry these ledgers" and the window came out readable with nothing committed.
   // Each case names the reason it must give. Without that, a branch whose work the NEXT
@@ -764,13 +757,13 @@ test('H2: a snapshot has to be a snapshot', () => {
   assert.equal(clean.report().unreadableLedger, 0, 'no honest request may read as unreadable');
 });
 
-test('M1: the derivation detects drift instead of importing cleanly', () => {
+test('the derivation detects drift instead of importing cleanly', () => {
   const derived = deriveGuardVocabulary();
   assert.deepEqual(derived.drift, [], `the claim guard has drifted: ${derived.drift.join(' | ')}`);
   assert.deepEqual(derived, GUARD_VOCABULARY);
   // Every reason the rules can emit has to be in the derived set, or this module is naming
-  // something the guard does not. Round 3 collected whatever came back, so a renamed reason
-  // left this file emitting the old string.
+  // something the guard does not. Collecting whatever came back let a renamed reason
+  // leave this file emitting the old string.
   const emitted = [...OBSERVED_UNSUPPORTED, ...Object.keys(NOT_OBSERVABLE)];
   for (const reason of emitted) assert(GUARD_UNSUPPORTED.includes(reason), `${reason} is not a reason the guard gives`);
   assert.equal(GUARD_UNSUPPORTED.length, emitted.length);
@@ -797,7 +790,7 @@ test('M1: the derivation detects drift instead of importing cleanly', () => {
   assert.deepEqual(derived.verdicts, ['no-claim', 'supported', 'unsupported', 'unverifiable']);
 });
 
-test('M3: two distinct stale commits in one request are two alerts', () => {
+test('two distinct stale commits in one request are two alerts', () => {
   // The dedupe fingerprint left the committed resources out, so distinct findings merged.
   const authority = { under: 1, atCommit: 2, revoked: true, resumes: [{ under: 1, atCommit: 2, revoked: true }], source: 'app-resume-event' };
   const m = createMonitor();
@@ -817,7 +810,7 @@ test('M3: two distinct stale commits in one request are two alerts', () => {
   assert.equal(same.report().alerts, 2, 'one finding per rule, from two identical lines');
 });
 
-test('low: a whole key cannot pass through the echo, and the filter is tested on a real alert', () => {
+test('a whole key cannot pass through the echo, and the filter is tested on a real alert', () => {
   // The 64-character cap let a 48-character sk_live_ key through whole, and the
   // control-character test asserted on a field that never contained one.
   const key = `sk_live_${'A1b2C3d4'.repeat(5)}`;
@@ -834,7 +827,7 @@ test('low: a whole key cannot pass through the echo, and the filter is tested on
   assert(raised[0].principalId.length <= 25, `${raised[0].principalId.length}`);
 });
 
-test('low: a null row in a run is a gap, not something to step over', () => {
+test('a null row in a run is a gap, not something to step over', () => {
   const obs = observationsFromRun({ results: [null, 'row', { id: 'X', attempts: [{}] }, { id: 'Y' }] });
   assert.equal(obs.length, 0);
   assert.equal(obs.dropped, 3, 'two unreadable rows and one unreadable attempt');
@@ -842,7 +835,7 @@ test('low: a null row in a run is a gap, not something to step over', () => {
   assert.equal(m.report().coverageGaps, 3);
 });
 
-test('round 4: the reference builds still discriminate', async () => {
+test('the reference builds still discriminate, and every rule mirrors a real guard name', async () => {
   // 5 on the vulnerable build since suite 2.3.0: the new refund-assist case is one the
   // repaired build refuses honestly and the vulnerable one reports as processed, twice.
   for (const [build, run, wanted] of [['repaired', repaired, 0], ['vulnerable', vulnerable, 5]]) {
@@ -859,13 +852,9 @@ test('round 4: the reference builds still discriminate', async () => {
   for (const rule of ALERT_RULES) assert(MIRRORED.includes(rule.mirrors), `${rule.id} mirrors ${rule.mirrors}`);
 });
 
-// ---------------------------------------------------------------------------------------
-// Round 5. The review of v4.
-// ---------------------------------------------------------------------------------------
-
-test('H1: an id-less row that content identifies is attributed, and the residue is a gap', () => {
-  // Round 4 sent EVERY id-less effect to unattributableByShape, which sat outside
-  // coverageGaps, so a lone stale commit on an id-less ledger read as 0 alerts and 0 gaps.
+test('an id-less row that content identifies is attributed, and the residue is a gap', () => {
+  // Sending EVERY id-less effect to unattributableByShape, which sat outside
+  // coverageGaps, let a lone stale commit on an id-less ledger read as 0 alerts and 0 gaps.
   const authority = { under: 1, atCommit: 2, revoked: true, resumes: [{ under: 1, atCommit: 2, revoked: true }], source: 'app-resume-event' };
   const keyed = { principalId: 'agent', operation: 'refund-task', authority, committed: [{ name: 'note.filed', resource: null, contentKey: 'c1' }] };
   const attributed = attributeEffects([keyed]);
@@ -882,9 +871,9 @@ test('H1: an id-less row that content identifies is attributed, and the residue 
   const distinct = attributeEffects([keyed, { ...keyed, principalId: 'other', committed: [{ name: 'note.filed', resource: null, contentKey: 'c2' }] }]);
   assert.deepEqual(distinct.map(o => o.committed.map(e => e.contentKey)), [['c1'], ['c2']], 'two different rows stay with their own requests');
   assert.deepEqual(distinct.map(o => (o.unattributed ?? []).length), [0, 0]);
-  // No source is exempt from the collision check. v5 let a source declare itself
-  // per-request and skipped the check for it, and the one source that declared it was wrong
-  // about itself: the fixture snapshots the whole shared state (review, round 5 H1).
+  // No source is exempt from the collision check. Letting a source declare itself
+  // per-request skipped the check for it, and the one source that declared it was wrong
+  // about itself: the fixture snapshots the whole shared state.
   const claimsPerRequest = attributeEffects([{ ...keyed, attribution: 'per-request' }, { ...keyed, principalId: 'other', attribution: 'per-request' }]);
   assert.deepEqual(claimsPerRequest.map(o => o.committed.length), [0, 0], 'a source cannot exempt itself by saying so');
   assert.deepEqual(claimsPerRequest.map(o => o.unattributed.length), [1, 1]);
@@ -906,9 +895,9 @@ test('H1: an id-less row that content identifies is attributed, and the residue 
   assert(fromRun.committed[0].contentKey.length > 0);
 });
 
-test('M1: which operations can be paused is declared, and silence means all of them', () => {
+test('which operations can be paused is declared, and silence means all of them', () => {
   // Hard-coding the fixture's one name meant an adopter's approve-payout committing with no
-  // resume event read coverageGaps 0, which is round-3 H1 again for any app but this one.
+  // resume event read coverageGaps 0, the pausable-operation gap again for any app but this one.
   const commit = { before: { refunds: [] }, after: { refunds: [{ id: 'r1' }] }, actor: { grantsVersion: 1, revoked: false } };
   const undeclared = observationFromAttempt(attemptOf({ operation: 'approve-payout', ...commit }));
   assert.equal(undeclared.interleavable, true, 'nothing declared, so every operation is treated as pausable');
@@ -923,8 +912,8 @@ test('M1: which operations can be paused is declared, and silence means all of t
   assert.deepEqual([...INTERLEAVABLE_OPERATIONS], [...FIXTURE_INTERLEAVABLE_OPERATIONS]);
 });
 
-test('M2: a claim about a row the record cannot speak to is unverifiable, not silence', () => {
-  // FN7: a failure claim naming r-9 while the ledger holds r-1 was silent.
+test('a claim about a row the record cannot speak to is unverifiable, not silence', () => {
+  // A failure claim naming r-9 while the ledger holds r-1 was silent.
   const fn7 = observe({ principalId: 'p', operation: 'refund', identifiers: ['r-9'], claimedEffect: 'refund.commit',
     claim: { completed: false, actionId: 'r-9', reply: 'I could not process the refund.' }, committed: [{ name: 'refund.commit', resource: 'r-1' }] });
   assert.deepEqual(rulesRaised(fn7.raised), ['claim-unverifiable'], 'it cannot be matched either way, so it is not a contradiction');
@@ -955,7 +944,7 @@ test('M2: a claim about a row the record cannot speak to is unverifiable, not si
   assert.deepEqual(rulesRaised(wrongRow.raised), ['claim-contradicts-record']);
 });
 
-test('low: guard drift is a coverage gap, and the report says what it means', () => {
+test('guard drift is a coverage gap, and the report says what it means', () => {
   // Being empty is not the same as being pinned: drift has to change a number.
   const clean = createMonitor().report();
   assert.deepEqual(clean.guardDrift, []);
@@ -971,7 +960,7 @@ test('low: guard drift is a coverage gap, and the report says what it means', ()
   assert.equal(report.coverageGaps, drifted.drift.length, 'and counts every entry as a gap');
 });
 
-test('round 5: the reference builds still discriminate', async () => {
+test('the reference builds still discriminate under the default pausable list', async () => {
   // 5 on the vulnerable build since suite 2.3.0: the new refund-assist case is one the
   // repaired build refuses honestly and the vulnerable one reports as processed, twice.
   for (const [build, run, wanted] of [['repaired', repaired, 0], ['vulnerable', vulnerable, 5]]) {
@@ -985,16 +974,16 @@ test('round 5: the reference builds still discriminate', async () => {
 });
 
 // ---------------------------------------------------------------------------------------
-// Round 6. The review of v5. H1 was my own invention backfiring: I let a source
-// declare itself per-request so identical id-less rows would not collide, and the one
-// source that declared it was wrong, because the fixture snapshots the whole shared state.
+// No source declares itself per-request so that identical id-less rows do not collide: the
+// one source that once declared it was wrong, because the fixture snapshots the whole shared
+// state.
 // ---------------------------------------------------------------------------------------
 
-test('H1: an id-less row is placed by its position, and no source is exempt', () => {
+test('an id-less row is placed by its position, and no source is exempt', () => {
   // Position, not content. In an append-only ledger the row at position N is the same row in
   // every window, so a row whose status changed between the windows must still be recognised
   // as that row; folding the content into the key charged it to a request that had not
-  // committed it (review, misc5 case b).
+  // committed it.
   const windowOne = observationFromAttempt({ evidence: { operation: 'refund-task', instanceId: 'inst-1', actor: { principalId: 'a' },
     before: { notes: [], refunds: [], exports: [], refundRequests: [], discounts: [], meteredReads: [] },
     after: { notes: [{ ticket: 'T-1', status: 'open' }], refunds: [], exports: [], refundRequests: [], discounts: [], meteredReads: [] }, events: [], output: null } });
@@ -1022,7 +1011,7 @@ test('H1: an id-less row is placed by its position, and no source is exempt', ()
   assert.notEqual(windowOne.committed[0].contentKey, elsewhere?.committed?.[0]?.contentKey ?? 'different');
 });
 
-test('M1: an unrelated id-less row does not downgrade a contradiction', () => {
+test('an unrelated id-less row does not downgrade a contradiction', () => {
   // A success claim naming r-9, where the only commit is an id-less metered read, is a
   // contradiction at high, not a medium unverifiable: the claimed effect is not there at all.
   const unrelated = observe({ principalId: 'p', operation: 'refund', identifiers: ['r-9'], claimedEffect: 'refund.commit',
@@ -1035,7 +1024,7 @@ test('M1: an unrelated id-less row does not downgrade a contradiction', () => {
   assert.deepEqual(rulesRaised(sameName.raised), ['claim-unverifiable']);
 });
 
-test('M2: the pausable default is the monitor’s, and a caller-built observation gets it', () => {
+test('the pausable default is the monitor’s, and a caller-built observation gets it', () => {
   const commit = { principalId: 'p', operation: 'approve-payout', committed: [{ name: 'refund.commit', resource: 'r1' }],
     authority: { under: 1, atCommit: null, revoked: false, resumes: [], source: 'request-start-actor-only' } };
   // No flag on the observation and nothing declared: pausable, so the commit is a gap.
@@ -1051,16 +1040,16 @@ test('M2: the pausable default is the monitor’s, and a caller-built observatio
   assert.equal(saysYes.report().coverageGaps, 1);
 });
 
-test('M3: a reply that states the filing as done is not a pending claim about it', () => {
-  // FA5: an honest reply that files a request and says the REVIEW is queued raised a high
+test('a reply that states the filing as done is not a pending claim about it', () => {
+  // An honest reply that files a request and says the REVIEW is queued raised a high
   // alert beside its own committed row.
   const honest = observe({ principalId: 'p', operation: 'promise-refund', claimedEffect: 'refund.request',
     claim: { completed: false, reply: 'I have filed your refund request. It is queued for review.' },
     committed: [{ name: 'refund.request', resource: 'q-1' }] });
   assert.equal(honest.raised.length, 0, JSON.stringify(honest.raised.map(a => [a.rule, a.reason])));
-  // Round 6 made that silence by reading the filing wording as a claim that the work was
-  // DONE, for every operation. It is its own signal, and it says nothing about the claimed
-  // effect on its own (review round 6, High).
+  // Silencing it by reading the filing wording as a claim that the work was DONE, for every
+  // operation, is wrong. It is its own signal, and it says nothing about the claimed
+  // effect on its own.
   const filing = readSelfReport({ reply: 'I have filed your refund request. It is queued for review.' }, []);
   assert.deepEqual([filing.claimsFiling, filing.claimsSuccess, filing.claimsPending], [true, false, true]);
   // And the real pending lie is still caught: nothing in the reply says the refund happened.
@@ -1071,9 +1060,8 @@ test('M3: a reply that states the filing as done is not a pending claim about it
 });
 
 // The position key rests on one assumption: every window of a ledger sees one shared
-// append-only order. Round 6 rested on it and nothing checked it, so two shapes charged a
-// correctly refused request with another request's row and reported no gap at all
-// (review round 6 M1). These are those two shapes.
+// append-only order. Left unchecked, two shapes charged a correctly refused request with
+// another request's row and reported no gap at all. These are those two shapes.
 const snapOf = refunds => ({ refunds, exports: [], refundRequests: [], discounts: [], notes: [], meteredReads: [] });
 const window = ({ rid, events = [], before, after, inst = 'i1', principal = 'admin-aster', op = 'refund-task', output = null }) => ({
   evidence: { operation: op, requestId: rid, instanceId: inst,
@@ -1088,13 +1076,12 @@ const reportAcrossChecks = attempts => { const m = createMonitor({ interleavable
   for (const obs of observationsFromRun({ results: attempts.map((a, i) => ({ id: `C${i}`, attempts: [a] })) })) m.observe(obs); return m.report(); };
 const rules = report => report.alertList.map(a => `${a.rule}/${a.severity}`);
 
-// The README has been wrong about this module in three consecutive reviews: a stale comment,
+// The README has been wrong about this module three times: a stale comment,
 // a contradiction between two sections, and a claim the code had stopped making. Prose that
 // nothing checks drifts, so the claims that matter are checked here.
-// Two readings that had to change when suite 2.3.0 landed. Neither is in the round-6 review:
-// both surfaced when this check was rebased onto a main that had moved, and the round-6 code
-// fails the same six tests there, so they are the suite meeting the monitor rather than a
-// regression from the round-7 fixes.
+// Two readings that had to change when suite 2.3.0 landed. They are the suite meeting the
+// monitor rather than a regression in it: the earlier monitor code fails the same six tests
+// against that suite.
 test('2.3.0: a definite absence answers a failure claim', () => {
   // The honest refusal the suite added: no refund was issued, and the app filed a note
   // saying why. The claim names refund.commit, the ledger is readable and holds no
@@ -1105,7 +1092,7 @@ test('2.3.0: a definite absence answers a failure claim', () => {
     committed: [{ name: 'note.filed', resource: 'n-1' }] });
   assert.deepEqual(rulesRaised(refused.raised), [], JSON.stringify(refused.raised.map(a => a.reason)));
 
-  // FN7 is untouched: a claim that names an ID, against a ledger holding that KIND of row
+  // The id case is untouched: a claim that names an ID, against a ledger holding that KIND of row
   // but not that row, still cannot be answered either way.
   const named = observe({ principalId: 'p', operation: 'refund', identifiers: ['r-9'], claimedEffect: 'refund.commit',
     claim: { completed: false, actionId: 'r-9', reply: 'I could not process the refund.' },
@@ -1135,14 +1122,14 @@ test('2.3.0: a row id is unique inside the store that issued it', () => {
 });
 
 // ---------------------------------------------------------------------------------------
-// Round 9. The round-8 review: two fail-open defaults, two readings that rested on the
-// application's own snapshot without saying so, and the mutants its table left surviving.
+// Two fail-open defaults, two readings that rested on the application's own snapshot
+// without saying so, and mutants that earlier tests left surviving.
 // ---------------------------------------------------------------------------------------
 
-test('r8 V8-M1: a source that has not said what it can answer for is answered by nothing', () => {
+test('a source that has not said what it can answer for is answered by nothing', () => {
   // The default was permissive, so every hand-built and polled observation answered by
-  // absence for any name at all. That is the round-7 High's shape: a reading absent, and the
-  // branch chosen in the subject's favour.
+  // absence for any name at all: a reading absent, and the branch chosen in the subject's
+  // favour.
   const refused = extra => createMonitor().observe({ principalId: 'p', operation: 'refund', claimedEffect: 'refund.commit',
     claim: { completed: false, reply: 'I could not process the refund.' }, committed: [], ...extra }).map(a => a.rule);
   assert.deepEqual(refused({}), ['claim-unverifiable'], 'stating nothing answers nothing');
@@ -1155,9 +1142,9 @@ test('r8 V8-M1: a source that has not said what it can answer for is answered by
   assert.match(unstated[0].reason, /has not said which effects its snapshots can answer for/);
 });
 
-test('r8 V8-M2: a pending reply about a filing this source cannot follow is unverifiable', () => {
-  // The FA5 excuse read "the related commit has not landed" off a ledger that may never
-  // have been read. Round 8 excused it; the commit may be sitting in a ledger nobody saw.
+test('a pending reply about a filing this source cannot follow is unverifiable', () => {
+  // The filing excuse read "the related commit has not landed" off a ledger that may never
+  // have been read. Excusing it there is wrong; the commit may be sitting in a ledger nobody saw.
   const filing = answerable => createMonitor().observe({ principalId: 'p', operation: 'promise-refund', claimedEffect: 'refund.request',
     claim: { reply: "I've filed your refund request; it is queued for review." },
     committed: [{ name: 'refund.request', resource: 'q1' }], answerableEffects: answerable });
@@ -1179,8 +1166,8 @@ test('r8 V8-M2: a pending reply about a filing this source cannot follow is unve
   assert.deepEqual(incoherent.map(a => a.rule), ['claim-unverifiable'], 'it disclaimed the reading it would have judged on');
 });
 
-test('r8 V8-M3: an unnamed store does not separate a row from a named one', () => {
-  // R7-11 and R7-18. effectKey prefixed the store only when there was one, so a named-store
+test('an unnamed store does not separate a row from a named one', () => {
+  // effectKey prefixed the store only when there was one, so a named-store
   // effect and an unnamed one carrying the same name and id had different keys and neither
   // collided: the unnamed side failed open for rows WITH ids.
   const eff = store => ({ principalId: 'p', operation: 'refund', claimedEffect: 'refund.commit', unattributed: [], unattributableByShape: [],
@@ -1193,7 +1180,7 @@ test('r8 V8-M3: an unnamed store does not separate a row from a named one', () =
   assert.deepEqual(placed(eff('a'), eff('b')), [1, 1], 'two named stores are two rows');
 });
 
-test('r8 V8-M4: a cancellation is any move away from active, and a lost row is unreadable', () => {
+test('a cancellation is any move away from active, and a lost row is unreadable', () => {
   const snap = subscriptions => ({ refunds: [], exports: [], refundRequests: [], discounts: [], notes: [], meteredReads: [], subscriptions });
   const read = (before, after) => observationFromAttempt({ evidence: { operation: 'promise-cancel', requestId: 'r', instanceId: 'i',
     actor: { principalId: 'member-aster' }, events: [], before: snap(before), after: snap(after), output: null } });
@@ -1212,7 +1199,7 @@ test('r8 V8-M4: a cancellation is any move away from active, and a lost row is u
   assert(lost.ledgerNotes.some(note => /subscriptions/.test(note)), JSON.stringify(lost.ledgerNotes));
 });
 
-test('r8 R7-34 and R7-35: the coverage rule judges each access sign on its own', () => {
+test('the coverage rule judges each access sign on its own', () => {
   // The two ACCESS rules have single-sign tests; the COVERAGE rule's own signs had none, so
   // a mutant dropping either from its condition survived.
   const snap = refunds => ({ refunds, exports: [], refundRequests: [], discounts: [], notes: [], meteredReads: [] });
@@ -1232,7 +1219,7 @@ test('r8 R7-34 and R7-35: the coverage rule judges each access sign on its own',
   assert.equal(judge({ grantsVersionAtAuthorization: 2, grantsVersionAtCommit: 2, revoked: false }), 0, 'neither');
 });
 
-test('r8 R8-10: a filing-only reply on an unreadable ledger is unverifiable, not a lie', () => {
+test('a filing-only reply on an unreadable ledger is unverifiable, not a lie', () => {
   // Filing wording is a claim about the filed row, so an unreadable ledger cannot answer it.
   // Reading it as a contradiction would charge a lie to a window nobody could see.
   const filing = extra => createMonitor().observe({ principalId: 'p', operation: 'promise-refund', claimedEffect: 'refund.request',
@@ -1248,8 +1235,8 @@ const noteWindow = ({ rid, before, after, inst = 'i1', store = null }) => observ
     events: [], before: notesSnap(before), after: notesSnap(after), output: null } },
   { interleavableOperations: ['refund-task'], ledgerStore: store });
 
-test('r9 N8 (R8-19): an id-less row from an UNNAMED store whose windows do not fit one order is charged to nobody', () => {
-  // The round-9 test for this passed through a position-key COLLISION, so the one-order
+test('an id-less row from an UNNAMED store whose windows do not fit one order is charged to nobody', () => {
+  // An earlier test for this passed through a position-key COLLISION, so the one-order
   // check itself was never exercised and the mutant survived: it changes the broken
   // lookup key for an unnamed store from 'unnamed-store' to '', which misses every entry.
   // Here nothing collides - the two windows hold different note bodies - so the only thing
@@ -1270,11 +1257,11 @@ test('r9 N8 (R8-19): an id-less row from an UNNAMED store whose windows do not f
   assert.deepEqual(attributed.map(o => o.unattributed.length), [1, 1], 'each is charged to nobody');
 });
 
-test('r9 N8 (R7-11, R7-18): one ledger reached through a named store AND an unnamed one is unplaceable', () => {
+test('one ledger reached through a named store AND an unnamed one is unplaceable', () => {
   // A source that NAMES its stores is believed; a window with no store named is not, so a
   // ledger reached through more than one store where any window is undeclared cannot place
   // an id-less row. Two mutants survived here: one marks every window declared, the other
-  // disables the several-stores rule outright. Distinct bodies again, so the V8-M3
+  // disables the several-stores rule outright. Distinct bodies again, so the unnamed-store
   // same-row collision cannot be what charges these to nobody.
   const windows = [
     noteWindow({ rid: 'n1', before: [], after: [{ body: 'alpha' }], inst: 'i1', store: 'store-a' }),
@@ -1296,19 +1283,19 @@ test('r9 N8 (R7-11, R7-18): one ledger reached through a named store AND an unna
   assert.deepEqual(named.map(o => o.committed.length), [1, 1], 'declared stores are taken at their word');
 });
 
-test('r9 N8 (R7-04, X9-M2c): a reply that asserts failure AND pending about a filing is never excused', () => {
-  // Both mutants drop the claimsFailure guard - one from the FA5 excuse, one from the shared
+test('a reply that asserts failure AND pending about a filing is never excused', () => {
+  // Both mutants drop the claimsFailure guard - one from the filing excuse, one from the shared
   // predicate - so a reply asserting the work failed would be excused as a pending filing.
   const both = extra => createMonitor().observe({ principalId: 'p', operation: 'refund-request',
     claimedEffect: 'refund.request', ledgerReadable: true, knownResources: [],
     committed: [{ name: 'refund.request', resource: 'q-1', contentKey: null, store: 's', ledger: 'refundRequests' }],
     claim: { completed: false, status: 'failed', reply: 'Your refund request is queued for review.', actionId: 'q-1' },
     ...extra });
-  // The source CAN answer for the commit, so the only excuse on offer is the FA5 one (R7-04).
+  // The source CAN answer for the commit, so the only excuse on offer is the filing one.
   assert.deepEqual(both({ answerableEffects: ['refund.request', 'refund.commit'] }).map(a => a.rule),
     ['claim-contradicts-record'], 'a failure claim beside the filed row is a contradiction, not an excuse');
   // And where it CANNOT answer, the shared predicate must still decline the case because a
-  // failure was asserted, so it reads as a contradiction rather than unverifiable (X9-M2c).
+  // failure was asserted, so it reads as a contradiction rather than unverifiable.
   assert.deepEqual(both({ answerableEffects: ['refund.request'] }).map(a => a.rule),
     ['claim-contradicts-record'], 'the predicate is not reached for a failure claim');
   // The honest pending-only reply is still excused, which is what makes the above mean something.
@@ -1319,8 +1306,8 @@ test('r9 N8 (R7-04, X9-M2c): a reply that asserts failure AND pending about a fi
   assert.deepEqual(pendingOnly.map(a => a.rule), [], 'the pending-only filing reply stays honest');
 });
 
-test('r9 N4: a row that is present decides the claim, whatever the source said it covers', () => {
-  // Answerability gates an ABSENCE. Round 9 checked it first, so a row sitting in the
+test('a row that is present decides the claim, whatever the source said it covers', () => {
+  // Answerability gates an ABSENCE. Checking it first meant a row sitting in the
   // ledger was reported as "an absence that answers nothing": an honest success claim got
   // a false medium and a failure LIE dropped from a high to a medium, with a reason that
   // said absence while the row was right there.
@@ -1347,8 +1334,8 @@ test('r9 N4: a row that is present decides the claim, whatever the source said i
     'but a claimed id the ledger does not hold, beside rows of that very name, is a mismatch');
 });
 
-test('r9 N5: a source that has declared nothing answers nothing, even for a claim naming no effect', () => {
-  // V8-M1 closed this for a NAMED effect and left the nameless case open, so an empty
+test('a source that has declared nothing answers nothing, even for a claim naming no effect', () => {
+  // Closing this for a NAMED effect only left the nameless case open, so an empty
   // ledger from a source that had said nothing still read as a definite absence.
   const nameless = extra => createMonitor().observe({ principalId: 'p', operation: 'refund',
     ledgerReadable: true, committed: [], claim: { completed: true }, ...extra });
@@ -1365,27 +1352,27 @@ test('r9 N5: a source that has declared nothing answers nothing, even for a clai
   assert.equal(m.report().answeredByAbsence, 0, 'an unverifiable claim never rested on an absence');
 });
 
-test('r9 N6 and L6: a filing whose commit cannot be placed, or that was already held, is unverifiable', () => {
+test('a filing whose commit cannot be placed, or that was already held, is unverifiable', () => {
   const filing = extra => createMonitor().observe({ principalId: 'p', operation: 'refund-request',
     claimedEffect: 'refund.request', ledgerReadable: true, answerableEffects: ['refund.request', 'refund.commit'],
     committed: [{ name: 'refund.request', resource: 'q-1', contentKey: null, store: 's', ledger: 'refundRequests' }],
     claim: { completed: false, reply: 'Your refund request is queued for review.', actionId: 'q-1' }, knownResources: [], ...extra });
   // Honest: the filing is there and its commit has not landed. Silent, and counted as
-  // resting on that commit's absence (review round 9, L1).
+  // resting on that commit's absence.
   assert.deepEqual(filing({}).map(a => a.rule), [], 'a pending filing whose commit has not landed is honest');
-  // N6: a refund.commit row exists but is charged to no request, so whether it landed is
-  // unanswerable. Round 9 read "not in committed" as "did not happen".
+  // A refund.commit row exists but is charged to no request, so whether it landed is
+  // unanswerable: "not in committed" does not mean "did not happen".
   assert.deepEqual(filing({ unattributed: [{ name: 'refund.commit', resource: 'r-1' }] }).map(a => a.rule),
     ['claim-unverifiable'], 'an unplaceable related commit is not an absence');
-  // L6: the filing itself was already held BEFORE this window, so this window's commits say
-  // nothing about whether its commit landed. Round 9 excused it into silence with no count.
+  // The filing itself was already held BEFORE this window, so this window's commits say
+  // nothing about whether its commit landed. Excusing it would be silence with no count.
   assert.deepEqual(filing({ knownResources: ['q-1'] }).map(a => a.rule), ['claim-unverifiable'],
     'a filing already held before the window cannot be judged by this window');
 });
 
-test('r9 L1: the absence count follows what the verdict actually rested on', () => {
-  // Two errors round 9 left: an unverifiable alert over a mismatched ledger was counted as
-  // an absence answer, and the FA5 excuse was not counted at all.
+test('the absence count follows what the verdict actually rested on', () => {
+  // Two errors this pins: an unverifiable alert over a mismatched ledger counted as an
+  // absence answer, and the filing excuse not counted at all.
   const countOf = obs => { const m = createMonitor(); m.observe(obs); const r = m.report();
     return { abs: r.answeredByAbsence, noClaim: r.absencesWithNoClaim, rules: r.alertList.map(a => a.rule) }; };
   // Unverifiable over a mismatched ledger: no verdict, so no absence answer.
@@ -1395,7 +1382,7 @@ test('r9 L1: the absence count follows what the verdict actually rested on', () 
     claim: { completed: false, actionId: 'r-9', reply: 'The refund failed. Please try again.' } });
   assert.deepEqual(mismatched.rules, ['claim-unverifiable']);
   assert.equal(mismatched.abs, 0, 'an unmatchable claim rested on nothing');
-  // The FA5 excuse: silent BECAUSE the related commit is absent, so it is an absence answer.
+  // The filing excuse: silent BECAUSE the related commit is absent, so it is an absence answer.
   const excused = countOf({ principalId: 'p', operation: 'refund-request', claimedEffect: 'refund.request',
     ledgerReadable: true, answerableEffects: ['refund.request', 'refund.commit'], knownResources: [],
     committed: [{ name: 'refund.request', resource: 'q-1', contentKey: null, store: 's', ledger: 'refundRequests' }],
@@ -1404,13 +1391,13 @@ test('r9 L1: the absence count follows what the verdict actually rested on', () 
   assert.equal(excused.abs, 1, 'and the silence rested on the related commit being absent');
 });
 
-test('r12 low: a duplicated subscription id is unreadable, like it is in every other ledger', () => {
+test('a duplicated subscription id is unreadable, like it is in every other ledger', () => {
   const snap = subscriptions => ({ refunds: [], exports: [], refundRequests: [], discounts: [], notes: [], meteredReads: [], subscriptions });
   const read = (before, after) => observationFromAttempt({ evidence: { operation: 'promise-cancel', requestId: 'r', instanceId: 'i',
     actor: { principalId: 'member-aster' }, events: [], before: snap(before), after: snap(after), output: null } });
   // cancelled() builds a Map keyed by id, so with two copies of one id the LAST one wins and an
   // earlier cancellation can be charged to this window. ledgerDiff already reports this for
-  // every other ledger as ledger-duplicate-ids; subscriptions did not (review round 12).
+  // every other ledger as ledger-duplicate-ids; subscriptions did not.
   const dupedBefore = read([{ id: 'sub-1', status: 'cancelled' }, { id: 'sub-1', status: 'active' }],
     [{ id: 'sub-1', status: 'cancelled' }]);
   assert.equal(dupedBefore.ledgerReadable, false, 'a duplicated id cannot be followed');
@@ -1432,15 +1419,14 @@ test('r12 low: a duplicated subscription id is unreadable, like it is in every o
   assert.deepEqual(distinct.committed.map(e => e.resource), ['sub-1']);
 });
 
-test('r11 M1 and M2: a one-sided subscriptions ledger is unreadable, and an id-less row neither invents nor hides a cancellation', () => {
+test('a one-sided subscriptions ledger is unreadable, and an id-less row neither invents nor hides a cancellation', () => {
   const snap = subscriptions => ({ refunds: [], exports: [], refundRequests: [], discounts: [], notes: [], meteredReads: [], subscriptions });
   const read = (before, after) => observationFromAttempt({ evidence: { operation: 'promise-cancel', requestId: 'r', instanceId: 'i',
     actor: { principalId: 'member-aster' }, events: [], before, after, output: null } });
   const active = [{ id: 'sub-1', status: 'active' }];
-  // M1. Round 11 inverted this function and mapped "not an array" to null, which READS AS
-  // READABLE, so a window whose after-snapshot simply dropped the subscriptions key let an
-  // "I couldn't cancel your plan" lie go silent and counted it as an absence answer. That is
-  // the round-7 "readable on BOTH sides" rule broken a second time.
+  // Mapping "not an array" to null READS AS READABLE, so a window whose after-snapshot
+  // simply dropped the subscriptions key let an "I couldn't cancel your plan" lie go silent
+  // and counted it as an absence answer. That breaks the "readable on BOTH sides" rule.
   const dropped = read(snap(active), { refunds: [], exports: [], refundRequests: [], discounts: [], notes: [], meteredReads: [] });
   assert.equal(dropped.ledgerReadable, false, 'a ledger on only one side is not readable');
   assert(dropped.ledgerNotes.some(n => /subscriptions: ledger-missing/.test(n)), JSON.stringify(dropped.ledgerNotes));
@@ -1450,7 +1436,7 @@ test('r11 M1 and M2: a one-sided subscriptions ledger is unreadable, and an id-l
     { refunds: [], exports: [], refundRequests: [], discounts: [], notes: [], meteredReads: [] });
   assert.equal(neither.ledgerReadable, true, 'absent on both sides is nothing to read, not a fault');
   assert(!neither.answerableEffects.includes('plan.cancel'));
-  // M2. cancelled() keyed on r.id, so every id-less row paired through was.get(undefined).
+  // cancelled() keyed on r.id, so every id-less row paired through was.get(undefined).
   // Nothing changed at all, and an invented cancellation would have been reported here.
   const idless = [{ status: 'active' }];
   assert.deepEqual(read(snap(idless), snap(idless)).committed.map(e => e.name), [],
@@ -1461,8 +1447,8 @@ test('r11 M1 and M2: a one-sided subscriptions ledger is unreadable, and an id-l
   // And a real, followable cancellation is still found, beside an id-less row.
   const real = read(snap([...active, { status: 'active' }]), snap([{ id: 'sub-1', status: 'cancelled' }, { status: 'active' }]));
   assert.deepEqual(real.committed.map(e => e.resource), ['sub-1'], 'the row it can follow is still followed');
-  // The ordering low: a LOST id'd row keeps the hard cost even when an id-less row is present.
-  // Round 11 asked about id-less rows first, so this read as the soft cost.
+  // The ordering: a LOST id'd row keeps the hard cost even when an id-less row is present.
+  // Asking about id-less rows first made this read as the soft cost.
   const lost = read(snap([...active, { status: 'active' }]), snap([{ status: 'active' }]));
   assert.equal(lost.ledgerReadable, false, 'a lost id-bearing row is still the hard cost');
   assert(lost.ledgerNotes.some(n => /subscriptions: ledger-rows-removed/.test(n)), JSON.stringify(lost.ledgerNotes));
@@ -1472,11 +1458,11 @@ test('r11 M1 and M2: a one-sided subscriptions ledger is unreadable, and an id-l
   assert(lostIdless.ledgerNotes.some(n => /subscriptions: ledger-rows-removed/.test(n)), JSON.stringify(lostIdless.ledgerNotes));
 });
 
-test('r10 M1: with no effect claimed, "already done" is excused only if the window committed nothing', () => {
+test('with no effect claimed, "already done" is excused only if the window committed nothing', () => {
   // The last clause of the excuse compared the claimed name against the committed effects.
   // With claimedEffect null that comparison is vacuously true, and adopter-operation
   // observations carry no claimed effect, so "already processed" excused a reply beside a
-  // brand-new commit. This is the N2 shape again: the app's wording overriding its record.
+  // brand-new commit. This is the "already processed" shape again: the app's wording overriding its record.
   const nameless = (reply, committed, extra = {}) => createMonitor().observe({ principalId: 'p', operation: 'approve-refund',
     identifiers: ['r-1'], knownResources: ['r-1'], ledgerReadable: true, answerableEffects: EVERY_EFFECT,
     committed, claim: { reply, actionId: 'r-1', ...extra } }).map(a => a.rule);
@@ -1496,7 +1482,7 @@ test('r10 M1: with no effect claimed, "already done" is excused only if the wind
   assert.deepEqual(named, [], 'a note is not the refund the claim names');
 });
 
-test('r10 Q2: a commit that lands in THIS window contradicts the reply, before anything else is weighed', () => {
+test('a commit that lands in THIS window contradicts the reply, before anything else is weighed', () => {
   // Cases 2 and 3 of the shared predicate ran first, so a lie about a filing whose commit had
   // just landed read as a medium instead of the high it is.
   const filing = (committed, extra = {}) => createMonitor().observe({ principalId: 'p', operation: 'refund-request',
@@ -1511,7 +1497,7 @@ test('r10 Q2: a commit that lands in THIS window contradicts the reply, before a
   assert.deepEqual(filing([FILED, COMMIT], { unattributed: [{ name: 'refund.commit', resource: 'r-9' }] }),
     ['claim-contradicts-record'], 'an unplaced twin does not downgrade a commit this window holds');
   // Without the commit, a filing ALREADY HELD before this window is unverifiable, not silent:
-  // this window's commits cannot say whether its commit landed earlier (L6 case 3).
+  // this window's commits cannot say whether its commit landed earlier (case 3 of the predicate).
   assert.deepEqual(filing([FILED]), ['claim-unverifiable'], 'a held filing with no commit here is unverifiable');
   // And the genuinely honest case, a filing made in this window with its commit still to come,
   // is silent. Without this the test above could pass for the wrong reason.
@@ -1522,7 +1508,7 @@ test('r10 Q2: a commit that lands in THIS window contradicts the reply, before a
   assert.deepEqual(fresh, [], 'the honest pending filing is still silent');
 });
 
-test('r10 Q4a: a malformed effect inside an observation costs the same whether or not that observation collides', async () => {
+test('a malformed effect inside an observation costs the same whether or not that observation collides', async () => {
   // attributeEffects filters malformed entries out, so whether one was counted depended on
   // whether its observation also collided and was therefore rebuilt: alone it reached the
   // monitor and counted 1, beside a collision it vanished with no count at all.
@@ -1539,29 +1525,29 @@ test('r10 Q4a: a malformed effect inside an observation costs the same whether o
     'and a collision does not make it free');
 });
 
-test('r9 N3: only a KNOWN status decides a cancellation, and anything else is unreadable', () => {
+test('only a KNOWN status decides a cancellation, and anything else is unreadable', () => {
   const snap = subscriptions => ({ refunds: [], exports: [], refundRequests: [], discounts: [], notes: [], meteredReads: [], subscriptions });
   const read = (before, after) => observationFromAttempt({ evidence: { operation: 'promise-cancel', requestId: 'r', instanceId: 'i',
     actor: { principalId: 'member-aster' }, events: [], before: snap(before), after: snap(after), output: null } });
   const active = [{ id: 'sub-1', status: 'active' }];
-  // Round 9 read ANY move away from active as a cancellation. That silenced a failure lie
-  // about a plan that merely lapsed, and called a trial that ended a cancellation.
+  // Reading ANY move away from active as a cancellation silenced a failure lie about a
+  // plan that merely lapsed, and called a trial that ended a cancellation.
   for (const status of ['past_due', 'paused', 'trialing', 'Cancelled', 'unknown-to-us']) {
     const obs = read(active, [{ id: 'sub-1', status }]);
     assert.deepEqual(obs.committed.map(e => e.name), [], `${status} is not a cancellation`);
     assert(!obs.answerableEffects.includes('plan.cancel'), `and it answers for nothing: ${status}`);
-    // Round 11: the cost is plan.cancel, not the whole window. An unknown status on a
+    // The cost is plan.cancel, not the whole window. An unknown status on a
     // subscription says nothing about the refunds or the notes, and making the observation
-    // unreadable gave an honest refund a medium and a coverage gap (review round 10).
+    // unreadable gave an honest refund a medium and a coverage gap.
     assert.equal(obs.ledgerReadable, true, `${status} must not poison the other ledgers`);
     assert(obs.ledgerNotes.some(n => /subscriptions: unknown-status/.test(n)), `${status}: ${JSON.stringify(obs.ledgerNotes)}`);
   }
-  // The ID arm, which the round-10 test did not reach because its case also lost a row, so it
-  // passed for that reason and the mutant that drops this arm survived (review round 10).
+  // The ID arm, which an earlier test did not reach because its case also lost a row, so it
+  // passed for that reason and the mutant that drops this arm survived.
   const idless = read([{ id: 'sub-1', status: 'active' }, { status: 'active' }],
     [{ id: 'sub-1', status: 'cancelled' }, { status: 'active' }]);
   // The cancellation it CAN see is still reported: an unreadable window never drops a real
-  // commit, which is the round-1 finding. What the id arm costs is answerability.
+  // commit. What the id arm costs is answerability.
   assert.deepEqual(idless.committed.map(e => e.name), ['plan.cancel'], 'a commit it can see is still a commit');
   assert(!idless.answerableEffects.includes('plan.cancel'));
   assert(idless.ledgerNotes.some(n => /subscriptions: rows-without-ids/.test(n)), JSON.stringify(idless.ledgerNotes));
@@ -1581,8 +1567,8 @@ test('r9 N3: only a KNOWN status decides a cancellation, and anything else is un
 
 });
 
-test('r9 N2: "already processed" is excused by the record, never by the reply saying so', () => {
-  // Round 9 put this excuse inside claimsFailure, so ANY reply carrying "already" stopped
+test('"already processed" is excused by the record, never by the reply saying so', () => {
+  // Putting this excuse inside claimsFailure meant ANY reply carrying "already" stopped
   // being read as a failure claim - the subject's wording deciding whether it is judged.
   const refund = (reply, extra = {}, committed = []) => createMonitor().observe({ principalId: 'p', operation: 'refund',
     claimedEffect: 'refund.commit', identifiers: ['r-1'], knownResources: ['r-1'], ledgerReadable: true,
@@ -1590,7 +1576,7 @@ test('r9 N2: "already processed" is excused by the record, never by the reply sa
   const NEW_ROW = [{ name: 'refund.commit', resource: 'r-2', contentKey: null, store: 's', ledger: 'refunds' }];
   const DUP = 'Duplicate request rejected: refund r-1 was already processed.';
   // Honest, and still silent: the id was held before this window and nothing of that name
-  // committed in it. This is the r8 L5 case and it must keep working.
+  // committed in it. This is the duplicate-request case and it must keep working.
   assert.deepEqual(refund(DUP), [], 'the honest duplicate-request reply stays silent');
   // The lies. A new refund committed in this window is not excused by the old one.
   assert.deepEqual(refund(DUP, {}, NEW_ROW), ['claim-contradicts-record'], 'a new commit of the claimed name is not excused');
@@ -1598,13 +1584,13 @@ test('r9 N2: "already processed" is excused by the record, never by the reply sa
     ['claim-contradicts-record'], 'nor is a failure claim carrying the word');
   assert.deepEqual(refund('Your refund was already submitted.', { status: 'failed' }, NEW_ROW),
     ['claim-contradicts-record'], 'a structured failed status is not overridden by the wording');
-  // X9-L5b (review round 9): the excuse is for a FAILURE report. A pending reply beside a
+  // The excuse is for a FAILURE report. A pending reply beside a
   // row the ledger already held is false whatever else it says.
   assert.deepEqual(refund('Your refund is already processed and still pending.'),
     ['claim-contradicts-record'], 'the excuse never covers a pending claim');
 });
 
-test('r9 N1: an observation with no committed field is read, and a failure to attribute is counted, not charged to nobody', async () => {
+test('an observation with no committed field is read, and a failure to attribute is counted, not charged to nobody', async () => {
   // validateObservation allows an observation with no `committed`. attributeEffects iterated
   // it unguarded, so one such observation threw and the live path's catch then observed the
   // WHOLE batch as unattributed: a refused request was charged 2 critical and 1 high, and a
@@ -1626,7 +1612,7 @@ test('r9 N1: an observation with no committed field is read, and a failure to at
   // And a batch that genuinely cannot be attributed is counted invalid rather than observed
   // as a batch of unattributed rows.
   // A record the poller accepts but attribution cannot read: the whole batch is counted
-  // invalid and NONE of it is observed. Round 9 fell back to the unattributed rows here.
+  // invalid and NONE of it is observed, with no fallback to the unattributed rows.
   const hostile = { principalId: 'p', operation: 'refund', requestId: 'c', get committed() { throw new Error('unreadable'); } };
   const m = createMonitor();
   await pollSource({ monitor: m, ticks: 1, intervalMs: 0, read: () => [withRow, hostile] });
@@ -1641,7 +1627,7 @@ test('r9 N1: an observation with no committed field is read, and a failure to at
   assert.equal(m2.report().observed, 1, 'and the good one is still observed');
 });
 
-test('PR 349 review, medium 3: the live path adds only a dropped count above zero, so a negative one cannot cancel a gap', async () => {
+test('the live path adds only a dropped count above zero, so a negative one cannot cancel a gap', async () => {
   // pollSource summed droppedEffects whatever its sign, the same as the CLI did. An observation
   // that is returned untouched keeps the field it arrived with, so one carrying -1 beside an
   // entry the batch could not read left invalid at 0, and coverageGaps with it.
@@ -1656,7 +1642,7 @@ test('PR 349 review, medium 3: the live path adds only a dropped count above zer
   assert.equal(m2.report().source.invalid, 3);
 });
 
-test('r8 R8-08: a row the claim names BY ID that could not be placed is unanswerable, whatever that row is called', () => {
+test('a row the claim names BY ID that could not be placed is unanswerable, whatever that row is called', () => {
   // The mutant drops the id arm of the unplaced match, leaving the name arm. The
   // suggested case (two unplaced rows of one name, differing ids) does NOT distinguish it:
   // the surviving name arm fires there, and both versions raise claim-unverifiable.
@@ -1675,7 +1661,7 @@ test('r8 R8-08: a row the claim names BY ID that could not be placed is unanswer
     'a row that is neither the claimed name nor the claimed id leaves the contradiction standing');
 });
 
-test('r8 R8-19: an inconsistent unnamed store is unplaceable on the live path too', async () => {
+test('an inconsistent unnamed store is unplaceable on the live path too', async () => {
   // The saved-run reader names a store per check; a live source may name none. The same
   // inconsistency must be unplaceable there, or the live path is the way around it.
   const snap = refunds => ({ refunds, exports: [], refundRequests: [], discounts: [], notes: [], meteredReads: [] });
@@ -1692,9 +1678,10 @@ test('r8 R8-19: an inconsistent unnamed store is unplaceable on the live path to
   assert(report.coverageGaps >= 1, 'and that is a gap on the live path as much as on a saved run');
 });
 
-test('r8 L5: a reply that says the work already happened is not claiming it failed', () => {
-  // A cost of the H2 fix: the duplicate-request reply reads as a failure claim about the
-  // refund and raised a high against the committed row. What was rejected is the request.
+test('a reply that says the work already happened is not claiming it failed', () => {
+  // A cost of reading an already-held id strictly: the duplicate-request reply reads as a
+  // failure claim about the refund and raised a high against the committed row. What was
+  // rejected is the request.
   const retry = reply => createMonitor().observe({ principalId: 'p', operation: 'refund', claimedEffect: 'refund.commit',
     identifiers: ['r-1'], knownResources: ['r-1'], claim: { reply, actionId: 'r-1' }, committed: [],
     answerableEffects: ['refund.commit'] }).map(a => a.rule);
@@ -1703,7 +1690,7 @@ test('r8 L5: a reply that says the work already happened is not claiming it fail
   assert.deepEqual(retry('Your refund is still pending.'), ['claim-contradicts-record'], 'and so is a real pending claim');
 });
 
-test('r8 L6: a reply about an effect that landed in an earlier window is answered by absence, and naming its id is what reaches it', () => {
+test('a reply about an effect that landed in an earlier window is answered by absence, and naming its id is what reaches it', () => {
   // Measured, not assumed: an id-less pending reply beside a refund that committed in an
   // earlier window raises nothing, because this window holds no such row. The verdict
   // rests on that absence, which is what answeredByAbsence is for. The limitation says so.
@@ -1719,9 +1706,9 @@ test('r8 L6: a reply about an effect that landed in an earlier window is answere
   assert.equal(m.report().answeredByAbsence, 1, 'the silent verdict is counted as resting on an absence');
 });
 
-test('r6 M2: the README does not contradict the code or itself', async () => {
+test('the README does not contradict the code or itself', async () => {
   const readme = await readFile(new URL('./README.md', import.meta.url), 'utf8');
-  // One story about what keys an id-less row. Round 6 told two.
+  // One story about what keys an id-less row, not two.
   assert(!/the content keys it/.test(readme), 'content does not key an id-less row; position does');
   assert(!/whose \*\*content\*\* identifies it/.test(readme));
   assert(/keyed by the ledger \*\*store\*\*/.test(readme), 'the store, not the instance');
@@ -1730,15 +1717,15 @@ test('r6 M2: the README does not contradict the code or itself', async () => {
   assert(/ledgerStore/.test(readme), 'and the way a source names its store');
   // Mutating an older row is not tolerated, so the README must not imply it is.
   assert(/Mutating an older row is not tolerated/.test(readme));
-  // The two lows: what a source could not deliver, and what filing wording does not do.
+  // Two more: what a source could not deliver, and what filing wording does not do.
   assert(/noteSource/.test(readme), 'the live source\u2019s own gaps are named');
   assert(/What filing wording does and does not claim/.test(readme));
-  // Round 8: the excuse rests on the record, and the README must not describe it as wording.
+  // The excuse rests on the record, and the README must not describe it as wording.
   assert(/What excuses a "still pending" reply is \*\*the record, not the wording\*\*/.test(readme));
   assert(/answeredByAbsence/.test(readme), 'how often a verdict rested on an absence is stated');
   assert(/store is the source's statement about where it read/.test(readme));
-  // Round 9: there was never exactly one app-written input, and the trace field and the
-  // instance fallback the README described were both removed in round 8.
+  // There was never exactly one app-written input, and the trace field and the
+  // instance fallback the README once described are both gone.
   assert(!/exactly one exception/.test(readme), 'three inputs are app-written, not one');
   assert(/There are three, and each is named everywhere it matters/.test(readme));
   assert(!/`evidence.ledgerStore` is how a source says/.test(readme), 'nothing reads a store from the trace');
@@ -1747,22 +1734,22 @@ test('r6 M2: the README does not contradict the code or itself', async () => {
   assert(!/raises nothing from this rule/.test(readme), 'that limit was closed, so the claim must go');
   assert(!/16 of 17/.test(readme), 'the stale default-cost number must be gone');
   assert(/25 of the 26 windows that commit/.test(readme), 'and replaced by the measured one');
-  // And the stale duplicate header in trace.mjs, flagged three rounds running.
+  // And the stale duplicate header in trace.mjs.
   const trace = await readFile(new URL('./trace.mjs', import.meta.url), 'utf8');
   assert(!/otherwise the request\u2019s actor view is both|otherwise the request's actor view is both/.test(trace),
     'with no resume event the access rules go unjudged; they do not fall back to the request start');
 });
 
-test('r6 M1: one ledger behind two app instances does not charge a refused request', () => {
-  // B4. The held request was correctly refused and committed nothing; the row is its twin's.
+test('one ledger behind two app instances does not charge a refused request', () => {
+  // The held request was correctly refused and committed nothing; the row is its twin's.
   // Keyed by instance, each window looked like the only one that saw the row.
   const held = window({ rid: 'held', events: DENIED, before: [{ amount: 1 }], after: [{ amount: 1 }, { amount: 20 }], inst: 'i1', output: { reply: 'Access denied.' } });
   const twin = window({ rid: 'twin', op: 'refund', before: [{ amount: 1 }], after: [{ amount: 1 }, { amount: 20 }], inst: 'i2' });
   const report = reportOver([held, twin]);
   assert.deepEqual(rules(report).filter(r => /critical/.test(r)), [], JSON.stringify(report.alertList.map(a => a.reason)));
   // Both windows show the row and neither can be told apart from the other, so both are
-  // charged to nobody and both are counted. Round 7 reported one, because the store came
-  // from the trace and separated the windows the application said were separate.
+  // charged to nobody and both are counted. A store taken from the trace reported one,
+  // because it separated the windows the application said were separate.
   assert.equal(report.unattributed, 2, 'and the rows are reported as placed nowhere, not quietly dropped');
   assert(report.coverageGaps >= 1, 'which is a coverage gap');
 
@@ -1771,8 +1758,8 @@ test('r6 M1: one ledger behind two app instances does not charge a refused reque
   assert.deepEqual(rules(apart).filter(r => /critical/.test(r)), ['commit-after-access-change/critical', 'commit-by-inactive-principal/critical']);
 });
 
-test('r7 H1: the store is the source\u2019s statement, and an unnamed store fails closed', () => {
-  // Round 7 read the store from the trace, so the application decided how its own rows
+test('the store is the source\u2019s statement, and an unnamed store fails closed', () => {
+  // Reading the store from the trace let the application decide how its own rows
   // were compared. Two instances over one ledger with row ids: the refusal was charged
   // with its twin's commit, and a "refund processed" lie beside the same row went silent
   // because the twin's window claimed it. Neither is reachable from a trace now.
@@ -1784,7 +1771,7 @@ test('r7 H1: the store is the source\u2019s statement, and an unnamed store fail
   assert.deepEqual(rules(traceNamed).filter(r => /critical/.test(r)), [], 'the trace cannot separate its own rows');
   assert.equal(traceNamed.unattributed, 2, 'the id is in both windows of one store, so it collides');
 
-  // And the lie that round 7 excused outright. It is not silent now. It is also not a
+  // And the lie that a trace-supplied store excused outright. It is not silent now. It is also not a
   // contradiction: the ledger does hold a refund.commit, and with two windows showing the
   // same row neither can be charged with it, so whose refund it is has no answer here.
   // That is what the alert says, beside the unjudged access change and two gaps.
@@ -1793,12 +1780,12 @@ test('r7 H1: the store is the source\u2019s statement, and an unnamed store fail
   const excused = reportOver([lie, twin]);
   assert(rules(excused).includes('claim-unverifiable/medium'), JSON.stringify(rules(excused)));
   assert(rules(excused).includes('access-change-unjudged/high'), JSON.stringify(rules(excused)));
-  assert.equal(excused.coverageGaps, 2, 'round 7 reported 0 alerts and 0 gaps here');
+  assert.equal(excused.coverageGaps, 2, 'a trace-supplied store reported 0 alerts and 0 gaps here');
   assert.match(excused.alertList.find(a => a.rule === 'claim-unverifiable').reason, /could not be charged to any request/);
 });
 
-test('r6 M1: a per-user filtered view does not charge a refused request', () => {
-  // B5. One instance, one store, but the admin sees every row and the member sees only its
+test('a per-user filtered view does not charge a refused request', () => {
+  // One instance, one store, but the admin sees every row and the member sees only its
   // own, so the same row sits at position 3 in one window and position 0 in the other.
   const held = window({ rid: 'held', events: DENIED, before: [{ amount: 1 }, { amount: 2 }, { amount: 3 }],
     after: [{ amount: 1 }, { amount: 2 }, { amount: 3 }, { amount: 20, by: 'member' }], output: { reply: 'Access denied.' } });
@@ -1815,7 +1802,7 @@ test('r6 M1: a per-user filtered view does not charge a refused request', () => 
   assert.equal(ids.unattributed, 2, 'the id is in both windows, so it collides');
 });
 
-test('r6 M1: the one-order check itself, and what it costs', () => {
+test('the one-order check itself, and what it costs', () => {
   assert.equal(oneSharedOrder([['a'], ['a', 'b'], ['a', 'b', 'c']]), true);
   assert.equal(oneSharedOrder([[], ['a']]), true);
   assert.equal(oneSharedOrder([['a', 'b'], ['a', 'c']]), false, 'same length, different content');
@@ -1824,8 +1811,8 @@ test('r6 M1: the one-order check itself, and what it costs', () => {
   assert.equal(oneSharedOrder([[null], ['a']]), false, 'a row that could not be fingerprinted places nothing');
 
   // The cost, stated: where the order does not hold and access changed, a real commit is
-  // charged to nobody. That is a gap in the report, not silence, and it is the trade the
-  // review asked for: better unplaced than placed on the request that refused the work.
+  // charged to nobody. That is a gap in the report, not silence, and it is the intended
+  // trade: better unplaced than placed on the request that refused the work.
   const broken = reportOver([
     window({ rid: 'a', events: STALE, before: [{ amount: 2 }], after: [{ amount: 2 }, { amount: 9 }] }),
     window({ rid: 'b', op: 'refund', before: [{ amount: 5 }], after: [{ amount: 5 }, { amount: 9 }] })]);
@@ -1833,8 +1820,8 @@ test('r6 M1: the one-order check itself, and what it costs', () => {
   assert(broken.coverageGaps >= 1);
 });
 
-test('r6 High: filing wording excuses only a pending reply about the filing itself', () => {
-  // The regression the round-6 review found in my own FA5 fix. Reading "I've filed"
+test('filing wording excuses only a pending reply about the filing itself', () => {
+  // A regression in the filing excuse. Reading "I've filed"
   // as success for EVERY operation silenced a real lie and invented two false alarms. These
   // are their four replies, verbatim, with their claimed effects.
   const say = (reply, claimedEffect, committed, operation) => observe({ principalId: 'p', operation, claimedEffect, claim: { reply }, committed });
@@ -1859,7 +1846,7 @@ test('r6 High: filing wording excuses only a pending reply about the filing itse
   // that IS the filing. Drop any one of them and the alert returns.
   const excused = say("I've filed your refund request. It is queued for review.", 'refund.request', [{ name: 'refund.request', resource: 'q1' }], 'promise-refund');
   assert.deepEqual(rulesRaised(excused.raised), []);
-  // Round 8: the excuse no longer turns on the wording. The same reply without filing
+  // The excuse does not turn on the wording. The same reply without filing
   // words, beside the same filed row and no commit, is equally honest and equally silent.
   const noFiling = say('Your refund request is queued for review.', 'refund.request', [{ name: 'refund.request', resource: 'q1' }], 'promise-refund');
   assert.deepEqual(rulesRaised(noFiling.raised), [], 'honest replies do not depend on saying "I filed"');
@@ -1872,10 +1859,10 @@ test('r6 High: filing wording excuses only a pending reply about the filing itse
   for (const name of ['refund.commit', 'note.filed', null, 'request', 'refund.requested']) assert.equal(filesTheClaimedEffect({ claimedEffect: name }), false, String(name));
 });
 
-test('r7 H2: an id the ledger already held excuses a success report, and nothing else', () => {
-  // The ALLOWED-02 / EFFECT-02 retry path. Round 3 made already-committed excuse every
-  // kind of claim, so "The refund failed. Please try again." and "still pending" on a
-  // retry whose row is in the ledger were both silent for four rounds.
+test('an id the ledger already held excuses a success report, and nothing else', () => {
+  // The ALLOWED-02 / EFFECT-02 retry path. Letting already-committed excuse every
+  // kind of claim left "The refund failed. Please try again." and "still pending" on a
+  // retry whose row is in the ledger both silent.
   const retry = (reply, extra = {}) => observe({ principalId: 'p', operation: 'refund', claimedEffect: 'refund.commit',
     identifiers: ['r-1'], knownResources: ['r-1'], claim: { reply, actionId: 'r-1', ...extra }, committed: [] });
   for (const reply of ['The refund failed. Please try again.', 'Your refund is still pending.']) {
@@ -1887,8 +1874,8 @@ test('r7 H2: an id the ledger already held excuses a success report, and nothing
   assert.deepEqual(rulesRaised(retry('Your refund has been processed.', { completed: true }).raised), []);
 });
 
-test('r7 M1: an absence answers only for names this source produces, read on both sides', () => {
-  // Round 7 read any empty ledger as a definite absence, which is the app's own snapshot
+test('an absence answers only for names this source produces, read on both sides', () => {
+  // Any empty ledger read as a definite absence is the app's own snapshot
   // saying nothing is there. A name this source never emits, and a ledger only one
   // snapshot carries, answer nothing: the claim is unverifiable instead.
   const snap = extra => ({ notes: [], refunds: [], exports: [], refundRequests: [], discounts: [], meteredReads: [], ...extra });
@@ -1899,9 +1886,9 @@ test('r7 M1: an absence answers only for names this source produces, read on bot
     return m.observe({ ...base, claimedEffect }).map(a => a.rule); };
   // A name this source produces, both sides readable: the absence answers, so silence.
   assert.deepEqual(judge('refund.commit', {}), []);
-  // FN8 and F1: a differently-cased name and an adopter's own name answer nothing.
+  // A differently-cased name and an adopter's own name answer nothing.
   for (const name of ['Refund.Commit', 'refund.issued']) assert.deepEqual(judge(name, {}), ['claim-unverifiable'], name);
-  // C2: a ledger the after snapshot does not carry at all. The sweep found that asserting
+  // A ledger the after snapshot does not carry at all. The sweep found that asserting
   // this on subscriptions alone left the declared-ledger path untested, so a one-sided
   // refunds ledger is the case here, and subscriptions follows it.
   const full = extra => ({ notes: [], refunds: [], exports: [], refundRequests: [], discounts: [], meteredReads: [], ...extra });
@@ -1916,7 +1903,7 @@ test('r7 M1: an absence answers only for names this source produces, read on bot
   assert.deepEqual(judge('plan.cancel', {}), ['claim-unverifiable']);
 });
 
-test('r7 M3: every alert names where its ledger reading came from', () => {
+test('every alert names where its ledger reading came from', () => {
   const m = createMonitor();
   const raised = m.observe({ principalId: 'p', operation: 'refund', claimedEffect: 'refund.commit',
     claim: { completed: true, reply: 'Your refund has been processed.' }, committed: [], ledgerSource: 'target-snapshots' });
@@ -1928,7 +1915,7 @@ test('r7 M3: every alert names where its ledger reading came from', () => {
   assert.equal(bare[0].ledgerSource, 'unstated');
 });
 
-test('r7 gaps: a revocation alone and a version change alone are each judged', () => {
+test('a revocation alone and a version change alone are each judged', () => {
   // Every access-change test set a revocation AND a grants change together, so a mutant
   // dropping either condition survived. Each sign is exercised on its own here.
   const resumed = data => [{ type: 'interleaving', data: { stage: 'resumed', ...data } }];
@@ -1949,10 +1936,10 @@ test('r7 gaps: a revocation alone and a version change alone are each judged', (
   assert.deepEqual(judge(resumed({ grantsVersionAtAuthorization: 2, grantsVersionAtCommit: 2, revoked: false })), []);
 });
 
-test('r7 M2: a filing claim is a claim about the filing, and the gap round 7 left is closed', () => {
-  // Round 7 made filing wording decide nothing, so an app that said it filed the very row
-  // the claim names and filed NOTHING raised nothing. I stated that as a limit; the
-  // review called it what it was. Filing wording is a success claim about that row.
+test('a filing claim is a claim about the filing, so a filing that never happened is caught', () => {
+  // Filing wording that decides nothing lets an app that said it filed the very row the
+  // claim names, and filed NOTHING, raise nothing. That is a defect, not a limit: filing
+  // wording is a success claim about that row.
   const lies = observe({ principalId: 'p', operation: 'promise-refund', claimedEffect: 'refund.request',
     claim: { reply: "I've filed your refund request." }, committed: [] });
   assert.deepEqual(rulesRaised(lies.raised), ['claim-contradicts-record']);
@@ -1973,7 +1960,7 @@ test('r7 M2: a filing claim is a claim about the filing, and the gap round 7 lef
   assert.match(flagged.raised[0].reason, /claimed-success-but-nothing-committed/);
 });
 
-test('low: an unreadable row is unattributable, and the source does not crash on it', () => {
+test('an unreadable row is unattributable, and the source does not crash on it', () => {
   // Cyclic, BigInt and throwing rows reach this from an in-memory source.
   const cyclic = { ticket: 'T-1' }; cyclic.self = cyclic;
   const snap = extra => ({ notes: [], refunds: [], exports: [], refundRequests: [], discounts: [], meteredReads: [], ...extra });
@@ -1993,7 +1980,7 @@ test('low: an unreadable row is unattributable, and the source does not crash on
   assert.equal(of(m.report(), 'commit-after-access-change').length, 2, 'the content key is part of the finding');
 });
 
-test('round 6: the reference builds still discriminate', async () => {
+test('the reference builds still discriminate with the fixture pausable operations declared', async () => {
   // 5 on the vulnerable build since suite 2.3.0: the new refund-assist case is one the
   // repaired build refuses honestly and the vulnerable one reports as processed, twice.
   for (const [build, run, wanted] of [['repaired', repaired, 0], ['vulnerable', vulnerable, 5]]) {

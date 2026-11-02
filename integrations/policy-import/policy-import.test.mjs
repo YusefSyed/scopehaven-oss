@@ -289,7 +289,7 @@ const owuiMatrix = async () => importOpenWebUi({ id: 'export.json', content: awa
 // Confirmation re-drafts from the matrix and binding, so tests pass both.
 const confirmWith = async (draft, profile, options) => confirmDraft(draft, profile, { matrix: await owuiMatrix(), binding: binding(), ...options });
 
-// Captured from original draft.mjs at 026fd297, before the M1 guard. These pins
+// Captured from the original draft.mjs, before the bound-write guard. These pins
 // cover both allow and deny; the legacy write drafts were also confirmed there.
 const boundActionCases = [
   { layer: RLS_LAYER, read: 'SELECT', readDraftId: 'b2b07c00b9d0f8f972ae025955606a2a1a7caddb5896ef34c24d95a4db1de56d',
@@ -324,7 +324,7 @@ const legacyBoundDraft = (matrix, binding, draftId) => ({ schema: DRAFT_SCHEMA, 
     requestKind: 'bound', basis: c.basis, citations: c.citations })), notDrafted: [], warnings: [], draftId });
 
 for (const { layer, read, readDraftId, readCheckIds, writes } of boundActionCases) {
-  test(`M1 bound-write: ${layer} rejects every allow/deny write action bound to GET`, () => {
+  test(`bound-write: ${layer} rejects every allow/deny write action bound to GET`, () => {
     for (const action of Object.keys(writes)) {
       const matrix = boundActionMatrix(layer, action), draft = draftChecks(matrix, boundActionBinding(action));
       assert.deepEqual(draft.checks, [], action);
@@ -335,7 +335,7 @@ for (const { layer, read, readDraftId, readCheckIds, writes } of boundActionCase
     }
   });
 
-  test(`M1 bound-write: ${layer} preserves the original read draft and check IDs`, () => {
+  test(`bound-write: ${layer} preserves the original read draft and check IDs`, () => {
     // The original drafts came from scopehaven-policy-matrix/1 matrices, which every reader still takes.
     const matrix = asSchema1(boundActionMatrix(layer, read)), bound = boundActionBinding(read), draft = draftChecks(matrix, bound);
     assert.equal(draft.draftId, readDraftId);
@@ -350,7 +350,7 @@ for (const { layer, read, readDraftId, readCheckIds, writes } of boundActionCase
     assert.notEqual(now.matrixId, matrix.matrixId);
   });
 
-  test(`M1 bound-write: ${layer} preserves non-GET rejection reasons`, () => {
+  test(`bound-write: ${layer} preserves non-GET rejection reasons`, () => {
     for (const action of [read, ...Object.keys(writes)]) for (const method of ['POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'TRACE']) {
       const matrix = boundActionMatrix(layer, action), draft = draftChecks(matrix, boundActionBinding(action, method));
       assert.deepEqual(draft.checks, [], `${action} ${method}`);
@@ -360,7 +360,7 @@ for (const { layer, read, readDraftId, readCheckIds, writes } of boundActionCase
     }
   });
 
-  test(`M1 bound-write: ${layer} cannot confirm any original sealed write-to-GET draft`, () => {
+  test(`bound-write: ${layer} cannot confirm any original sealed write-to-GET draft`, () => {
     for (const [action, draftId] of Object.entries(writes)) {
       const matrix = asSchema1(boundActionMatrix(layer, action)), bound = boundActionBinding(action), legacy = legacyBoundDraft(matrix, bound, draftId);
       assert.equal(verifyDraftId(legacy), true, 'this is the sealed original fixture');
@@ -373,7 +373,7 @@ for (const { layer, read, readDraftId, readCheckIds, writes } of boundActionCase
   });
 }
 
-test('M1 bound-write: action names in another layer retain their existing drafting behavior', () => {
+test('bound-write: action names in another layer retain their existing drafting behavior', () => {
   for (const action of ['INSERT', 'UPDATE', 'DELETE', 'POST', 'PUT', 'PATCH', 'write']) {
     const draft = draftChecks(boundActionMatrix('synthetic-other-layer', action), boundActionBinding(action));
     assert.equal(draft.checks.length, 2);
@@ -382,7 +382,7 @@ test('M1 bound-write: action names in another layer retain their existing drafti
   }
 });
 
-test('M1 bound-write: the existing Open WebUI read/POST-binding draft keeps its original ID', async () => {
+test('bound-write: the existing Open WebUI read/POST-binding draft keeps its original ID', async () => {
   // Drafted, as originally, from the /1 matrix of this export (it has no gaps).
   assert.equal(draftChecks(asSchema1(await owuiMatrix()), binding()).draftId, '7124b11adbd097c5d568d482ecb96bd722da5d17e5a74fc262b3f70fee2cc085');
   assert.deepEqual(draftChecks(await owuiMatrix(), binding()).checks, draftChecks(asSchema1(await owuiMatrix()), binding()).checks);
@@ -534,9 +534,7 @@ test('CLI confirm writes nothing when the product validator rejects the resultin
   await assert.rejects(stat(join(dir, 'r.json')), /ENOENT/);
 });
 
-// ---- Review round 1 regressions (REVIEW-FINDINGS.md) ---------------------------------
-
-test('R1: turning RLS off or deleting a security requirement is a gated became-undeclared change', async t => {
+test('turning RLS off or deleting a security requirement is a gated became-undeclared change', async t => {
   const before = rls('alter table t enable row level security; create policy p on t for select to authenticated using (owner = auth.uid());');
   const after = rls('alter table t enable row level security; create policy p on t for select to authenticated using (owner = auth.uid()); alter table t disable row level security;');
   const d = diffMatrices(before, after);
@@ -549,14 +547,14 @@ test('R1: turning RLS off or deleting a security requirement is a gated became-u
   assert.equal(await main(['diff', join(dir, 'b.json'), join(dir, 'a.json')], { out: () => {} }), 1);
 });
 
-test('R2: a gap follows its table through RENAME and SET SCHEMA', () => {
+test('a gap follows its table through RENAME and SET SCHEMA', () => {
   const renamed = rls('alter table t enable row level security; create policy p on t for select to authenticated using (x = 1) garbage; alter table t rename to u;');
   assert.equal(cell(renamed, 'authenticated', 'public.u', 'SELECT').decision, 'unknown');
   const moved = rls('alter table t enable row level security; create policy p on t for select to authenticated using (x = 1) garbage; alter table t set schema app;');
   assert.equal(cell(moved, 'authenticated', 'app.t', 'SELECT').decision, 'unknown');
 });
 
-test('R3: confirmation re-derives GET, no body, id, title and assertions, so a recomputed draftId cannot smuggle a change', async () => {
+test('confirmation re-derives GET, no body, id, title and assertions, so a recomputed draftId cannot smuggle a change', async () => {
   const draft = draftChecks(await owuiMatrix(), binding());
   const reseal = d => { const { draftId, ...body } = d; return { ...body, draftId: createHashHex(body) }; };
   const forge = edit => { const d = structuredClone(draft); edit(d); return reseal(d); };
@@ -577,7 +575,7 @@ import { createHash } from 'node:crypto';
 import { canonical } from './matrix.mjs';
 const createHashHex = body => createHash('sha256').update(canonical(body)).digest('hex');
 
-test('R4: search_path is a list resolved in order; RESET and DEFAULT mean public; an unresolvable name is a gap', () => {
+test('search_path is a list resolved in order; RESET and DEFAULT mean public; an unresolvable name is a gap', () => {
   const listed = rls('alter table public.t enable row level security; set search_path to app, public; create policy p on t for select using (true);');
   assert.equal(cell(listed, 'anon', 'public.t', 'SELECT').decision, 'allow');
   assert.equal(listed.complete, true);
@@ -589,7 +587,7 @@ test('R4: search_path is a list resolved in order; RESET and DEFAULT mean public
   assert.equal(lost.complete, false);
 });
 
-test('R5: SET SCHEMA and ALTER SCHEMA RENAME move policies; DROP OWNED makes everything unknown', () => {
+test('SET SCHEMA and ALTER SCHEMA RENAME move policies; DROP OWNED makes everything unknown', () => {
   const moved = rls('create policy p on public.t for select using (true); alter table public.t set schema app; alter table app.t enable row level security;');
   assert.equal(cell(moved, 'anon', 'app.t', 'SELECT').decision, 'allow');
   const renamed = rls('create policy p on app.t for select using (true); alter schema app rename to core; alter table core.t enable row level security;');
@@ -598,7 +596,7 @@ test('R5: SET SCHEMA and ALTER SCHEMA RENAME move policies; DROP OWNED makes eve
   assert.ok(dropped.cells.every(c => c.decision === 'unknown'));
 });
 
-test('R6: role membership, BYPASSRLS and table owners are never guessed', () => {
+test('role membership, BYPASSRLS and table owners are never guessed', () => {
   const member = rls('alter table t enable row level security; create policy p on t for select to authenticated using (true); grant authenticated to editor;', { roles: ['anon', 'authenticated', 'editor'] });
   assert.equal(cell(member, 'editor', 'public.t', 'SELECT').decision, 'unknown');
   assert.equal(cell(member, 'anon', 'public.t', 'SELECT').decision, 'deny');
@@ -613,13 +611,13 @@ test('R6: role membership, BYPASSRLS and table owners are never guessed', () => 
   assert.equal(objectGrant.complete, true, 'object privileges are listed as not evaluated, not gaps');
 });
 
-test('R7: clauses out of PostgreSQL\'s order are a gap', () => {
+test('clauses out of PostgreSQL\'s order are a gap', () => {
   const m = rls('alter table t enable row level security; create policy p on t to authenticated for select using (true);');
   assert.equal(m.complete, false);
   assert.ok(m.cells.every(c => c.decision === 'unknown'));
 });
 
-test('R8: EXECUTE or policy text in a body is a gap; a comment or seed row mentioning RLS is not', () => {
+test('EXECUTE or policy text in a body is a gap; a comment or seed row mentioning RLS is not', () => {
   const concat = rls("alter table t enable row level security; do $$ begin execute 'create ' || 'pol' || 'icy p on t using (true)'; end $$;");
   assert.ok(concat.cells.every(c => c.decision === 'unknown'));
   assert.match(concat.gaps[0].reason, /catalog dump/);
@@ -629,13 +627,13 @@ test('R8: EXECUTE or policy text in a body is a gap; a comment or seed row menti
   assert.equal(called.complete, false);
 });
 
-test('R9: quoted names with dots get distinct keys', () => {
+test('quoted names with dots get distinct keys', () => {
   const m = rls('alter table "x.y".z enable row level security; create policy p on x."y.z" for select using (true);');
   assert.equal(cell(m, 'anon', '"x.y".z', 'SELECT').decision, 'deny');
   assert.equal(cell(m, 'anon', 'x."y.z"', 'SELECT').decision, 'undeclared');
 });
 
-test('R11: OpenAPI drafts use the server path, skip operations with their own servers, and never count 404', () => {
+test('OpenAPI drafts use the server path, skip operations with their own servers, and never count 404', () => {
   const doc = { openapi: '3.1.0', servers: [{ url: 'https://api.example.test/api/v1' }], components: { securitySchemes: { s: { type: 'http', scheme: 'bearer' } } },
     paths: { '/me': { get: { security: [{ s: [] }] } }, '/other': { servers: [{ url: '/x' }], get: { security: [{ s: [] }] } } } };
   const m = importOpenApi({ id: 'o.json', content: JSON.stringify(doc) }, { application: 'x', roleMap: { member: { s: [] } } });
@@ -649,7 +647,7 @@ test('R11: OpenAPI drafts use the server path, skip operations with their own se
   assert.throws(() => importOpenApi({ id: 'o.json', content: JSON.stringify(doc) }, { application: 'x', roleMap: { member: { s: true } } }), /roleMap/);
 });
 
-test('R12: explain refuses another target or application, and the CLI exits 0 only when everything is verified', async t => {
+test('explain refuses another target or application, and the CLI exits 0 only when everything is verified', async t => {
   const draft = draftChecks(await owuiMatrix(), binding());
   const { profile, record } = await confirmWith(draft, baseProfile(), { confirmedBy: 'Synthetic Reviewer' });
   const target = profile.targets[0];
@@ -670,7 +668,7 @@ test('R12: explain refuses another target or application, and the CLI exits 0 on
   assert.equal(await exit({ core: leaky, sha256: digest(leaky) }), 1);
 });
 
-test('R13: Open WebUI group data that is missing or malformed, or a malformed legacy field, is unknown', async () => {
+test('Open WebUI group data that is missing or malformed, or a malformed legacy field, is unknown', async () => {
   const data = JSON.parse(await fixture('openwebui-export.json'));
   const read = d => importOpenWebUi({ id: 'e.json', content: JSON.stringify(d) }, { application: 'owui' });
   const { groups, ...noGroups } = data;
@@ -705,9 +703,7 @@ test('Open WebUI: a write-only grant gives no read', async () => {
 });
 
 
-// ---- Review round 2 regressions (REVIEW-FINDINGS-R2.md) ---------------------------------
-
-test('R2-C1: confirm re-drafts from the matrix and binding, so a fully recomputed forgery is refused', async () => {
+test('confirm re-drafts from the matrix and binding, so a fully recomputed forgery is refused', async () => {
   const matrix = await owuiMatrix(), draft = draftChecks(matrix, binding());
   const reseal = d => { const { draftId, ...body } = d; return { ...body, draftId: createHashHex(body) }; };
   const i = draft.provenance.findIndex(p => p.role === 'carol' && p.resource === 'knowledge:kb-private' && p.action === 'read');
@@ -730,7 +726,7 @@ test('R2-C1: confirm re-drafts from the matrix and binding, so a fully recompute
   }
 });
 
-test('R2-C2: explain refuses a run of an edited profile and an edited record, and compares actor and path', async () => {
+test('explain refuses a run of an edited profile and an edited record, and compares actor and path', async () => {
   const draft = draftChecks(await owuiMatrix(), binding());
   const { profile, record } = await confirmWith(draft, baseProfile(), { confirmedBy: 'Synthetic Reviewer' });
   assert.equal(verifyRecord(record), true);
@@ -749,7 +745,7 @@ test('R2-C2: explain refuses a run of an edited profile and an edited record, an
   assert.throws(() => explainRun(exported, record, { profile }), /exported run no longer matches/);
 });
 
-test('R2-C3: a DO block or a called function is a gap; defining a function or commenting is not', () => {
+test('a DO block or a called function is a gap; defining a function or commenting is not', () => {
   for (const sql of ['do $$ begin grant authenticated to anon; end $$;', "do 'begin grant authenticated to anon; end';", "create function f() returns void language sql as 'create policy p on public.t for select using (true)'; select f();",
     "do $$ begin perform set_config('search_path','app',false); end $$;", 'do $$ begin alter table t rename to t_old; end $$;'])
     assert.ok(rls(`alter table t enable row level security; create policy p on t for select to authenticated using (true); ${sql}`).cells.every(c => c.decision === 'unknown'), sql);
@@ -759,13 +755,13 @@ test('R2-C3: a DO block or a called function is a gap; defining a function or co
   assert.equal(rls('create event trigger e on ddl_command_end execute function f(); alter table t enable row level security;').complete, false);
 });
 
-test('R2-C4: CREATE TABLE goes to the first schema in search_path, not an existing table further along', () => {
+test('CREATE TABLE goes to the first schema in search_path, not an existing table further along', () => {
   const m = rls('alter table public.t enable row level security; set search_path = app, public; create table t (id int); alter table t enable row level security; create policy p on t for select using (true);');
   assert.equal(cell(m, 'anon', 'app.t', 'SELECT').decision, 'allow');
   assert.equal(cell(m, 'anon', 'public.t', 'SELECT').decision, 'deny');
 });
 
-test('R2-I1: a release that adds open cells is gated', async () => {
+test('a release that adds open cells is gated', async () => {
   const before = rls('alter table t enable row level security;', { roles: ['anon'] });
   const after = rls('alter table t enable row level security; create policy p on t for select to editor using (true);', { roles: ['anon'] });
   const d = diffMatrices(before, after);
@@ -777,7 +773,7 @@ test('R2-I1: a release that adds open cells is gated', async () => {
   assert.equal(closed.gated, false, 'added deny cells are not gated');
 });
 
-test('R2-I2/I3/I5: role renames, REASSIGN OWNED, quoted search_path and SET LOCAL are handled; role settings are not gaps', () => {
+test('role renames, REASSIGN OWNED, quoted search_path and SET LOCAL are handled; role settings are not gaps', () => {
   const renamed = rls('alter table t enable row level security; create policy p on t for select to editor using (true); alter role editor rename to writer;', { roles: ['writer', 'anon'] });
   assert.equal(cell(renamed, 'writer', 'public.t', 'SELECT').decision, 'unknown');
   assert.equal(cell(renamed, 'anon', 'public.t', 'SELECT').decision, 'deny');
@@ -791,13 +787,13 @@ test('R2-I2/I3/I5: role renames, REASSIGN OWNED, quoted search_path and SET LOCA
   assert.equal(rls('create role reader in role authenticated; alter table t enable row level security;').complete, false);
 });
 
-test('R2-I4: an Open WebUI group without member_ids is unknown', async () => {
+test('an Open WebUI group without member_ids is unknown', async () => {
   const data = JSON.parse(await fixture('openwebui-export.json'));
   const m = importOpenWebUi({ id: 'e.json', content: JSON.stringify({ ...data, groups: [{ id: 'g-support' }] }) }, { application: 'owui' });
   assert.equal(cell(m, 'bob', 'knowledge:kb-support', 'read').decision, 'unknown');
 });
 
-test('R2-minor: statements PostgreSQL rejects, temp tables, unbalanced parentheses and ASCII-only case folding', () => {
+test('statements PostgreSQL rejects, temp tables, unbalanced parentheses and ASCII-only case folding', () => {
   for (const sql of ['alter table t rename to app.u;', 'create table u (id int); alter table t rename to u;', 'create table app.x (id int); drop schema app;', 'create policy p on t using (true); alter policy p on t rename to q extra;',
     'create policy p on t for insert with check (true); alter policy p on t using (true);', 'drop policy if exists p on t extra;', 'alter table t enable row level security extra;'])
     assert.equal(rls(`create table t (id int); alter table t enable row level security; ${sql}`).complete, false, sql);
@@ -810,7 +806,7 @@ test('R2-minor: statements PostgreSQL rejects, temp tables, unbalanced parenthes
   assert.equal(rls("set search_path to 'a, b'; alter table t enable row level security;").complete, false);
 });
 
-test('R2-minor: malformed OpenAPI and Open WebUI inputs become gaps instead of throwing; role labels cannot collide', async () => {
+test('malformed OpenAPI and Open WebUI inputs become gaps instead of throwing; role labels cannot collide', async () => {
   const doc = { openapi: '3.0.0', components: { securitySchemes: { s: { type: 'http', scheme: 'bearer' }, anonymous: { type: 'http', scheme: 'bearer' } } },
     paths: { '/a': { get: { security: [{ s: { length: 1 } }] } }, '/b': { get: { security: [{ anonymous: [] }] } }, '/c': { get: { security: 'bad' } } }, servers: [{ url: 'v1' }] };
   const m = importOpenApi({ id: 'o.json', content: JSON.stringify(doc) }, { application: 'x' });
@@ -828,9 +824,7 @@ test('R2-minor: malformed OpenAPI and Open WebUI inputs become gaps instead of t
   assert.equal(cell(dupRes, 'alice', 'knowledge:kb-private', 'read').decision, 'unknown');
 });
 
-// ---- Review round 3 regressions (REVIEW-FINDINGS-R3.md) ---------------------------------
-
-test('R3-K1: any CASCADE is a gap (it can drop dependent policies); DROP POLICY and TRUNCATE CASCADE are not', () => {
+test('any CASCADE is a gap (it can drop dependent policies); DROP POLICY and TRUNCATE CASCADE are not', () => {
   const base = 'create table t (id int, tenant_id int); alter table t enable row level security; create policy open on t for select using (true); create policy r on t as restrictive for select using (tenant_id = app_tenant());';
   for (const sql of ['drop function app_tenant() cascade;', 'alter table t drop column tenant_id cascade;', 'drop type tier cascade;', 'drop schema private cascade;', 'drop table b cascade;'])
     assert.ok(rls(`${base} ${sql}`).cells.every(c => c.decision === 'unknown'), sql);
@@ -838,7 +832,7 @@ test('R3-K1: any CASCADE is a gap (it can drop dependent policies); DROP POLICY 
   assert.equal(rls(`${base} truncate t cascade;`).complete, true);
 });
 
-test('R3-I1: calling a function these files define is a gap wherever the call runs; defining or triggering a built-in is not', () => {
+test('calling a function these files define is a gap wherever the call runs; defining or triggering a built-in is not', () => {
   const f = "create function f() returns int language plpgsql as $$ begin execute 'create policy sneaky on public.t for select using (true)'; return 1; end $$; alter table t enable row level security;";
   for (const sql of ['with x as (select f() as v) select v from x;', 'insert into log values (f());', '(select f());', 'values (f());', 'create table t2 as select f();', 'prepare p as select 1; execute p;',
     'create table log (id int); create trigger tr after insert on log for each row execute function f(); insert into log values (1);',
@@ -851,7 +845,7 @@ test('R3-I1: calling a function these files define is a gap wherever the call ru
   assert.equal(rls(`${f} create table log (id int); create trigger tr after insert on log for each row execute function f(); insert into other values (1);`).complete, true, 'a write to another table fires nothing');
 });
 
-test('R3-I2: explain survives a later confirmation into the same profile, and still refuses an edited confirmed check or actor', async () => {
+test('explain survives a later confirmation into the same profile, and still refuses an edited confirmed check or actor', async () => {
   const draft = draftChecks(await owuiMatrix(), binding());
   const { profile, record } = await confirmWith(draft, baseProfile(), { confirmedBy: 'Synthetic Reviewer' });
   const later = structuredClone(profile);
@@ -867,7 +861,7 @@ test('R3-I2: explain survives a later confirmation into the same profile, and st
   assert.throws(() => explainRun(run, record), /needs the profile/);
 });
 
-test('R3-I3: PostgREST refusal by table privilege is its own mode', async () => {
+test('PostgREST refusal by table privilege is its own mode', async () => {
   const m = rls('alter table staff enable row level security; create policy r on staff for select to authenticated using (true);');
   const draft = draftChecks(m, { schema: BINDING_SCHEMA, targetId: 'sb', actors: { anon: 'anonymous', authenticated: 'member' }, postgrest: { basePath: '/rest/v1', refusal: 'privilege' } });
   const deny = draft.checks.find(c => c.id === checkIdFor({ role: 'anon', resource: 'public.staff', action: 'SELECT', decision: 'deny' }));
@@ -878,7 +872,7 @@ test('R3-I3: PostgREST refusal by table privilege is its own mode', async () => 
   assert.throws(() => draftChecks(m, { schema: BINDING_SCHEMA, targetId: 'sb', actors: {}, postgrest: { basePath: '/rest/v1', refusal: 'maybe' } }), /refusal/);
 });
 
-test('R3-I4/I5: a rename that drops RLS, a new table without RLS, and a changed function body all show in the diff', () => {
+test('a rename that drops RLS, a new table without RLS, and a changed function body all show in the diff', () => {
   const renamed = diffMatrices(rls('alter table secrets enable row level security;'), rls('alter table secrets enable row level security; alter table secrets rename to vault; alter table vault disable row level security;'));
   assert.equal(renamed.gated, true);
   assert.equal(diffMatrices(rls('alter table t enable row level security;'), rls('alter table t enable row level security; create table u (id int);')).gated, true);
@@ -887,7 +881,7 @@ test('R3-I4/I5: a rename that drops RLS, a new table without RLS, and a changed 
   assert.ok(d.changes.some(c => c.kind === 'conditions-changed'), JSON.stringify(d.counts));
 });
 
-test('R3-minor: search_path edge cases, BEGIN ATOMIC, schema elements, rename collisions and temp tables', () => {
+test('search_path edge cases, BEGIN ATOMIC, schema elements, rename collisions and temp tables', () => {
   const two = rls("select set_config('application_name', 'x', false), set_config('search_path', 'app', false); alter table t enable row level security; create policy p on t for select using (true);");
   assert.equal(cell(two, 'anon', 'app.t', 'SELECT').decision, 'allow');
   assert.equal(rls("select set_config('search_path', 'app', 'true'); alter table t enable row level security;").complete, false);
@@ -904,7 +898,7 @@ test('R3-minor: search_path edge cases, BEGIN ATOMIC, schema elements, rename co
   assert.ok(rls('alter table t enable row level security;').assumptions.some(a => /catalog dump of the migrated test database is the authoritative input/.test(a)));
 });
 
-test('R3-design: confirmation records a warning when the matrix names another application', async () => {
+test('confirmation records a warning when the matrix names another application', async () => {
   const draft = draftChecks(await owuiMatrix(), binding());
   const other = baseProfile(); other.targets[0].applicationId = 'sb';
   const { record } = await confirmWith(draft, other, { confirmedBy: 'x' });
@@ -912,16 +906,14 @@ test('R3-design: confirmation records a warning when the matrix names another ap
 });
 
 
-// ---- Review round 4 regressions (REVIEW-FINDINGS-R4.md) ---------------------------------
-
-test('R4-C1: a "case" label inside BEGIN ATOMIC does not swallow the file; an unclosed body is a gap', () => {
+test('a "case" label inside BEGIN ATOMIC does not swallow the file; an unclosed body is a gap', () => {
   const files = [{ id: '1.sql', content: 'create table t (id int); alter table t enable row level security;', kind: 'sql' },
     { id: '2.sql', content: 'create table ev (id int, "case" int); create function g() returns int language sql begin atomic select e.case from ev e; end; create policy open on t for select using (true);', kind: 'sql' }];
   assert.equal(cell(importRls(files, { application: 'app', roles: ['anon'] }), 'anon', 'public.t', 'SELECT').decision, 'allow');
   assert.equal(rls('create table t (id int); alter table t enable row level security; create function g() returns int language sql begin atomic select 1; create policy open on t for select using (true);').complete, false);
 });
 
-test('R4-C2: the diff sees a widening between two unknown cells', () => {
+test('the diff sees a widening between two unknown cells', () => {
   const before = rls('alter table t enable row level security; do $$ begin null; end $$;');
   const after = rls('alter table t enable row level security; do $$ begin null; end $$; create policy anyone on t for select using (true);');
   const d = diffMatrices(before, after);
@@ -929,7 +921,7 @@ test('R4-C2: the diff sees a widening between two unknown cells', () => {
   assert.equal(d.gated, true);
 });
 
-test('R4-FP: foreign-key actions, statements that only name a function, views and indexes are not gaps', () => {
+test('foreign-key actions, statements that only name a function, views and indexes are not gaps', () => {
   const f = 'create function is_admin() returns boolean language sql as $$ select true $$;';
   for (const sql of ['create table child (id int, parent_id int references t(id) on delete cascade on update cascade);', 'alter table t add constraint fk foreign key (id) references t(id) on delete cascade;',
     `${f} alter function is_admin() owner to postgres;`, `${f} alter function is_admin() set search_path = '';`, `${f} grant all on function is_admin() to authenticated;`, `${f} revoke execute on function is_admin() from anon;`,
@@ -938,7 +930,7 @@ test('R4-FP: foreign-key actions, statements that only name a function, views an
     assert.equal(rls(`create table t (id int); alter table t enable row level security; ${sql}`).complete, true, sql);
 });
 
-test('R4-I1: CTAS forms, renamed trigger tables, TRUNCATE triggers, ALTER TABLE expressions and trigger WHEN clauses are gaps', () => {
+test('CTAS forms, renamed trigger tables, TRUNCATE triggers, ALTER TABLE expressions and trigger WHEN clauses are gaps', () => {
   const f = "create function f() returns int language plpgsql as $$ begin execute 'create policy sneaky on public.t for select using (true)'; return 1; end $$; create table t (id int); alter table t enable row level security;";
   for (const sql of ['create table t2 as with x as (select f() as v) select v from x;', 'create table t2 as values (f());', 'create table t2 as (select f());', 'create materialized view mv as select f();',
     'create table log (id int); create trigger tr after insert on log for each row execute function f(); alter table log rename to log2; insert into log2 values (1);',
@@ -949,7 +941,7 @@ test('R4-I1: CTAS forms, renamed trigger tables, TRUNCATE triggers, ALTER TABLE 
   assert.ok(rls('alter table t enable row level security;').assumptions.some(a => /attribute notation or operators/.test(a)), 'what replay does not follow is stated');
 });
 
-test('R4-I5: helpers, overloads, quoted names and function attributes are part of a condition', () => {
+test('helpers, overloads, quoted names and function attributes are part of a condition', () => {
   const policy = 'alter table t enable row level security; create policy p on t for select using (is_member(org_id));';
   const helper = body => rls(`create function has_role(r text) returns boolean language sql as $$ ${body} $$; create function is_member(o uuid) returns boolean language sql as $$ select has_role('member') $$; ${policy}`);
   assert.ok(diffMatrices(helper('select false'), helper('select true')).changes.some(c => c.kind === 'conditions-changed'));
@@ -961,13 +953,13 @@ test('R4-I5: helpers, overloads, quoted names and function attributes are part o
   assert.ok(diffMatrices(attr('security invoker'), attr('security definer')).changes.some(c => c.kind === 'conditions-changed'));
 });
 
-test('R4-temp: ON COMMIT DROP and DISCARD end a temporary table', () => {
+test('ON COMMIT DROP and DISCARD end a temporary table', () => {
   const base = 'create table t (id int); alter table t enable row level security;';
   assert.equal(cell(rls(`${base} begin; create temp table t (id int) on commit drop; commit; alter table t disable row level security;`), 'anon', 'public.t', 'SELECT').decision, 'undeclared');
   assert.equal(cell(rls(`${base} create temp table t (id int); discard temp; alter table t disable row level security;`), 'anon', 'public.t', 'SELECT').decision, 'undeclared');
 });
 
-test('R4-catalog: a dump with owners, roles, memberships and functions decides what replay leaves unknown', () => {
+test('a dump with owners, roles, memberships and functions decides what replay leaves unknown', () => {
   const dump = { tables: [{ schemaname: 'public', tablename: 't', rowsecurity: true, forcerowsecurity: false }, { schemaname: 'public', tablename: 'f', rowsecurity: true, forcerowsecurity: true }],
     policies: [{ schemaname: 'public', tablename: 't', policyname: 'auth read', permissive: 'PERMISSIVE', roles: '{authenticated}', cmd: 'SELECT', qual: 'is_member(org_id)', with_check: null }],
     owners: [{ schemaname: 'public', tablename: 't', owner: 'app_owner' }, { schemaname: 'public', tablename: 'f', owner: 'app_owner' }],
@@ -985,7 +977,7 @@ test('R4-catalog: a dump with owners, roles, memberships and functions decides w
   assert.ok(diffMatrices(m, changed).changes.some(c => c.kind === 'conditions-changed'));
 });
 
-test('R4-record: explain refuses a profile whose origin or context changed after confirmation', async () => {
+test('explain refuses a profile whose origin or context changed after confirmation', async () => {
   const draft = draftChecks(await owuiMatrix(), binding());
   const { profile, record } = await confirmWith(draft, baseProfile(), { confirmedBy: 'x' });
   const moved = structuredClone(profile); moved.targets[0].origin = 'http://127.0.0.1:4999';
@@ -993,9 +985,7 @@ test('R4-record: explain refuses a profile whose origin or context changed after
   assert.throws(() => explainRun(run, record, { profile: moved }), /origin or context changed/);
 });
 
-// ---- 2026-10-16 security scan (F1, F2) ------------------------------------------
-
-test('SEC-F1: in a catalog dump a member of the owning role skips RLS like the owner; FORCE and a non-member keep their policies', () => {
+test('in a catalog dump a member of the owning role skips RLS like the owner; FORCE and a non-member keep their policies', () => {
   const role = rolname => ({ rolname, rolbypassrls: false, rolsuper: false, rolinherit: true });
   const dump = members => ({ tables: [{ schemaname: 'public', tablename: 'docs', rowsecurity: true, forcerowsecurity: false }, { schemaname: 'public', tablename: 'forced', rowsecurity: true, forcerowsecurity: true }],
     policies: ['docs', 'forced'].map(tablename => ({ schemaname: 'public', tablename, policyname: 'tenant only', permissive: 'PERMISSIVE', roles: '{authenticated}', cmd: 'ALL', qual: 'tenant_id = 1', with_check: null })),
@@ -1022,7 +1012,7 @@ test('SEC-F1: in a catalog dump a member of the owning role skips RLS like the o
   assert.equal(cell(mixed([]), 'authenticated', 'public.docs', 'SELECT').decision, 'conditional', 'without the membership the policies decide');
 });
 
-test('SEC-F2: a statement with a U&"..." name or U&\'...\' string is a gap on every table, so a policy on it never lands on a phantom table', () => {
+test('a statement with a U&"..." name or U&\'...\' string is a gap on every table, so a policy on it never lands on a phantom table', () => {
   const base = 'create table docs (tenant_id int); alter table docs enable row level security; create policy tenant_only on docs for select to authenticated using (tenant_id = 1);';
   const before = rls(base);
   assert.equal(cell(before, 'authenticated', 'public.docs', 'SELECT').decision, 'conditional');
@@ -1052,8 +1042,8 @@ test('SEC-F2: a statement with a U&"..." name or U&\'...\' string is a gap on ev
   assert.deepEqual(cell(readable, 'authenticated', 'public.docs', 'UPDATE').conditions, ['permissive using: menu & mask = 1 [masked]', 'permissive check: menu & mask = 1 [masked]']);
 });
 
-// #350 review (major 1): PostgreSQL 16+ sets inheritance per grant, so a NOINHERIT role between a role and the owner can pass it on.
-test('SEC-F1b: inheritance is read per grant; a role reached only by SET ROLE, or through a grant the dump cannot show, makes the cells it decides unknown', () => {
+// PostgreSQL 16+ sets inheritance per grant, so a NOINHERIT role between a role and the owner can pass it on.
+test('inheritance is read per grant; a role reached only by SET ROLE, or through a grant the dump cannot show, makes the cells it decides unknown', () => {
   assert.match(CATALOG_DUMP_SQL, /'inherit', \(to_jsonb\(a\)->>'inherit_option'\)::boolean, 'set', \(to_jsonb\(a\)->>'set_option'\)::boolean/);
   const role = (rolname, rolinherit = true) => ({ rolname, rolbypassrls: false, rolsuper: false, rolinherit });
   const dump = members => ({ tables: [{ schemaname: 'public', tablename: 'docs', rowsecurity: true, forcerowsecurity: false }],
@@ -1102,8 +1092,8 @@ test('SEC-F1b: inheritance is read per grant; a role reached only by SET ROLE, o
   assert.equal(cell(read(withBypasser([{ role: 'bypasser', member: 'authenticated', inherit: true, set: true }])), 'anon', 'public.docs', 'SELECT').decision, 'deny', 'only the member is unknown');
 });
 
-// #350 review (F8): where a '...' string ends depends on standard_conforming_strings.
-test('SEC-F8: standard_conforming_strings set other than on, or a quote after an odd run of backslashes in a \'...\' string, is a gap on every table', () => {
+// Where a '...' string ends depends on standard_conforming_strings.
+test('standard_conforming_strings set other than on, or a quote after an odd run of backslashes in a \'...\' string, is a gap on every table', () => {
   const base = 'create table docs (tenant_id int); alter table docs enable row level security; create policy tenant_only on docs for select to authenticated using (tenant_id = 1);';
   const before = rls(base);
   assert.ok(before.assumptions.some(a => /standard_conforming_strings on/.test(a)), 'replay states how it reads strings');
@@ -1131,8 +1121,8 @@ test('SEC-F8: standard_conforming_strings set other than on, or a quote after an
   }
 });
 
-// #350 final review (majors 1 and 2): a NOINHERIT matrix role and RESTRICTIVE policies; roles a role can grant itself.
-test('SEC-F1c: a NOINHERIT matrix role\'s unflagged grants are unsure (RESTRICTIVE included); WITH ADMIN and pre-16 CREATEROLE reach roles like SET ROLE', () => {
+// A NOINHERIT matrix role and RESTRICTIVE policies; roles a role can grant itself.
+test('a NOINHERIT matrix role\'s unflagged grants are unsure (RESTRICTIVE included); WITH ADMIN and pre-16 CREATEROLE reach roles like SET ROLE', () => {
   for (const exported of [/'admin', a\.admin_option\)/, /'rolcreaterole', rolcreaterole\)/, /'server_version_num', current_setting\('server_version_num'\)::int/]) assert.match(CATALOG_DUMP_SQL, exported);
   const role = (rolname, extra = {}) => ({ rolname, rolbypassrls: false, rolsuper: false, rolinherit: true, rolcreaterole: false, ...extra });
   const docs = (owner, policies) => ({ tables: [{ schemaname: 'public', tablename: 'docs', rowsecurity: true, forcerowsecurity: false }],
@@ -1166,8 +1156,8 @@ test('SEC-F1c: a NOINHERIT matrix role\'s unflagged grants are unsure (RESTRICTI
   assert.equal(at(supers).decision, 'conditional');
 });
 
-// #350 final review (major 3): client_encoding decides which bytes are a backslash or a quote.
-test('SEC-F9: client_encoding set other than UTF8 (SET, SET NAMES, SET LOCAL, set_config, ALTER ROLE or DATABASE) is a gap on every table', () => {
+// client_encoding decides which bytes are a backslash or a quote.
+test('client_encoding set other than UTF8 (SET, SET NAMES, SET LOCAL, set_config, ALTER ROLE or DATABASE) is a gap on every table', () => {
   const base = 'create table docs (tenant_id int); alter table docs enable row level security; create policy tenant_only on docs for select to authenticated using (tenant_id = 1);';
   const before = rls(base);
   assert.ok(before.assumptions.some(a => /client_encoding UTF8/.test(a)), 'replay states the encoding it reads');
@@ -1179,7 +1169,7 @@ test('SEC-F9: client_encoding set other than UTF8 (SET, SET NAMES, SET LOCAL, se
     assert.ok(after.gaps.some(g => g.scope === '*' && /client_encoding/.test(g.reason)), sql);
     assert.equal(diffMatrices(before, after).gated, true, sql);
   }
-  // Round 3: parameter names are case-insensitive, quoted or not; set_config takes a dollar-quoted name, or any expression.
+  // Parameter names are case-insensitive, quoted or not; set_config takes a dollar-quoted name, or any expression.
   for (const [sql, reason] of [[`SET "CLIENT_ENCODING" = 'SJIS';\n${hidden}`, /client_encoding/], [`SET "Client_Encoding" TO 'SJIS';\n${hidden}`, /client_encoding/],
     [`ALTER ROLE authenticator SET "CLIENT_ENCODING" = 'SJIS';`, /client_encoding/], [`select set_config($$client_encoding$$, 'SJIS', false);\n${hidden}`, /client_encoding/],
     [`select set_config('client' || '_encoding', 'SJIS', false);\n${hidden}`, /set_config with a setting name/],
@@ -1198,8 +1188,8 @@ test('SEC-F9: client_encoding set other than UTF8 (SET, SET NAMES, SET LOCAL, se
     assert.equal(rls(`${base}\n${sql}`).complete, true, sql);
 });
 
-// #350 final review (minor): pg_dump 17.6+ brackets its output in \restrict <key> ... \unrestrict <key>.
-test('SEC-M4: exactly pg_dump\'s \\restrict and \\unrestrict pair (one key, first and last) is skipped; any other backslash command is a gap', () => {
+// pg_dump 17.6+ brackets its output in \restrict <key> ... \unrestrict <key>.
+test('exactly pg_dump\'s \\restrict and \\unrestrict pair (one key, first and last) is skipped; any other backslash command is a gap', () => {
   const body = ['SET client_encoding = \'UTF8\';', 'SET standard_conforming_strings = on;', "SELECT pg_catalog.set_config('search_path', '', false);",
     'CREATE TABLE public.docs (tenant_id integer);', 'ALTER TABLE public.docs ENABLE ROW LEVEL SECURITY;', 'CREATE POLICY tenant_only ON public.docs FOR SELECT TO authenticated USING ((tenant_id = 1));'];
   const dumpOf = (open, close, extra = []) => ['--', '-- PostgreSQL database dump', '--', '', open, '', ...extra, ...body, '', '--', '-- PostgreSQL database dump complete', '--', '', close, ''].join('\n');
@@ -1219,9 +1209,9 @@ test('SEC-M4: exactly pg_dump\'s \\restrict and \\unrestrict pair (one key, firs
   }
 });
 
-// #350 round 4, follow-up 1: PostgreSQL decodes E'' escapes, so each name below is client_encoding (PostgreSQL 17.11: each
+// PostgreSQL decodes E'' escapes, so each name below is client_encoding (PostgreSQL 17.11: each
 // switches the encoding, and the hidden policy is created).
-test('PR350-R4-1: a set_config name written as an E\'...\' string with a backslash escape is not one literal, so it is a gap on every table', () => {
+test('a set_config name written as an E\'...\' string with a backslash escape is not one literal, so it is a gap on every table', () => {
   const base = 'create table docs (tenant_id int); alter table docs enable row level security; create policy tenant_only on docs for select to authenticated using (tenant_id = 1);';
   const before = rls(base);
   const hidden = "select E'ā\\'; create policy anyone_reads on docs for select using (true); --';";
@@ -1237,11 +1227,11 @@ test('PR350-R4-1: a set_config name written as an E\'...\' string with a backsla
     assert.equal(rls(`${base}\n${sql}`).complete, true, sql);
 });
 
-// #350 round 4, follow-up 2. After set search_path = scratch, PostgreSQL 17.11 puts the unqualified policy on public.docs after
-// each form in R4-2 and on scratch.docs after each in R4-3 (where a form fails on the server, nothing changes).
+// After set search_path = scratch, PostgreSQL 17.11 puts the unqualified policy on public.docs after each form in the
+// first test below and on scratch.docs after each in the second (where a form fails on the server, nothing changes).
 const twoSchemas = 'create schema scratch; create table public.docs (tenant_id int); alter table public.docs enable row level security; create policy tenant_only on public.docs for select to authenticated using (tenant_id = 1);\ncreate table scratch.docs (tenant_id int); set search_path = scratch;';
 const anyoneReads = 'create policy anyone_reads on docs for select using (true);';
-test('PR350-R4-2: SET SCHEMA, quoted and dollar-quoted names, a quoted "set_config", RESET and DISCARD ALL move search_path as PostgreSQL does', () => {
+test('SET SCHEMA, quoted and dollar-quoted names, a quoted "set_config", RESET and DISCARD ALL move search_path as PostgreSQL does', () => {
   const before = rls(twoSchemas);
   for (const form of ["SET SCHEMA 'public';", 'SET SESSION SCHEMA $$public$$;', 'SET "SEARCH_PATH" = public;', 'RESET "SEARCH_PATH";', 'discard all;',
     "select set_config($$search_path$$, 'public', false);", `select "set_config"('search_path', 'public', false);`, "select set_config('SEARCH_PATH', 'public', false);",
@@ -1258,7 +1248,7 @@ test('PR350-R4-2: SET SCHEMA, quoted and dollar-quoted names, a quoted "set_conf
   assert.deepEqual([temp.complete, cell(temp, 'authenticated', 'public.docs', 'SELECT').decision], [true, 'conditional']);
 });
 
-test('PR350-R4-3: a search_path PostgreSQL may not have set as written is a gap for later unqualified names; outside a SELECT, for the rest of the history', () => {
+test('a search_path PostgreSQL may not have set as written is a gap for later unqualified names; outside a SELECT, for the rest of the history', () => {
   const before = rls(twoSchemas);
   for (const form of ["select set_config(E'search\\x5fpath', 'public', false);", "set search_path = E'pub\\x6cic';", "select set_config('search_path', E'pub\\x6cic', false);", "SET SCHEMA E'pub\\x6cic';",
     "set search_path = '';", "SET SCHEMA '';", "SET SCHEMA 'public', 'scratch';", "select set_config('search_path', 'public,', false);",
@@ -1283,7 +1273,7 @@ test('PR350-R4-3: a search_path PostgreSQL may not have set as written is a gap 
 });
 
 // Carried: PostgreSQL cuts every name to 63 bytes (17.11: the policies below land on the 63-byte and 62-byte tables).
-test('PR350-R4-4: names are cut to 63 bytes at a character boundary, in statements, search_path values and function bodies', () => {
+test('names are cut to 63 bytes at a character boundary, in statements, search_path values and function bodies', () => {
   const a = n => 'a'.repeat(n);
   for (const [table, spelling] of [[a(63), a(70)], [a(62), `"${a(62)}é"`]]) {
     const m = rls(`create table ${table} (tenant_id int); alter table ${table} enable row level security; create policy anyone_reads on ${spelling} for select using (true);`);
@@ -1300,9 +1290,9 @@ test('PR350-R4-4: names are cut to 63 bytes at a character boundary, in statemen
   assert.match(cell(m, 'anon', 'public.t', 'SELECT').conditions[0], new RegExp(`${helper.slice(0, 63)}#`));
 });
 
-// Carried N2: pg_database_owner's member is the database owner, implicitly (17.11: with authenticated owning the database,
+// pg_database_owner's member is the database owner, implicitly (17.11: with authenticated owning the database,
 // both statements let it read every row; with FORCE ROW LEVEL SECURITY it reads its policies' rows).
-test('PR350-R4-5: a table pg_database_owner owns without FORCE, or a policy aimed at pg_database_owner, makes that table\'s cells unknown', () => {
+test('a table pg_database_owner owns without FORCE, or a policy aimed at pg_database_owner, makes that table\'s cells unknown', () => {
   const base = 'create table docs (tenant_id int); alter table docs enable row level security; create policy tenant_only on docs for select to authenticated using (tenant_id = 1);';
   const before = rls(base);
   for (const sql of ['alter table docs owner to pg_database_owner;', 'create policy owner_reads on docs for select to pg_database_owner using (true);']) {
@@ -1321,18 +1311,18 @@ test('PR350-R4-5: a table pg_database_owner owns without FORCE, or a policy aime
 });
 
 // ---- Gap identity: diff gates on a new gap even where cells are already unknown ----------------------
-// PR362 review, open question 1: with one standing gap every cell is unknown, so a release that adds a hidden change (and
-// with it new gaps) changed no cell, and the diff did not gate. A gap now has an identity; a new one gates.
+// With one standing gap every cell is unknown, so a release that adds a hidden change (and with it new gaps) changed no
+// cell, and the diff did not gate. A gap now has an identity; a new one gates.
 const STANDING = 'do $$ begin perform refresh_reports(); end $$;';
 const DOCS = 'create table docs (tenant_id int); alter table docs enable row level security; create policy tenant_only on docs for select to authenticated using (tenant_id = 1);';
 const replay = files => importRls(files.map(([id, content]) => ({ id, content, kind: 'sql' })), { application: 'app', roles: ['anon', 'authenticated'] });
 const cellGated = d => d.changes.filter(c => GATED_KINDS.includes(c.kind));
 
-test('GAP-1: with a standing gap, a release that adds a gap is gated although every cell was already unknown', () => {
+test('with a standing gap, a release that adds a gap is gated although every cell was already unknown', () => {
   const before = rls(`${DOCS}\n${STANDING}`);
   assert.equal(before.gaps.length, 1);
   assert.ok(before.cells.every(c => c.decision === 'unknown'), 'the standing gap makes every cell unknown');
-  // The hidden-change rules of #350 and #362 (client_encoding, standard_conforming_strings, U&, an E'' set_config name), and a
+  // The hidden-change rules (client_encoding, standard_conforming_strings, U&, an E'' set_config name), and a
   // second procedural block. Each hides a policy anyone_reads that no cell shows.
   const hidden = "select E'ā\\'; create policy anyone_reads on docs for select using (true); --';";
   for (const sql of [`set client_encoding = 'SJIS';\n${hidden}`,
@@ -1351,7 +1341,7 @@ test('GAP-1: with a standing gap, a release that adds a gap is gated although ev
   }
 });
 
-test('GAP-2: a standing gap keeps its identity through comments, spacing, keyword case, a renamed or split file and migrations appended after it', () => {
+test('a standing gap keeps its identity through comments, spacing, keyword case, a renamed or split file and migrations appended after it', () => {
   const before = replay([['001_init.sql', `${DOCS}\n${STANDING}`]]);
   for (const [files, moved] of [
     // Comments, blank lines and spacing move the block down; keyword case, in it and before it, folds as PostgreSQL folds it.
@@ -1370,14 +1360,14 @@ test('GAP-2: a standing gap keeps its identity through comments, spacing, keywor
   const narrowed = diffMatrices(before, replay([['001_init.sql', `${DOCS}\n${STANDING}`],
     ['002_narrow.sql', 'drop policy tenant_only on docs; create policy tenant_only on docs for select to authenticated using (tenant_id = 2);']]));
   assert.deepEqual([narrowed.gated, narrowed.counts, narrowed.gapChanges], [false, { 'conditions-changed': 1 }, []]);
-  // A changed gap statement is another gap, and so is one after an edited earlier statement (GAP-10): removed and added (gated).
+  // A changed gap statement is another gap, and so is one after an edited earlier statement: removed and added (gated).
   const changed = diffMatrices(before, replay([['001_init.sql', `${DOCS}\ndo $$ begin perform refresh_reports(); perform grant_all(); end $$;`]]));
   assert.deepEqual([changed.gated, changed.gapCounts, cellGated(changed)], [true, { 'gap-added': 1, 'gap-removed': 1 }, []]);
   const editedBefore = diffMatrices(before, replay([['001_init.sql', `${DOCS.replace('tenant_id = 1', 'tenant_id = 2')}\n${STANDING}`]]));
   assert.deepEqual([editedBefore.gated, editedBefore.counts, editedBefore.gapCounts], [true, { 'conditions-changed': 1 }, { 'gap-added': 1, 'gap-removed': 1 }]);
 });
 
-test('GAP-3: identical statements are counted: a second copy of a standing gap is a new gap; a copy keeps its id only while the history before it is unchanged', () => {
+test('identical statements are counted: a second copy of a standing gap is a new gap; a copy keeps its id only while the history before it is unchanged', () => {
   const one = replay([['001.sql', `${DOCS}\n${STANDING}`]]);
   const two = replay([['001.sql', `${DOCS}\n${STANDING}`], ['002.sql', STANDING]]);
   assert.equal(new Set(two.gaps.map(g => g.id)).size, 2, 'two identical statements are two gaps');
@@ -1399,7 +1389,7 @@ test('GAP-3: identical statements are counted: a second copy of a standing gap i
   assert.deepEqual([repeated.gated, repeated.gapCounts], [true, { 'gap-added': 1 }]);
 });
 
-test('GAP-4: a removed gap does not gate', () => {
+test('a removed gap does not gate', () => {
   const closed = 'create table docs (tenant_id int); alter table docs enable row level security;';
   const before = rls(`${closed}\n${STANDING}`), after = rls(closed);
   assert.deepEqual([cell(before, 'authenticated', 'public.docs', 'SELECT').decision, cell(after, 'authenticated', 'public.docs', 'SELECT').decision], ['unknown', 'deny']);
@@ -1407,7 +1397,7 @@ test('GAP-4: a removed gap does not gate', () => {
   assert.deepEqual([d.gated, d.gapCounts, d.gapChanges.map(c => [c.kind, c.id])], [false, { 'gap-removed': 1 }, [['gap-removed', before.gaps[0].id]]]);
 });
 
-test('GAP-5: a scopehaven-policy-matrix/1 matrix is still compared, but its gaps fail closed: every gap after is gated, and the diff says why', () => {
+test('a scopehaven-policy-matrix/1 matrix is still compared, but its gaps fail closed: every gap after is gated, and the diff says why', () => {
   const current = rls(`${DOCS}\n${STANDING}`), old = asSchema1(current);
   assert.deepEqual([old.schema, verifyMatrixId(old), Object.hasOwn(old.gaps[0], 'id')], ['scopehaven-policy-matrix/1', true, false]);
   const d = diffMatrices(old, current);
@@ -1438,7 +1428,7 @@ test('GAP-5: a scopehaven-policy-matrix/1 matrix is still compared, but its gaps
   assert.deepEqual(diffMatrices(reseal({ ...current, gaps: {} }), current), { comparable: false, reason: 'before-matrix-invalid' });
 });
 
-test('GAP-6: in a catalog dump, an Open WebUI export and an OpenAPI document a gap is its row or item, not its index or the file name', () => {
+test('in a catalog dump, an Open WebUI export and an OpenAPI document a gap is its row or item, not its index or the file name', () => {
   // Catalog: an unreadable policy row keeps its id when the rows reorder and the dump has another name; a changed row is a new gap.
   const good = { schemaname: 'public', tablename: 'docs', policyname: 'tenant only', permissive: 'PERMISSIVE', roles: '{authenticated}', cmd: 'SELECT', qual: '(tenant_id = 1)', with_check: null };
   const bad = { ...good, policyname: 'odd', cmd: 'MERGE' };
@@ -1475,7 +1465,7 @@ test('GAP-6: in a catalog dump, an Open WebUI export and an OpenAPI document a g
   assert.deepEqual([rescoped.gated, cellGated(rescoped)], [true, []]);
 });
 
-test('GAP-7: the CLI diff exits 1 on a new gap where every cell was already unknown and 0 when the gaps only moved; an old baseline says why it fails closed', async t => {
+test('the CLI diff exits 1 on a new gap where every cell was already unknown and 0 when the gaps only moved; an old baseline says why it fails closed', async t => {
   const dir = await scratch(t);
   const write = async (name, m) => { await writeFile(join(dir, name), JSON.stringify(m)); return join(dir, name); };
   const before = await write('before.json', rls(`${DOCS}\n${STANDING}`));
@@ -1490,7 +1480,7 @@ test('GAP-7: the CLI diff exits 1 on a new gap where every cell was already unkn
   assert.deepEqual(JSON.parse(await readFile(join(dir, 'old-diff.json'), 'utf8')).gapChanges.map(c => c.kind), ['gap-unidentified']);
 });
 
-test('GAP-8: every replayed matrix says replay reads every statement as succeeded, and that the 63-byte cut assumes a UTF-8 server', () => {
+test('every replayed matrix says replay reads every statement as succeeded, and that the 63-byte cut assumes a UTF-8 server', () => {
   const replayed = rls(DOCS);
   assert.ok(replayed.assumptions.some(a => /reads every statement as having succeeded/.test(a) && /BEGIN \.\.\. COMMIT rolls the transaction back/.test(a) && /catalog dump reads the real result/.test(a)));
   assert.ok(replayed.assumptions.some(a => /cut to 63 bytes as a server with UTF-8 encoding cuts them/.test(a)));
@@ -1498,7 +1488,7 @@ test('GAP-8: every replayed matrix says replay reads every statement as succeede
   assert.ok(!dumped.assumptions.some(a => /having succeeded|63 bytes/.test(a)), 'a catalog dump reads the real result and the real names');
 });
 
-test('GAP-9: matrices are scopehaven-policy-matrix/2 with an id on every gap; the readers take a /1 matrix and refuse an edited or unknown one', () => {
+test('matrices are scopehaven-policy-matrix/2 with an id on every gap; the readers take a /1 matrix and refuse an edited or unknown one', () => {
   const m = rls(`${DOCS}\n${STANDING}\nalter table docs enable row level security junk;`);
   assert.deepEqual([m.schema, MATRIX_SCHEMA], ['scopehaven-policy-matrix/2', 'scopehaven-policy-matrix/2']);
   assert.ok(m.gaps.length === 2 && m.gaps.every(g => /^[a-f0-9]{64}$/.test(g.id) && !Object.hasOwn(g, 'identity')), 'an id on every gap; the identity basis is not written');
@@ -1512,8 +1502,8 @@ test('GAP-9: matrices are scopehaven-policy-matrix/2 with an id on every gap; th
   }
 });
 
-// PR366 review, major 2: a DO block's effect depends on what ran before it, so a replayed gap is placed by the history before it.
-test('GAP-10: moving a DO block that disables RLS past ENABLE ROW LEVEL SECURITY, or editing or inserting a statement before a gap, gates; appending does not', () => {
+// A DO block's effect depends on what ran before it, so a replayed gap is placed by the history before it.
+test('moving a DO block that disables RLS past ENABLE ROW LEVEL SECURITY, or editing or inserting a statement before a gap, gates; appending does not', () => {
   const DISABLE = "do $$ begin execute 'alter table docs disable row level security'; end $$;";
   const ENABLE = 'alter table docs enable row level security; create policy tenant_only on docs for select to authenticated using (tenant_id = 1);';
   const before = replay([['1.sql', `create table docs (tenant_id int);\n${DISABLE}`], ['2.sql', ENABLE]]);
@@ -1533,8 +1523,8 @@ test('GAP-10: moving a DO block that disables RLS past ENABLE ROW LEVEL SECURITY
   assert.deepEqual([diffMatrices(before, appended).gated, appended.gaps[0].id], [false, before.gaps[0].id], 'migrations appended later keep every earlier id');
 });
 
-// PR366 review, major 1: nothing in an untokenizable file is read, and psql runs what is above a meta-command before reaching it.
-test('GAP-11: a file that cannot be tokenized is one gap over the whole file, so an edit above its failing line gates', () => {
+// Nothing in an untokenizable file is read, and psql runs what is above a meta-command before reaching it.
+test('a file that cannot be tokenized is one gap over the whole file, so an edit above its failing line gates', () => {
   const before = replay([['0.sql', DOCS], ['1.sql', '\\i other.sql\n']]);
   assert.match(before.gaps[0].reason, /could not tokenize: unexpected character "\\\\" \(line 1\)/);
   const above = diffMatrices(before, replay([['0.sql', DOCS], ['1.sql', 'create policy anyone_reads on docs for select using (true);\n\\i other.sql\n']]));
@@ -1547,8 +1537,8 @@ test('GAP-11: a file that cannot be tokenized is one gap over the whole file, so
   assert.notEqual(later('\\i other.sql\n'), later('\\i another.sql\n'));
 });
 
-// PR366 review, ruling: after a non-UTF8 client_encoding the readers disagree on every later quote, so nothing after it can be read.
-test('GAP-12: once the history sets a non-UTF8 client_encoding, every later change gates', () => {
+// After a non-UTF8 client_encoding the readers disagree on every later quote, so nothing after it can be read.
+test('once the history sets a non-UTF8 client_encoding, every later change gates', () => {
   const enc = [['1.sql', `${DOCS}\nset client_encoding = 'SJIS';`]];
   const before = replay(enc);
   assert.equal(diffMatrices(before, replay(enc)).gated, false, 'an unchanged history stays clean');
@@ -1567,8 +1557,8 @@ test('GAP-12: once the history sets a non-UTF8 client_encoding, every later chan
   assert.equal(diffMatrices(replay(utf8), replay([...utf8, ['2.sql', 'create index docs_tenant on docs (tenant_id);']])).gated, false);
 });
 
-// Lead ruling on #366: RLS turned off after a standing gap read `changed` between two unknown cells and did not gate.
-test('GAP-13: a cell that would now be undeclared, from any other state (unknown included), became undeclared and gates, gap or no gap', () => {
+// RLS turned off after a standing gap used to read `changed` between two unknown cells and did not gate.
+test('a cell that would now be undeclared, from any other state (unknown included), became undeclared and gates, gap or no gap', () => {
   const ENABLE = 'alter table docs enable row level security; create policy tenant_only on docs for select to authenticated using (tenant_id = 1);';
   const offAfter = standing => {
     const before = replay([['1.sql', `create table docs (tenant_id int);\n${standing}`], ['2.sql', ENABLE]]);
@@ -1596,9 +1586,9 @@ test('GAP-13: a cell that would now be undeclared, from any other state (unknown
   assert.deepEqual([diffMatrices(one('unknown', 'undeclared'), one('undeclared')).changes[0].kind, diffMatrices(one('deny'), one('undeclared')).changes[0].kind], ['became-undeclared', 'became-undeclared']);
 });
 
-// PR366 final review, major 1: behind a standing gap a cell kept only its last unknown reason (source-gap), so a reason a release
+// Behind a standing gap a cell used to keep only its last unknown reason (source-gap), so a reason a release
 // added (an owner that bypasses RLS, a policy for current_user) changed nothing in the cell.
-test('GAP-14: a cell that stays unknown but gains a reason other than a gap became unknown and gates; a lost reason does not', () => {
+test('a cell that stays unknown but gains a reason other than a gap became unknown and gates; a lost reason does not', () => {
   const owned = `${DOCS} alter table docs owner to authenticated; alter table docs force row level security;`;
   const cases = [['OWNER TO authenticated', DOCS, 'alter table docs owner to authenticated;', 'table-owner-bypasses-rls (no FORCE ROW LEVEL SECURITY)', 4],
     ['NO FORCE with authenticated the owner', owned, 'alter table docs no force row level security;', 'table-owner-bypasses-rls (no FORCE ROW LEVEL SECURITY)', 4],

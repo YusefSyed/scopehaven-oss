@@ -1,4 +1,4 @@
-// Coverage v2 Part C: an egress background source may pin the resource the egress recorder names a send by ("<METHOD> <declared
+// Resource pins on egress background sources: an egress background source may pin the resource the egress recorder names a send by ("<METHOD> <declared
 // path>" or "<METHOD> *"), with operation send and an exact host, and only a resource that host's declared destinations can
 // produce. Classification stays inclusive: a send with no resource fits the pin, and a send the pin excludes is not background,
 // so a clause about that host stays decisive for it. Pure unit tests plus profile validation (no I/O).
@@ -22,7 +22,7 @@ const FILLER = { kind: 'effect.none', select: { source: 'http-egress', operation
 const run = sends => ({ rows: [{ effects: decideEffects([NONE_HOST], [win(sends)], { role: 'boundary' }), windows: [win(sends)] }, { effects: decideEffects([FILLER], [win()], { role: 'boundary' }), windows: [win()] }], gaps: [[win()], [win()], [win()]] });
 const finding = (r, background) => attributionFindings(r.rows, r.gaps, undefined, { background })[0][0];
 
-test('Part C declaration: a resource pin needs operation send, an exact host and an exact egress resource', () => {
+test('resource pin declaration: a resource pin needs operation send, an exact host and an exact egress resource', () => {
   for (const resource of ['POST /sync/', 'POST *', 'DELETE /v1/charges']) assert.equal(backgroundProblem([{ id: 's', select: { operation: 'send', name: HOST, resource } }]), null, resource);
   const refused = select => assert.match(backgroundProblem([{ id: 's', select }]) ?? '', /resource" pin needs operation "send", an exact host/, JSON.stringify(select));
   refused({ name: HOST, resource: 'POST /sync/' });
@@ -34,7 +34,7 @@ test('Part C declaration: a resource pin needs operation send, an exact host and
   for (const key of ['source', 'outcome', 'traceId']) assert.match(backgroundProblem([{ id: 's', select: { operation: 'send', name: HOST, [key]: 'x' } }]) ?? '', /"select" pins only/, key);
 });
 
-test('Part C profile: the pinned resource must be one the host\'s egress-recorder destinations produce', () => {
+test('resource pin profile: the pinned resource must be one the host\'s egress-recorder destinations produce', () => {
   const profile = (resource, destinations = [{ host: HOST, paths: ['/sync/', '/notify'] }]) => ({ id: 't', name: 'T', applicationId: 'a', origin: 'http://127.0.0.1:4000', buildLabel: 'b', contextId: 'c',
     actors: { u: { principalId: 'u' } }, requiredControlIds: ['C'],
     observers: [{ id: 'hooks', type: 'egress-recorder', port: 40998, routing: 'proxy', destinations, witness: { actorId: 'u', method: 'GET', path: '/ping', host: 'witness.scopehaven.invalid' }, settleMs: 250, quietMs: 150 }],
@@ -49,7 +49,7 @@ test('Part C profile: the pinned resource must be one the host\'s egress-recorde
   assert.throws(() => valid('POST /sync/', [{ host: 'other.example', paths: ['/sync/'] }]), /attribution-resource-unproducible/, 'no destination for the host');
 });
 
-test('Part C classification stays inclusive: a pinned source takes its resource and sends with none; other resources stay decisive', () => {
+test('resource pin classification stays inclusive: a pinned source takes its resource and sends with none; other resources stay decisive', () => {
   const isBackground = backgroundClassifier([SYNC]);
   assert.equal(isBackground(send('POST /sync/')), true);
   assert.equal(isBackground(send('POST /notify')), false);
@@ -65,9 +65,9 @@ test('Part C classification stays inclusive: a pinned source takes its resource 
   assert.equal(finding(run([send(null)]), [SYNC]), 'background-unattributed');
 });
 
-// Part C review (the readiness owner): a send whose path the recorder flagged as ambiguous may be another declared path, so it fits
+// A send whose path the recorder flagged as ambiguous may be another declared path, so it fits
 // every resource pin. Otherwise a pin could classify it "not background" on an uncertain resource and let a pass it decided stand.
-test('Part C: a send in a window that flags its path as ambiguous fits every resource pin (v1 reason and v2 scoped entry)', () => {
+test('resource pins: a send in a window that flags its path as ambiguous fits every resource pin (v1 reason and v2 scoped entry)', () => {
   const PIN_B = [{ id: 'worker', select: { operation: 'send', name: HOST, resource: 'POST /v1/b' } }];
   const EXISTS_A = { kind: 'effect.exists', select: { source: 'http-egress', operation: 'send', name: HOST, resource: 'POST /v1/a' } };
   const findingFor = own => {

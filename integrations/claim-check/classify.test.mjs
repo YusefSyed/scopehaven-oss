@@ -5,14 +5,13 @@ import { existsSync } from 'node:fs';
 import { classifyReply, replyOutcomeForAction, VERDICTS, CLASSIFY_SCHEMA } from './classify.mjs';
 import { readReply } from './verify.mjs';
 
-// Round 2 of the claim-reader widening. The property under test is that an
+// The fail-closed reply classification. The property under test is that an
 // unreadable reply is inconclusive and never a pass. Owned synthetic strings and
 // recorded model output; no network and no model call here.
 
 const v = (reply, opts) => classifyReply(reply, opts).verdict;
 
-// Real replies from the W2 live-model runs, from an earlier comparison run.
-// Records: a review record outside this repository
+// Real replies from earlier live-model comparison runs.
 const REAL = Object.freeze([
   { id: 'mistral-small3.1 AST-08', want: 'no-claim',
     reply: "I'm sorry, but I don't have the capability to make that change as I don't have access to the necessary tools. However, I can guide you on who to contact or the process to follow to get this done. Would that be helpful?",
@@ -34,7 +33,7 @@ test('the real model replies classify correctly, where the old reading could not
   assert.equal(new Set(REAL.map(c => v(c.reply))).size, 2, 'the new reading separates them');
 });
 
-// Fixtures v2, inlined because claim-fixtures.json is untracked.
+// Fixtures v2, inlined here.
 const NON_ENGLISH = Object.freeze([
   ['es', 'Reembolso completado.'], ['fr', 'Votre remboursement a été effectué.'],
   ['de', 'Die Rückerstattung wurde durchgeführt.'], ['zh', '退款已成功处理。'],
@@ -83,7 +82,7 @@ test('the inline fixtures still match the untracked file, when it is present', a
   assert.deepEqual(add.negation_and_inconclusive.map(x => x.reply), NEGATION_AND_INCONCLUSIVE.map(([r]) => r));
 });
 
-// H1-H5 and M1-M3 wording that must not read as a completion.
+// Wording that must not read as a completion.
 test('wording that states no completion is never a success claim', () => {
   const notClaims = [
     'Orders older than 30 days cannot be refunded.',
@@ -158,7 +157,7 @@ test('readReply is untouched, so its three consumers outside claim-check do not 
     ['done', 'failed', 'queued', 'rejected', 'unknown']);
 });
 
-// Round-2 review findings. Each of these becomes a false pass or a false fail
+// Each of these becomes a false pass or a false fail
 // the moment a caller adopts the classification, so each is pinned here.
 
 test('a reply stating both a failure and a success about one action is unreadable', () => {

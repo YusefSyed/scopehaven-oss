@@ -24,7 +24,7 @@
 // prefix would never match what it says, and the overlap check could not see what it covers.
 // An action names every method on its path prefix: the hold gate names every request a rule's prefix matches with that
 // rule's id, whatever its method, so a rule limited to one method would hold, number and judge different requests.
-// Every execution carries an allowed-use twin (FIX-07): after the prohibitions' window, the twin turn runs through the
+// Every execution carries an allowed-use twin: after the prohibitions' window, the twin turn runs through the
 // same gate and must apply the actions the baseline applied. With "restore", access is restored first and the twin is
 // the same turn by the same actor; without it, "twinTurn" must name an actor the access change does not touch (as the
 // sequences README's in-flight example pairs Amy's held refund with Ben's).
@@ -53,7 +53,7 @@ const intIn = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
 
 function checkRequest(r, where, actors, bad) {
   // A string actorId first: Object.hasOwn coerces its key, so ["amy"] would run as amy while the twin-actor test below, which
-  // compares strictly, reads another actor (D-01's shape, #502).
+  // compares strictly, reads another actor.
   if (!isObject(r) || typeof r.actorId !== 'string' || !Object.hasOwn(actors, r.actorId) || !SEQUENCE_METHODS.includes(r.method) || typeof r.path !== 'string' || !r.path.startsWith('/')) bad(`${where} needs an actorId from actors, a method (${SEQUENCE_METHODS.join(', ')}) and a path starting with "/"`);
   if (r.timeoutMs !== undefined && !intIn(r.timeoutMs, 1, SWEEP_LIMITS.turnTimeoutMs)) bad(`${where}.timeoutMs must be 1 to ${SWEEP_LIMITS.turnTimeoutMs}`);
 }
@@ -76,7 +76,7 @@ export function validateSweepSpec(spec) {
   }
   if (spec.twinTurn !== undefined) checkRequest(spec.twinTurn, 'twinTurn', spec.actors, bad);
   // Without a restore, a twin by the changed actor could never apply anything: the twin needs another actor.
-  if (spec.restore === undefined && !(spec.twinTurn !== undefined && spec.twinTurn.actorId !== spec.turn.actorId)) bad('needs "restore", or a "twinTurn" by an actor the access change does not touch, for the allowed-use twin (FIX-07)');
+  if (spec.restore === undefined && !(spec.twinTurn !== undefined && spec.twinTurn.actorId !== spec.turn.actorId)) bad('needs "restore", or a "twinTurn" by an actor the access change does not touch, for the allowed-use twin');
   if (!Array.isArray(spec.actions) || !spec.actions.length || spec.actions.length > SWEEP_LIMITS.actions) bad(`needs 1 to ${SWEEP_LIMITS.actions} actions`);
   if (spec.passive !== undefined && !(Array.isArray(spec.passive) && spec.passive.length <= SWEEP_LIMITS.actions)) bad(`passive lists up to ${SWEEP_LIMITS.actions} paths`);
   const ids = new Set(), rule = (a, kind) => {

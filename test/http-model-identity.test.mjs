@@ -389,12 +389,12 @@ test('strict reads a tap log file as subject-writable custody: an in-place rewri
   // ... so the strict policy never counts a tap-file identity, and the run fails closed.
   const gate = summarizeGate({ baseline: before, candidate: forged, requireModelIdentity: true });
   assert.deepEqual([gate.exitCode, gate.reasons], [1, ['repair-not-attributable', 'model-identity-unverified']]);
-  // G1-v4 L-1: without the switch the forged file still credits nothing. Its reading says the model held,
+  // Without the switch the forged file still credits nothing. Its reading says the model held,
   // and a tap-file reading of a held model never credits a repair.
   const loose = summarizeGate({ baseline: before, candidate: forged });
   assert.deepEqual([loose.exitCode, loose.reasons, loose.comparison.modelAttribution.flipCause, loose.comparison.modelAttribution.relation], [1, ['repair-not-attributable'], 'model-unverified', 'same']);
   assert.match(compareRuns(before, forged).restorationLabel, /^Not attributable to the application: a model identity was read from a tap log file/);
-  // G1-v4 L-2: the strict summary marks the policy and credits nothing; the Action's diff says so.
+  // The strict summary marks the policy and credits nothing; the Action's diff says so.
   assert.deepEqual([gate.comparison.modelAttribution.repairCreditedToApp, gate.comparison.modelAttribution.policy], [false, 'not-met']);
   assert.equal(forged.modelIdentity.custody, 'tap-file');
   assert.deepEqual(gate.comparison.modelIdentityPolicy.causes, [{ side: 'baseline', reason: 'subject-writable-custody' }, { side: 'candidate', reason: 'subject-writable-custody' }]);

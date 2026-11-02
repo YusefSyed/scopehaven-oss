@@ -101,8 +101,8 @@ test('live: the owned refund app: the fixed twin passes and the defective twin f
 
 test('live: a write through a second connection that bypasses the app is caught; a write to an ignored table leaves absence decidable, an unlisted one holds it back', { skip }, async t => {
   const f = await fixture(t);
-  // The same writes seen by two observers: one lists the unrelated table on its ignore list (N12), one does not.
-  // Created before the observers start: a table created during the run is a schema change (N13, ./catalog.mjs).
+  // The same writes seen by two observers: one lists the unrelated table on its ignore list, one does not.
+  // Created before the observers start: a table created during the run is a schema change (./catalog.mjs).
   await f.admin.query(`CREATE TABLE ${f.orders}_bg (n int)`);
   const o = f.wal({ ignore: [`public.${f.orders}_bg`] }); await o.start();
   const plain = f.wal(); await plain.start();
@@ -205,7 +205,7 @@ test('live: WAL the slot needed is removed (max_slot_wal_keep_size): the window 
 test('live: schema drift (a column added, RLS enabled and disabled again), an in-flight writer, TRUNCATE and an unlogged table read inconclusive or refused', { skip }, async t => {
   const f = await fixture(t);
   let o = f.wal(); await o.start();
-  // A lasting schema change makes every later window differ from the run's baseline (N13, ./catalog.mjs): a fresh
+  // A lasting schema change makes every later window differ from the run's baseline (./catalog.mjs): a fresh
   // observer (its own baseline) after each one, so the checks after it read their own reasons.
   const restart = async () => { await o.stop(); o = f.wal(); await o.start(); };
   t.after(() => o.stop());
@@ -295,7 +295,7 @@ test('live: what leaves the server: another table\'s values and a logical messag
       await f.admin.query(`SELECT pg_logical_emit_message(true, 'x', 'table public.${f.payouts}: INSERT: id[text]:''forged'' order_id[text]:''o1'' amount[numeric]:1 ${secret}-message')`);
       await f.app.query(`UPDATE ${f.orders} SET card_last4 = '${secret}-declared' WHERE id = 'o2'`);
     });
-    // The other table and the message each hold absence back (N12); what reaches the observer is the same either way.
+    // The other table and the message each hold absence back; what reaches the observer is the same either way.
     assert.deepEqual([w.coverage, w.reason], ['partial', 'logical-message,unlisted-table-changed']);
     const wire = received.join('\n');
     assert.ok(!wire.includes(`${secret}-other`), 'another table\'s value stays in the server');
@@ -307,11 +307,11 @@ test('live: what leaves the server: another table\'s values and a logical messag
   } finally { await f.admin.query(`DROP TABLE IF EXISTS ${f.orders}_priv`); }
 });
 
-// The independent review's probes (2026-10-24), each a former false pass: a rename after the end mark read with the
+// Probes, each a former false pass: a rename after the end mark read with the
 // later catalog, a key moved inside a window while the primary key was swapped away and back, a system catalog declared
 // as a table, a change in a relation two declared trees share, a domain over char as the key, and a schema renamed away
 // and back inside a window.
-test('live (review): renames after the mark, a primary key swapped inside a window, system catalogs, overlapping trees and a char-domain key', { skip }, async t => {
+test('live: renames after the mark, a primary key swapped inside a window, system catalogs, overlapping trees and a char-domain key', { skip }, async t => {
   const f = await fixture(t);
   const part = `${f.orders}_rp`, keyed = `${f.orders}_pk`, coded = `${f.orders}_cd`, code = `${f.orders}_code`;
   await f.admin.query(`CREATE TABLE ${part} (id text, region text, v text, PRIMARY KEY (id, region)) PARTITION BY LIST (region); CREATE TABLE ${part}_eu PARTITION OF ${part} FOR VALUES IN ('eu');
@@ -358,20 +358,20 @@ test('live (review): renames after the mark, a primary key swapped inside a wind
       const moved = await span(r, async () => {
         await f.admin.query(`ALTER SCHEMA ${ns} RENAME TO ${ns}_tmp`); await f.admin.query(`INSERT INTO ${ns}_tmp.t VALUES ('x', 'v')`); await f.admin.query(`ALTER SCHEMA ${ns}_tmp RENAME TO ${ns}`);
       });
-      // The write made under the other name meanwhile is also an unlisted table's change (N12).
+      // The write made under the other name meanwhile is also an unlisted table's change.
       assert.deepEqual([moved.coverage, moved.reason], ['partial', 'schema-drift,unlisted-table-changed']);
       assert.notEqual(verdict('effect.none', sel('t', 'insert'), [asWindow(r, moved)]), 'pass');
     } finally { await f.admin.query(`DROP SCHEMA IF EXISTS ${ns} CASCADE; DROP SCHEMA IF EXISTS ${ns}_tmp CASCADE`); }
   } finally { await f.admin.query(`DROP TABLE IF EXISTS ${part} CASCADE; DROP TABLE IF EXISTS ${part}_europe; DROP TABLE IF EXISTS ${keyed}; DROP TABLE IF EXISTS ${coded}; DROP DOMAIN IF EXISTS ${code}; DROP SCHEMA IF EXISTS ${f.orders}_ns`); }
 });
 
-// The completeness table for the PR: the same planted writes read by pg-snapshot (net change between two snapshots) and by
+// The completeness table: the same planted writes read by pg-snapshot (net change between two snapshots) and by
 // pg-wal (every committed change), each pair of marks taken around the same writes. Internal numbers only.
 test('live completeness: pg-snapshot against pg-wal on the same planted writes', { skip }, async t => {
   const f = await fixture(t);
   let authExisted = true;
   try { authExisted = (await f.admin.query("SELECT count(*)::text FROM pg_namespace WHERE nspname = 'auth'"))[0].rows[0][0] === '1'; } catch {}
-  // The platform job writes a table on Supabase's checked-in list (N12: the list names tables, not whole schemas). A
+  // The platform job writes a table on Supabase's checked-in list (the list names tables, not whole schemas). A
   // server that already has auth.audit_log_entries (a real Supabase stack) gets a table of the test's own on the profile's list.
   const free = (await f.admin.query("SELECT (pg_catalog.to_regclass('auth.audit_log_entries') IS NULL)::text"))[0].rows[0][0] === 'true';
   const job = free ? 'audit_log_entries' : `sessions_${f.suffix}`;
@@ -391,7 +391,7 @@ async function completeness(t, f, job, ignore) {
   const rows = [];
   const record = (name, snapReads, walReads) => { rows.push({ case: name, pgSnapshot: snapReads, pgWal: walReads }); t.diagnostic(`COMPLETENESS ${JSON.stringify(rows.at(-1))}`); };
   const ops = w => w.events.map(e => `${e.operation} ${e.resource}`).join(', ') || 'nothing';
-  // Each observer's own source: pg-wal's is sql-wal since NC9 item 4, pg-snapshot's sql-snapshot.
+  // Each observer's own source: pg-wal's is sql-wal, pg-snapshot's sql-snapshot.
   const v = (kind, select, w, extra) => verdict(kind, { ...select, source: w.source }, [w], extra);
 
   // 1. Write and undo: a payout inserted and deleted again.

@@ -1,5 +1,5 @@
-// E2b: countApplications on a forwarded host reads only a proven outcome, and a rejection only with a status in the window's own
-// declared rejected list. Checked on windows built directly, so the rule holds even where E1's binding is not in the path.
+// Rejected retries: countApplications on a forwarded host reads only a proven outcome, and a rejection only with a status in the window's own
+// declared rejected list. Checked on windows built directly, so the rule holds even where the forward's outcome binding is not in the path.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { countApplications } from '../src/idempotency.mjs';

@@ -1,7 +1,7 @@
 // App-log admissions end to end (src/http-connector.mjs, src/contracts.mjs, src/runner.mjs): an admitted clause fails in the live
 // run and in the saved-run validator alike; a forged or stripped admission is refused; a line logged after the cut is never
-// admitted; a baseline fail that rests only on admissions never credits a repair (B2); an admitted lifecycle change check keeps
-// the run valid (M3). Injected transport and observers, a temporary file: no socket, no model, no provider.
+// admitted; a baseline fail that rests only on admissions never credits a repair; an admitted lifecycle change check keeps
+// the run valid. Injected transport and observers, a temporary file: no socket, no model, no provider.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, appendFileSync, writeFileSync, readFileSync } from 'node:fs';
@@ -27,7 +27,7 @@ const check = (id, severity, method, path, effects, extra = {}) => ({ id, title:
   ...(method === 'POST' ? { body: {} } : {}), evidenceRequirement: severity === 'control' ? 'response' : 'backend', assertions: [{ kind: 'status.equals', expected: 200 }], ...(effects ? { effects } : {}), ...extra });
 const NO_PAY = [{ kind: 'effect.none', select: { source: 'http-egress', operation: 'send', name: PAY } }];
 // earlier: checks of the same actor declared before NO-PAY. CHECKOUT is the actor's required allowed-use control with a positive
-// effect (an order sent to the shop, another host than the payments one), so NO-PAY's absence is guarded (FIX-07).
+// effect (an order sent to the shop, another host than the payments one), so NO-PAY's absence is guarded.
 const CHECKOUT = check('CHECKOUT', 'control', 'POST', '/checkout', [{ kind: 'effect.exists', select: { source: 'http-egress', operation: 'send', name: SHOP } }]);
 function profile(path, earlier = []) {
   return { id: 'app-log-admission', name: 'App log admission', applicationId: 'app-log-admission', origin: 'http://127.0.0.1:9', buildLabel: 'b1', contextId: 'synthetic-app-log',
@@ -111,7 +111,7 @@ test('the validator recomputes admissions: a stripped or forged admission, or a 
   assert.throws(() => validateHttpRunEvidence(reseal(malformed)), error => error.code === 'invalid-run-evidence' && typeof error.detail === 'string');
 });
 
-test('B2: a baseline fail that rests only on admissions is unverified in the comparison, its document and the gate, never a repair', async t => {
+test('a baseline fail that rests only on admissions is unverified in the comparison, its document and the gate, never a repair', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-app-log-b2-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const path = join(dir, 'actions.jsonl');
   const baseline = await run(t, { path }), candidate = await run(t, { forbidden: false, path });
@@ -133,10 +133,10 @@ test('B2: a baseline fail that rests only on admissions is unverified in the com
   assert.ok(gate.reasons.includes('comparison-incomplete'), JSON.stringify(gate.reasons));
 });
 
-// M3: the change check is an allowed-use control that suspends carol; its own clause forbids a payment, and the application's
+// The change check is an allowed-use control that suspends carol; its own clause forbids a payment, and the application's
 // log admits one in its window. The admission makes the change check fail after it was sent: the post-change check was sent and
 // reads change-not-attributed, and the run stays valid evidence.
-test('M3: an admitted lifecycle change check keeps the run valid; the post-change check reads change-not-attributed', async t => {
+test('an admitted lifecycle change check keeps the run valid; the post-change check reads change-not-attributed', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven-app-log-lifecycle-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const path = join(dir, 'actions.jsonl'); writeFileSync(path, '');
   const ENV = { SCOPEHAVEN_TARGET_A: 'tok-admin', SCOPEHAVEN_TARGET_C: 'tok-carol' };
@@ -184,10 +184,10 @@ test('M3: an admitted lifecycle change check keeps the run valid; the post-chang
   assert.deepEqual([clause.verdict, clause.custody, Object.hasOwn(clause, 'appLog')], ['fail', 'independent', false]);
 });
 
-// B1 c end to end: an earlier check by the same actor whose claim rule names the payment. Its selector sets NO-PAY's logged
+// End to end: an earlier check by the same actor whose claim rule names the payment. Its selector sets NO-PAY's logged
 // payment aside (it may be the earlier check's late line), in the live run and in the validator alike; without the claim it is
 // NO-PAY's own and admitted.
-test('B1 c: an earlier same-actor check\'s claim selector sets a logged line aside, live and in the validator', async t => {
+test('an earlier same-actor check\'s claim selector sets a logged line aside, live and in the validator', async t => {
   const CLAIM = { trigger: { field: { pointer: '/ok', success: [true], refusal: [false] } }, select: { source: 'http-egress', operation: 'send', name: PAY, resource: 'POST /v1/refunds' } };
   const withClaim = await run(t, { earlier: [check('CLAIMED', 'high', 'POST', '/claimed', undefined, { claims: [CLAIM] })] });
   validateHttpRunEvidence(withClaim);

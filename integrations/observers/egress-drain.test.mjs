@@ -1,4 +1,4 @@
-// Coverage v2 PR-2 (Part D): the bounded run-end drain. Before the final mark each egress recorder waits, under one shared cap,
+// The bounded run-end drain. Before the final mark each egress recorder waits, under one shared cap,
 // until no request is arriving, no record is pending and its quiet period has passed since the latest arrival, forward settle
 // or reply. A drain follows a recorder's late entries only when it ended quiescent, its final mark was clear and no record
 // pending at a collect had its connection closed after it. Over real loopback HTTP; destination hosts are names only.
@@ -119,7 +119,7 @@ test('closedAfterCollect: after a scoped collect left a late entry, a forward th
   const s = await window(ok, 'slow');
   assert.equal(s.status, 200);
   assert.equal(ok.closedAfterCollect(), false);
-  // Review of PR-2: any close the recorder makes after that collect counts, here an over-limit body it destroys.
+  // Any close the recorder makes after that collect counts, here an over-limit body it destroys.
   const big = await new Promise(resolve => { const url = new URL(`http://${HOOKS}/big`); const req = request({ host: '127.0.0.1', port: ok.port, method: 'POST', path: url.href, headers: { host: url.host, 'content-type': 'application/json' } }, res => { res.resume(); res.on('end', () => resolve(res.statusCode)); }); req.on('error', () => resolve(null)); req.end('x'.repeat(2 * 1024 * 1024)); });
   assert.ok(big === 413 || big === null, String(big));
   await pause(50);
@@ -162,7 +162,7 @@ test('the shared cap, the drains record and the follow rule (pure)', () => {
   assert.deepEqual(unfollowedLate([[late('a', after)]]).map(s => [...s]), [['a']], 'no drain: the last check stays unfollowed');
 });
 
-// Follow-ups of 2026-10-12 (FOLLOW-UPS-2026-10-11.md items 1 and 2).
+// Clocks and arriving connections.
 // A step of the wall clock: Date.now jumps after the first few reads. Every quiet and elapsed comparison is monotonic.
 const stepClock = (t, deltaMs, after = 2) => { const real = Date.now; let calls = 0; Date.now = () => real() + (calls++ >= after ? deltaMs : 0); t.after(() => { Date.now = real; }); return () => { Date.now = real; }; };
 test('monotonic clock: a forward wall-clock step never fakes quiet for the drain', async t => {
@@ -203,7 +203,7 @@ test('a freshly accepted connection that has sent nothing, or part of its header
   assert.equal((await o.drain({ capMs: 1000 })).quiescent, true, 'idle after a complete request');
 });
 
-test('the ledger and the recorder read no wall clock (review of the follow-up: the clock tests only catch Date.now itself)', async () => {
+test('the ledger and the recorder read no wall clock (the clock tests only catch Date.now itself)', async () => {
   const { readFile } = await import('node:fs/promises');
   for (const name of ['sink-ledger.mjs', 'egress-recorder.mjs']) {
     const code = (await readFile(new URL(`./${name}`, import.meta.url), 'utf8')).replace(/\/\/.*$/gm, '');

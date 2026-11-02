@@ -1,4 +1,4 @@
-// An effect whose outcome no observer decided (started at the window end, or unknown) may have committed. PR398-REVIEW's open edge:
+// An effect whose outcome no observer decided (started at the window end, or unknown) may have committed. Before this rule,
 // an honest export-file feed's send stamped before its window read unknown, and because a presence-only window opens no coverage gap,
 // effect.none and effect.only dropped it and passed on another observer's silence (3 false passes in 8 runs at load average 7 to 12).
 // From any relevant window, presence-only included, such a send now holds an absence, a count it could still reach and an effect.only
@@ -89,7 +89,7 @@ test('effect.count by applications: an undecided send holds a keyed count it cou
   const clause = { ...count(1), countBy: 'idempotency-key' };
   assert.equal(verdict(clause, [A([s1, s2], { scope: keyed })], { countBy: true }), 'pass', 'the control: two sends, one application');
   assert.equal(verdict(clause, [A([s1, s2], { scope: keyed }), B([inB('unknown')])], { countBy: true }), 'missing', 'the undecided send may be a second application');
-  // PR429-REVIEW minor 1: an undecided send can add an application, or replay one, never take one away.
+  // An undecided send can add an application, or replay one, never take one away.
   const app = c => send('egress-recorder-a', 'committed', { content: { c: 'c' }, idempotency: { status: 'keyed', key: c.repeat(64), fold: c.repeat(64), head: c.repeat(64), firstSeq: seq + 1 } });
   const by = n => ({ ...count(n), countBy: 'idempotency-key' });
   const three = ['a', 'b', 'c'].map(app);
@@ -134,10 +134,10 @@ test('effect.only: an undecided judged send no allow fits holds the pass at miss
   assert.equal(only([A(), B([inB('unknown'), inB('committed')])]).verdict, 'fail', 'a committed send outside the set still fails');
 });
 
-// The deterministic regression: PR398-REVIEW's honest F1. Vendor A is a stub whose witnessed endpoint feed is silent; vendor B is a
+// The deterministic regression: an honest export file. Vendor A is a stub whose witnessed endpoint feed is silent; vendor B is a
 // stub declared as such whose export file really records every send the app makes through it. B's clock runs a minute behind
 // ScopeHaven's, so every entry it writes is stamped before its check's start mark and reads unknown (no skew on the file route): the
-// 2026-10-18 edge, forced instead of left to a same-millisecond race. Before this change CLEAN and ONLY passed and SENT-B failed.
+// open edge above, forced instead of left to a same-millisecond race. Before this change CLEAN and ONLY passed and SENT-B failed.
 test('end to end: an honest export file behind the clock holds a forbidden send at inconclusive, never a pass on the other vendor\'s silence', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'sh-unresolved-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -187,9 +187,9 @@ test('end to end: an honest export file behind the clock holds a forbidden send 
   assert.deepEqual(['CLEAN', 'ONLY', 'SENT-B'].map(id => row(quiet, id).status), ['pass', 'pass', 'fail']);
 });
 
-// PR429-REVIEW's combined case with FIX-04 (#428, egress-recorder/11): a send to a declared alias is recorded under its destination's name,
-// so an open one in a presence-only recorder holds the destination's absence beside an authoritative recorder that saw nothing (main
-// c5515273 passed it). A sibling host keeps its own name, so the rule does not see it, and a presence-only recorder opens no gap: an
+// With declared aliases (egress-recorder/11): a send to a declared alias is recorded under its destination's name,
+// so an open one in a presence-only recorder holds the destination's absence beside an authoritative recorder that saw nothing (an
+// earlier build passed it). A sibling host keeps its own name, so the rule does not see it, and a presence-only recorder opens no gap: an
 // open or committed sibling send there holds nothing, the limit docs/KNOWN-LIMITS.md states. Over real loopback HTTP; hosts are names only.
 test('aliases: an aborted send to a declared alias in a presence-only recorder holds the destination\'s absence; a sibling send there does not (the stated limit)', async t => {
   const PAY = 'api.pay.example', ALIAS = 'api-eu.pay.example', SIBLING = 'files.pay.example', WITNESS = 'witness.scopehaven.invalid', CHARGES = 'POST /v1/charges';

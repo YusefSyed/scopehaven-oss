@@ -210,7 +210,7 @@ test('a foreign or platform schema, a misdeclared column or a non-superuser is r
   await intactOf(f);
 });
 
-test('round 2: a 2,000-row update stays fast, a claims rewrite mid-request is caught, and keys, json columns and a rewritten audit table are handled', { skip }, async t => {
+test('a 2,000-row update stays fast, a claims rewrite mid-request is caught, and keys, json columns and a rewritten audit table are handled', { skip }, async t => {
   const f = await fixture(t), table = `public.${f.table}`, x = randomBytes(4).toString('hex');
   // A bulk write as a signed-in user: every row gets its audit entry, through the key's index, in well under the timeout.
   await f.owner.query(`INSERT INTO ${table} SELECT 'BULK-' || g, '${f.ana.id}', 'open', NULL FROM generate_series(1, 2000) g`);
@@ -248,7 +248,7 @@ test('round 2: a 2,000-row update stays fast, a claims rewrite mid-request is ca
   assert.equal(verifyRecord(await f.admin.query(verifySql(json)), json, record.definitionSha256).status, 'intact');
 });
 
-test('round 3: a key GENERATED ALWAYS AS IDENTITY and a generated stored column install, and their writes are recorded', { skip }, async t => {
+test('a key GENERATED ALWAYS AS IDENTITY and a generated stored column install, and their writes are recorded', { skip }, async t => {
   const f = await fixture(t), x = randomBytes(4).toString('hex'), table = `sh_ident_${x}`;
   // The default Supabase table shape: an identity key the application never writes, and a generated search column.
   await f.owner.query(`CREATE TABLE public.${table} (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, title text NOT NULL, made_by text, search tsvector GENERATED ALWAYS AS (to_tsvector('simple', title)) STORED)`);

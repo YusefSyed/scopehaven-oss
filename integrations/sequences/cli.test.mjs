@@ -62,7 +62,7 @@ test('configuration errors exit 2 before any request', async () => {
   assert.throws(() => buildObservers([]), /1 to 16/);
   // R3 Low 2: an mcp-log observer reads a recorder log; without a path it would be a different kind.
   assert.throws(() => buildObservers([{ type: 'mcp-log' }]), /needs "path"/);
-  // W3: a routed sink needs a witness request, which a sequence never sends; a presence-only sink is built.
+  // A routed sink needs a witness request, which a sequence never sends; a presence-only sink is built.
   assert.throws(() => buildObservers([{ type: 'egress-recorder', port: 47001, routing: 'proxy', destinations: [{ host: 'api.pay.example' }], witness: { actorId: 'ops', method: 'GET', path: '/ping', host: 'witness.scopehaven.invalid' } }]), /routed egress recorder or SMTP sink/);
   assert.throws(() => buildObservers([{ type: 'smtp-sink', port: 47002, routing: 'smtp-host', domains: [{ domain: 'customers.example' }], witness: { actorId: 'ops', method: 'GET', path: '/ping', domain: 'witness.scopehaven.invalid' } }]), /routed egress recorder or SMTP sink/);
   assert.deepEqual(buildObservers([{ type: 'egress-recorder', port: 47001, destinations: [{ host: 'api.pay.example' }] }]).map(o => [o.kind, o.scope.evidence]), [['http-egress-recorder', 'presence-only']]);

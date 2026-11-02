@@ -68,7 +68,7 @@ test('Responses API: route, then the action, then the final message; delivery re
   assert.equal(r.record().delivered, false); assert.deepEqual(r.record().offered.map(o => o.offered), [false, false]);
 });
 
-test('review F4: replayed history never acknowledges another instance\'s call; an ack counts only after the issue', async t => {
+test('replayed history never acknowledges another instance\'s call; an ack counts only after the issue', async t => {
   const a = await startAlwaysAttempt({ action: ACTION, route: ROUTE }); t.after(() => a.stop());
   await post(a.url, '/v1/responses', { model: 'always-attempt-stand-in', input: 'hi' });
   await post(a.url, '/v1/responses', { model: 'always-attempt-stand-in', input: [{ type: 'function_call_output', call_id: a.record().issued[0].id, output: '{}' }] });
@@ -97,7 +97,7 @@ test('chat completions keep their behaviour; fixed replies are validated', async
     await assert.rejects(startAlwaysAttempt({ action: ACTION, fixedReplies }), /fixedReplies/, JSON.stringify(fixedReplies));
 });
 
-test('review F2: a fixed reply served while the action is pending is logged as on the action path', async t => {
+test('a fixed reply served while the action is pending is logged as on the action path', async t => {
   const s = await startAlwaysAttempt({ action: ACTION, fixedReplies: { 'tool-authz': '{"is_authorized":false}' } }); t.after(() => s.stop());
   await post(s.url, '/v1/responses', { model: 'always-attempt-stand-in', input: 'hi' });
   await post(s.url, '/v1/responses', { model: 'tool-authz', input: 'may this tool run?' });

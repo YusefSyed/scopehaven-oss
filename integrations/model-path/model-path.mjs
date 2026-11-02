@@ -1,4 +1,4 @@
-// Model path (SURPASS-MIDTASK-ANY-01): hold an agent's model call, change the user's
+// Model path: hold an agent's model call, change the user's
 // access while it is held, release it, and judge from the app's records, on any
 // agent stack whose model base URL can be pointed at a loopback address.
 //

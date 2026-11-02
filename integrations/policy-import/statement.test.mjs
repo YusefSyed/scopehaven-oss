@@ -1,4 +1,4 @@
-// Goal 03 M1: the operator policy statement (scopehaven-policy-statement/1). Local and synthetic: matrices are built
+// The operator policy statement (scopehaven-policy-statement/1). Local and synthetic: matrices are built
 // in memory, the CLI writes only into a temporary directory, and nothing reads an application or sends a request.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,7 +28,7 @@ const seal = (rules, extra, matrices = [MATRIX]) => sealStatement(written(rules,
 const refuse = (rules, pattern, extra) => assert.throws(() => seal(rules, extra), pattern);
 const scratch = async t => { const dir = await mkdtemp(join(tmpdir(), 'scopehaven policy statement ')); t.after(() => rm(dir, { recursive: true, force: true })); return dir; };
 
-test('propose: a proposal states nothing; declared allow and deny cells are candidates and the rest are listed (R9)', () => {
+test('propose: a proposal states nothing; declared allow and deny cells are candidates and the rest are listed', () => {
   const p = proposeStatement({ application: 'app', matrices: [MATRIX] });
   assert.equal(p.schema, STATEMENT_SCHEMA);
   assert.deepEqual(p.rules, []);
@@ -65,7 +65,7 @@ test('seal: a named person, an id that detects edits, and canonical order', () =
   assert.equal(verifyStatement(null), false);
 });
 
-test('R9: an unlisted or undeclared cell is not stated; only defaults.unlisted "deny" makes it stated-default', () => {
+test('an unlisted or undeclared cell is not stated; only defaults.unlisted "deny" makes it stated-default', () => {
   const none = seal([stated('r1', 'authenticated', 'public.notes', 'SELECT', 'allow')]);
   assert.equal(statedDecision(none, { role: 'anon', resource: 'public.notes', action: 'UPDATE' }), null);
   const dflt = seal([stated('r1', 'authenticated', 'public.notes', 'SELECT', 'allow')], { defaults: { unlisted: 'deny' } });
@@ -259,8 +259,8 @@ test('CLI: statement propose, seal and check in a path with spaces; new files, m
   await assert.rejects(main(['statement', 'rewrite', at('sealed.json')], quiet), /Usage/);
 });
 
-// The review of #227 (F1, F2): a declaration of allow or deny covers every variant of its cell, so each stated part
-// compares with it, through the CLI's exit status. Inputs as in the review's probes P01-P06, plus agreeing controls.
+// A declaration of allow or deny covers every variant of its cell, so each stated part compares with it, through the
+// CLI's exit status. Six probe inputs, plus agreeing controls.
 test('check: every stated part compares with a whole-cell declaration, and the CLI exits 1 on any disagreement', async t => {
   const dir = await scratch(t), at = n => join(dir, n), quiet = { out: () => {} };
   const one = decision => matrixOf([['authenticated', 'public.notes', 'SELECT', decision]]);
@@ -313,12 +313,12 @@ test('adoption and source edges: a stated source never names an adoption; an ado
   assert.throws(() => seal([shifted], {}, [twoAllow]), /keeps the declaration's role, resource and action/);
 });
 
-// The delta review of #227 round 2: the whole-cell summary agrees with the parts, an unresolved comparison has its
+// The whole-cell summary agrees with the parts, an unresolved comparison has its
 // own exit status, and the CLI's own help says the labels authenticate no one.
 test('check: the whole-cell reading agrees with the parts, and unresolved exits 3 (2 > 1 > 3 > 0)', async t => {
   const dir = await scratch(t), at = n => join(dir, n), quiet = { out: () => {} };
   const r = (decision, extra = {}) => stated('R1', 'authenticated', 'public.notes', 'SELECT', decision, extra);
-  // S1: every concrete relation allows and the default denies the rest, but no rest is left: the row agrees, and its
+  // Every concrete relation allows and the default denies the rest, but no rest is left: the row agrees, and its
   // whole-cell reading is not the default (no rule covers the whole cell, so it is null).
   const exhaustive = seal(['own', 'other-same-role', 'other-role', 'cross-tenant'].map((relation, i) => ({ ...r('allow', { relation }), ruleId: `R${i}` })), { defaults: { unlisted: 'deny' } });
   const s1 = checkStatement(exhaustive, { matrices: [matrixOf([['authenticated', 'public.notes', 'SELECT', 'allow']])] }).rows[0];
@@ -358,7 +358,7 @@ test('check: the whole-cell reading agrees with the parts, and unresolved exits 
 });
 
 test('guards on the check path and the JS API: a malformed adoption id is refused even with a recomputed id; a hidden candidate flag is refused', () => {
-  // AD1: check does not look adoptions up, so the structural guard is what refuses a malformed matrix id there.
+  // check does not look adoptions up, so the structural guard is what refuses a malformed matrix id there.
   const s = seal([adopted('anon-read', 'anon', 'public.notes', 'SELECT', 'deny')]);
   const { statementId: _id, ...body } = structuredClone(s);
   body.rules[0].source.adoptedFrom.matrixId = 'not-a-matrix-id';

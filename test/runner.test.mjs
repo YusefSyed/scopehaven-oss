@@ -167,7 +167,7 @@ test('matching contradictory producer metadata and cross-family payloads cannot 
     assert.equal(comparison.restorationLabel, 'Unverified changes');
   }
 });
-// #502's look-alike: Object.hasOwn coerces its key, so a fixture version that is an array or an object naming a known family
+// Object.hasOwn coerces its key, so a fixture version that is an array or an object naming a known family
 // would be treated as that family by the synthetic lookup. The family check now requires a string; the pair stays incompatible
 // either way (the producer-family check already refuses it), and this pins both the refusal and its reason.
 test('a non-string fixture version is never a recognized synthetic family and the pair is not comparable', () => {

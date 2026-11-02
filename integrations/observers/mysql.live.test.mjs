@@ -93,7 +93,7 @@ test('live mysql: content changed under an unchanged stamp voids the table; a re
   assert.notEqual(evaluateEffectAssertion(none('notes/n1'), [revoked]).verdict, 'pass');
 });
 
-test('live mysql (round 2): only a TIMESTAMP the server sets on insert and update is a change column; a partitioned table is refused', { skip }, async t => {
+test('live mysql: only a TIMESTAMP the server sets on insert and update is a change column; a partitioned table is refused', { skip }, async t => {
   for (const [label, options, reason] of [
     ['DATETIME (stamped in the writer\'s time zone)', { column: 'DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)' }, 'change-column-not-server-maintained'],
     ['a constant default', { column: "TIMESTAMP(6) NOT NULL DEFAULT '2020-01-01 00:00:00' ON UPDATE CURRENT_TIMESTAMP(6)" }, 'change-column-not-server-maintained'],
@@ -104,7 +104,7 @@ test('live mysql (round 2): only a TIMESTAMP the server sets on insert and updat
   }
 });
 
-test('live mysql (round 2): a writer four hours behind UTC still moves a TIMESTAMP(0) stamp; REPLACE stamps the new row', { skip }, async t => {
+test('live mysql: a writer four hours behind UTC still moves a TIMESTAMP(0) stamp; REPLACE stamps the new row', { skip }, async t => {
   const f = await fixture(t, { column: 'TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP' }), o = f.observer();
   const behind = await f.window(o, async () => { await f.q("SET SESSION time_zone = '-04:00'"); await f.q(`UPDATE ${f.db}.notes SET body = 'x' WHERE id = 'n1'`); await f.q(`UPDATE ${f.db}.notes SET body = 'first' WHERE id = 'n1'`); await f.q('SET SESSION time_zone = SYSTEM'); });
   assert.notEqual(evaluateEffectAssertion(none('notes/n1'), [behind]).verdict, 'pass');
@@ -113,7 +113,7 @@ test('live mysql (round 2): a writer four hours behind UTC still moves a TIMESTA
   assert.equal(evaluateEffectAssertion(none('notes/n2'), [replaced]).verdict, 'fail');
 });
 
-test('live mysql (round 2): EXCHANGE PARTITION keeps CREATE_TIME (stated limit); with tableIds it, a same-second RENAME swap and TRUNCATE fail the window', { skip }, async t => {
+test('live mysql: EXCHANGE PARTITION keeps CREATE_TIME (stated limit); with tableIds it, a same-second RENAME swap and TRUNCATE fail the window', { skip }, async t => {
   const f = await fixture(t, { process: true });
   // A partitioned twin with the same rows, made seconds after notes.
   await f.table('pt', ' PARTITION BY RANGE COLUMNS(id) (PARTITION p0 VALUES LESS THAN (MAXVALUE))');

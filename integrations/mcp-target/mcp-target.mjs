@@ -1,4 +1,4 @@
-// MCP server as a target (CMP-MCP-TARGET-01): several identities call tools on a loopback
+// MCP server as a target: several identities call tools on a loopback
 // MCP server, each with its own credential, and allowed and forbidden tool calls are judged
 // from records:
 //   - the server's own audit table (sqlite audit observer, authoritative), and

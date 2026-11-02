@@ -1,4 +1,4 @@
-// Second opinion (SURPASS-REFEREE-01, part 2): a judge-vs-records matrix for an external
+// Second opinion: a judge-vs-records matrix for an external
 // evaluation. Each test has two verdicts, reported side by side and never merged:
 //   judge    what the evaluation's own grader said, mapped by the importer's rules
 //            (import.mjs classify: pass, fail, error, unknown);

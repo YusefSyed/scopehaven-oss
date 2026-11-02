@@ -1,4 +1,4 @@
-// M2 EVID-BOUNDS and PAIR verdicts. Owned synthetic fixture, its two degenerate
+// EVID-BOUNDS and PAIR verdicts. Owned synthetic fixture, its two degenerate
 // builds (test/self-check-builds.mjs) and a loopback notes app; no model, provider
 // or customer system. Presentation only: nothing here changes a verdict.
 import test from 'node:test';
@@ -22,7 +22,7 @@ test.before(async () => {
   [doNothing, dumpEverything] = await Promise.all(['do-nothing', 'dump-everything'].map(mode => runAssessment('demo-vulnerable', { fixtureFactory: build => createDegenerateFixture(mode, build) })));
 });
 const NO_OVERCLAIM = /\b(secure|certif|safe|guarantee)/i;
-// The suite each target exports, as the gate reads it (round 4: "supported" needs it).
+// The suite each target exports, as the gate reads it ("supported" needs it).
 const suiteOf = (id, profiles = []) => createRegistry({ profiles, env: {} }).exportSuite(id);
 const SYNTH = { expectedSuite: suiteOf('demo-repaired') };
 
@@ -43,7 +43,7 @@ test('reference builds: the repaired build holds every pair usefully; the vulner
   for (const b of [r, v]) for (const line of boundsLines(b)) assert.doesNotMatch(line, NO_OVERCLAIM);
 });
 
-test('F8: a build that refuses everything is reported as held only by refusal, never as secure, and its undecided share is shown', () => {
+test('a build that refuses everything is reported as held only by refusal, never as secure, and its undecided share is shown', () => {
   const b = evidenceBounds(doNothing);
   assert.deepEqual([b.allowed.n, b.allowed.pass], [18, 0]);
   assert.equal(b.pairs.counts['held-and-useful'], 0);
@@ -61,7 +61,7 @@ test('F8: a build that refuses everything is reported as held only by refusal, n
   assert.ok(base['dump-everything'].allowed[0] > 0.5, 'the permissive build keeps most allowed actions working');
 });
 
-test('F8: a stored pass the evidence does not support is counted from the recomputed contract, not the stored status', () => {
+test('a stored pass the evidence does not support is counted from the recomputed contract, not the stored status', () => {
   // An evaluator that mapped a missing snapshot to pass: the row says pass, the snapshot is gone.
   const gap = structuredClone(repaired);
   const row = gap.results.find(r => r.id === 'ROLE-01'); delete row.attempts.at(-1).evidence.after;
@@ -78,16 +78,16 @@ test('comparison support: a change counts only when the candidate\'s lower bound
   assert.deepEqual([same.label, same.reason], ['?', 'the bounds overlap, so the evidence does not separate the runs']);
   // checkIds narrows the forbidden side: one check still separates, a control-only list leaves nothing to compare.
   const one = comparisonSupport(vulnerable, repaired, { ...SYNTH, checkIds: ['TENANT-01'] });
-  assert.deepEqual([one.after, one.label, one.compared], [[1, 1], 'supported', ['TENANT-01']], 'the compared ids are echoed (round 4, G3-6)');
-  // A control in checkIds is refused: every control always counts (round 4, G3-6).
+  assert.deepEqual([one.after, one.label, one.compared], [[1, 1], 'supported', ['TENANT-01']], 'the compared ids are echoed');
+  // A control in checkIds is refused: every control always counts.
   assert.throws(() => comparisonSupport(vulnerable, repaired, { ...SYNTH, checkIds: ['TENANT-01', 'ALLOWED-01'] }), /names an allowed-use control/);
-  // Without the expected suite nothing is supported (round 4, G3-2): the bounds are still shown.
+  // Without the expected suite nothing is supported: the bounds are still shown.
   const bare = comparisonSupport(vulnerable, repaired);
   assert.deepEqual([bare.label, bare.supported, bare.suiteChecked, bare.before, bare.after], ['?', false, false, [0, 0], [1, 1]]);
   assert.equal(bare.reason, 'no expected suite was given, so an edit made consistent in both stored runs cannot be ruled out');
 });
 
-test('F8: neither degenerate build compares as supported, although both clear the vulnerable build\'s upper bound', () => {
+test('neither degenerate build compares as supported, although both clear the vulnerable build\'s upper bound', () => {
   for (const [build, run, passed] of [['do-nothing', doNothing, 0], ['dump-everything', dumpEverything, 13]]) {
     const s = comparisonSupport(vulnerable, run, SYNTH);
     assert.ok(s.after[0] > s.before[1], `${build}: the forbidden bounds alone would separate`);
@@ -139,7 +139,7 @@ async function observersOffRun(t, { limits = HTTP_LIMITS, requiredControlIds = [
 // The profile each observers-off run was made from, so a test can take its exported suite.
 const OFF_PROFILES = new WeakMap();
 
-// A response-only notes app (round 2): secure answers 403 to the forbidden writes, leaky answers
+// A response-only notes app: secure answers 403 to the forbidden writes, leaky answers
 // 200, hang-delete never answers the delete, reset-delete drops the connection on it, hang-all
 // never answers either forbidden write. controlEffect gives OWN-NOTE an effect no observer can see,
 // so the control reads undecided. One server per test, its mode switched between runs, so the
@@ -178,7 +178,7 @@ const responseProfile = (origin, { controlEffect = false, applicationId = 'notes
 const responseRun = (app, mode = 'secure', options = {}) => { app.set(mode); return runHttpAssessment(responseProfile(app.origin, options), { env }); };
 const NOTE_PAIRS = [['OTHER-NOTE', 'OWN-NOTE'], ['OTHER-DELETE', 'OWN-NOTE']];
 
-test('R2-H1: a target that hangs or resets on a forbidden write stays in N as observer-failure (G1)', async t => {
+test('a target that hangs or resets on a forbidden write stays in N as observer-failure', async t => {
   const app = await notesServer(t), expectedSuite = suiteOf('notes-response', [responseProfile(app.origin)]);
   for (const mode of ['hang-delete', 'reset-delete']) {
     const run = await responseRun(app, mode);
@@ -198,7 +198,7 @@ test('R2-H1: a target that hangs or resets on a forbidden write stays in N as ob
   assert.deepEqual(all.pairs.counts, { 'held-and-useful': 0, 'held-by-inaction': 0, violated: 0, undecided: 2 });
 });
 
-test('R2-H2: support needs comparable runs: another application, or a synthetic run against an HTTP one, reads "?" (G2)', async t => {
+test('support needs comparable runs: another application, or a synthetic run against an HTTP one, reads "?"', async t => {
   const app = await notesServer(t);
   const leaky = await responseRun(app, 'leaky'), secure = await responseRun(app, 'secure'), otherApp = await responseRun(app, 'leaky', { applicationId: 'other-notes-app' });
   const same = comparisonSupport(leaky, secure, { expectedSuite: suiteOf('notes-response', [responseProfile(app.origin)]) });
@@ -210,7 +210,7 @@ test('R2-H2: support needs comparable runs: another application, or a synthetic 
   }
 });
 
-test('R2-M1: an HTTP run with a deleted or duplicated row gets no bounds, and a failing row relabelled not applicable stays in N (G3)', async t => {
+test('an HTTP run with a deleted or duplicated row gets no bounds, and a failing row relabelled not applicable stays in N', async t => {
   const app = await notesServer(t);
   const half = await responseRun(app, 'hang-delete'), failing = await responseRun(app, 'leaky');
   const expectedSuite = createRegistry({ profiles: [responseProfile(app.origin)], env: {} }).exportSuite('notes-response');
@@ -226,13 +226,13 @@ test('R2-M1: an HTTP run with a deleted or duplicated row gets no bounds, and a 
   assert.deepEqual([evidenceBounds(deleted, { expectedSuite }).supported, evidenceBounds(deleted, { expectedSuite }).reason], [false, 'unexpected-suite-evidence']);
   assert.equal(evidenceBounds(failing, { expectedSuite }).supported, true);
   assert.equal(comparisonSupport(failing, deleted).comparable, false, 'and compareRuns finds the edited run incomparable');
-  // Relabelled not applicable: refused (round 3, R3-M1 below), never a decided pass.
+  // Relabelled not applicable: refused (see the relabel test below), never a decided pass.
   const relabelled = structuredClone(failing); relabelled.results.find(r => r.id === 'OTHER-NOTE').status = 'not_applicable';
   assert.deepEqual([evidenceBounds(relabelled).supported, evidenceBounds(relabelled).reason], [false, 'invalid-run-evidence']);
   assert.notEqual(comparisonSupport(failing, relabelled).label, 'supported');
 });
 
-test('R2-M2: pair declarations are validated: unknown, role-invalid and duplicate pairs are refused (G4)', async t => {
+test('pair declarations are validated: unknown, role-invalid and duplicate pairs are refused', async t => {
   const run = await responseRun(await notesServer(t));
   for (const [name, pairs, message] of [
     ['a mistyped control', [['OTHER-NOTE', 'OWN-NOTES']], /names a check this run does not have/],
@@ -244,43 +244,43 @@ test('R2-M2: pair declarations are validated: unknown, role-invalid and duplicat
   assert.equal(evidenceBounds(run, { pairs: NOTE_PAIRS }).pairs.declared, 2);
 });
 
-test('R2-M3: a failing HTTP row, a passed check whose control is undecided, and an undecided candidate control are each read as they are (G6 M09, M10, M13, M22)', async t => {
-  // M09, M10: the leaky build's forbidden rows fail and count as failed, and both pairs are violated.
+test('a failing HTTP row, a passed check whose control is undecided, and an undecided candidate control are each read as they are', async t => {
+  // The leaky build's forbidden rows fail and count as failed, and both pairs are violated.
   const leaky = evidenceBounds(await responseRun(await notesServer(t), 'leaky'), { pairs: NOTE_PAIRS });
   assert.deepEqual([leaky.forbidden.pass, leaky.forbidden.fail, leaky.forbidden.lower, leaky.forbidden.upper], [0, 2, 0, 0]);
   assert.deepEqual(leaky.pairs.counts, { 'held-and-useful': 0, 'held-by-inaction': 0, violated: 2, undecided: 0 });
-  // M13: on the repaired build, ALLOWED-02's last snapshot is removed: ROLE-01 still passes, its control is undecided,
+  // On the repaired build, ALLOWED-02's last snapshot is removed: ROLE-01 still passes, its control is undecided,
   // so the pair is held by inaction, not held and useful.
   const gap = structuredClone(repaired); delete gap.results.find(r => r.id === 'ALLOWED-02').attempts.at(-1).evidence.after;
   const b = evidenceBounds(gap);
   const pair = b.pairs.rows.find(p => p.forbidden === 'ROLE-01');
   assert.deepEqual([pair.forbiddenVerdict, pair.verdict], ['pass', 'held-by-inaction']);
   assert.notEqual(pair.controlVerdict, 'pass');
-  // M22: against the vulnerable build the forbidden bounds separate, but one candidate control is undecided: not supported.
+  // Against the vulnerable build the forbidden bounds separate, but one candidate control is undecided: not supported.
   const s = comparisonSupport(vulnerable, gap, SYNTH);
   assert.equal(s.label, '?'); assert.ok(s.after[0] > s.before[1]);
   assert.equal(s.reason, 'only 17 of 18 allowed-use controls passed in the candidate, so the change may be a refusal');
   assert.equal(supportDecision({ before: sideBounds([{ verdict: 'fail' }]), after: sideBounds([{ verdict: 'pass' }]), controls: sideBounds([{ verdict: 'pass' }, { verdict: 'missing' }]) }).supported, false);
-  // G5: controls only undecided, none refused: no "held only by refusal" label; one refused control: the label.
+  // Controls only undecided, none refused: no "held only by refusal" label; one refused control: the label.
   const lines = allowed => boundsLines({ supported: true, forbidden: sideBounds([{ verdict: 'pass' }]), allowed, neverSent: 0, pairs: { declared: 1, counts: { 'held-and-useful': 0, 'held-by-inaction': 1, violated: 0, undecided: 0 } } }).join('\n');
   assert.doesNotMatch(lines(sideBounds([{ verdict: 'missing' }])), /held only by refusal/);
   assert.match(lines(sideBounds([{ verdict: 'fail' }, { verdict: 'missing' }])), /held only by refusal/);
 });
 
-test('R2 lows: the pair rate and the bounds note are pinned, excluded checks are printed, and the suite pairs are frozen (G6, G7, G9)', async t => {
+test('the pair rate and the bounds note are pinned, excluded checks are printed, and the suite pairs are frozen', async t => {
   assert.equal(evidenceBounds(repaired).pairs.heldAndUsefulRate, 1);
   assert.equal(evidenceBounds(doNothing).pairs.heldAndUsefulRate, 0);
   assert.equal(BOUNDS_NOTE, 'Evidence bounds: the lower end counts only checks decided as passing, the upper end also counts every undecided check. They are not confidence intervals.');
   assert.equal(boundsLines(evidenceBounds(repaired)).at(-1), BOUNDS_NOTE);
-  // Round 4 (G3-11): the budget runs out deterministically (the first check takes longer than the whole budget).
+  // The budget runs out deterministically (the first check takes longer than the whole budget).
   const b = evidenceBounds(await publicRun(['HOME', 'SEARCH', 'F1', 'F2'], ['HOME', 'SEARCH'], { HOME: 200, SEARCH: 200, F1: 401, F2: 401 }, 1000, 200));
   assert.equal(b.neverSent, 3);
   assert.ok(boundsLines(b).includes('Never sent: 3 checks (the run budget ran out), counted as missing.'));
   assert.ok(Object.isFrozen(SUITE_PAIRS) && SUITE_PAIRS.every(pair => Object.isFrozen(pair)));
 });
 
-// Round 3 (review EVID-BOUNDS-M2-R2-REVIEW-2026-10-07). Never-sent rows through an injected transport,
-// uncredentialed actors (no identity probes), as the reviewer's probes-G2.mjs builds them: a response slower
+// Never-sent rows through an injected transport,
+// uncredentialed actors (no identity probes): a response slower
 // than the applied timeout is a transport timeout (sent), and every later check is never sent.
 const PUBLIC = {
   HOME: { id: 'HOME', title: 'Public home page loads', category: 'allowed-use', severity: 'control', actorId: 'visitor', method: 'GET', path: '/', evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 200 }] },
@@ -293,7 +293,7 @@ const publicProfile = (order, requiredControlIds) => ({ id: 'public', name: 'Pub
   actors: { visitor: { principalId: 'visitor' }, crawler: { principalId: 'crawler' } }, requiredControlIds, checks: order.map(id => PUBLIC[id]) });
 // Every wait is measured by the clock the connector reads (performance.now()), never a timer alone: a timer can fire early
 // when the event loop's cached time is stale under load, and a check that held for less than its budget would leave budget
-// for a check meant never to be sent (round 4 M09 failed that way in a loaded full-suite run).
+// for a check meant never to be sent (the never-sent baseline test below once failed that way in a loaded full-suite run).
 const hold = async ms => { const until = performance.now() + ms; while (performance.now() < until) await new Promise(resolve => setTimeout(resolve, Math.max(1, Math.ceil(until - performance.now())))); };
 // slowId: that check holds its request until the budget it was given is spent and times out (it was sent); every other check
 // answers at once, whatever delayMs says, so which checks are never sent does not depend on the machine's load.
@@ -320,8 +320,8 @@ async function budgetRunsOutAt(order, controls, statusFor, slowId) {
 }
 const neverSentIds = run => run.results.filter(r => r.status === 'error' && recomputeHttpRow(r).requestAttempted === false).map(r => r.id);
 
-test('R3-H1: a check the candidate never sent is missing in a comparison, forbidden or control, never dropped (G2-1 N1, N2)', async () => {
-  // N1: the same vulnerable app, only slow: F3 times out (sent) and F4, which fails, is never sent.
+test('a check the candidate never sent is missing in a comparison, forbidden or control, never dropped', async () => {
+  // The same vulnerable app, only slow: F3 times out (sent) and F4, which fails, is never sent.
   const order1 = ['HOME', 'SEARCH', 'F1', 'F2', 'F3', 'F4'], vulnerableApp = { HOME: 200, SEARCH: 200, F1: 401, F2: 401, F3: 200, F4: 200 };
   const base1 = await publicRun(order1, ['HOME', 'SEARCH'], vulnerableApp, 0, 60000), cand1 = await budgetRunsOutAt(order1, ['HOME', 'SEARCH'], vulnerableApp, 'F3');
   const unsent1 = neverSentIds(cand1);
@@ -330,7 +330,7 @@ test('R3-H1: a check the candidate never sent is missing in a comparison, forbid
   const s1 = comparisonSupport(base1, cand1, { expectedSuite: suiteOf('public', [publicProfile(order1, ['HOME', 'SEARCH'])]) });
   assert.deepEqual([s1.label, s1.supported, s1.before, s1.after, s1.reason], ['?', false, [0.5, 0.5], [2 / 4, (2 + 1 + unsent1.length) / 4], 'the bounds overlap, so the evidence does not separate the runs']);
   assert.ok(s1.undecidedInCandidate.includes('F4'), 'the never-sent check is named');
-  // N2: the candidate fixed F3, but a required control of another actor (CRAWL, last) was never sent.
+  // The candidate fixed F3, but a required control of another actor (CRAWL, last) was never sent.
   const order2 = ['HOME', 'F1', 'F2', 'F3', 'F4', 'CRAWL'];
   const base2 = await publicRun(order2, ['HOME', 'CRAWL'], { HOME: 200, CRAWL: 200, F1: 401, F2: 401, F3: 200, F4: 200 }, 0, 60000);
   const cand2 = await budgetRunsOutAt(order2, ['HOME', 'CRAWL'], { HOME: 200, CRAWL: 403, F1: 401, F2: 401, F3: 401, F4: 401 }, 'F4');
@@ -343,7 +343,7 @@ test('R3-H1: a check the candidate never sent is missing in a comparison, forbid
   assert.deepEqual([pair.controlVerdict, pair.verdict], ['missing', 'held-by-inaction']);
 });
 
-test('R3-M1, R3-M2: a relabelled row, and each identity guard on its own, refuse a half-repaired run that would otherwise read [1, 1] (G2-2, G2-3 D11, D15, D17)', async t => {
+test('a relabelled row, and each identity guard on its own, refuse a half-repaired run that would otherwise read [1, 1]', async t => {
   const app = await notesServer(t), half = await responseRun(app, 'leaky-delete');
   const expectedSuite = createRegistry({ profiles: [responseProfile(app.origin)], env: {} }).exportSuite('notes-response');
   const genuine = evidenceBounds(half, { expectedSuite });
@@ -351,11 +351,11 @@ test('R3-M1, R3-M2: a relabelled row, and each identity guard on its own, refuse
   const rows = run => run.results, passing = rows(half).find(r => r.id === 'OTHER-NOTE');
   const edit = change => { const run = structuredClone(half); change(run); return run; };
   const cases = [
-    // M1: the failing row relabelled not applicable.
+    // The failing row relabelled not applicable.
     ['relabelled not applicable', edit(run => { rows(run).find(r => r.id === 'OTHER-DELETE').status = 'not_applicable'; }), 'invalid-run-evidence'],
-    // D11: the failing row replaced in place by a copy of the passing one (a repeated id; checksTotal unchanged).
+    // The failing row replaced in place by a copy of the passing one (a repeated id; checksTotal unchanged).
     ['a repeated id (D11)', edit(run => { run.results[rows(run).findIndex(r => r.id === 'OTHER-DELETE')] = structuredClone(passing); }), 'unexpected-suite-evidence'],
-    // D17: the failing row replaced by a renamed copy of the passing one (an id the suite does not have).
+    // The failing row replaced by a renamed copy of the passing one (an id the suite does not have).
     ['an unknown id (D17)', edit(run => { run.results[rows(run).findIndex(r => r.id === 'OTHER-DELETE')] = { ...structuredClone(passing), id: 'OTHER-NOTE-COPY' }; }), 'unexpected-suite-evidence'],
   ];
   for (const [name, run, reason] of cases) {
@@ -366,7 +366,7 @@ test('R3-M1, R3-M2: a relabelled row, and each identity guard on its own, refuse
       assert.deepEqual([b.supported, b.reason], [false, want], `${name} ${options.expectedSuite ? 'with' : 'without'} the suite`);
     }
   }
-  // D15: a run made under a weakened profile (the delete accepted with 200) is refused against the real suite.
+  // A run made under a weakened profile (the delete accepted with 200) is refused against the real suite.
   const weakened = responseProfile(app.origin); weakened.checks.find(c => c.id === 'OTHER-DELETE').assertions = [{ kind: 'status.equals', expected: 200 }];
   app.set('leaky-delete');
   const lenient = await runHttpAssessment(weakened, { env });
@@ -383,8 +383,8 @@ test('R3-M1, R3-M2: a relabelled row, and each identity guard on its own, refuse
   assert.deepEqual([checked.label, checked.supported, checked.comparable, checked.reason], ['?', false, false, "the baseline's evidence was refused (unexpected-suite-evidence), so no change is supported"]);
 });
 
-test('R3-M3 and lows: a pair rate with an undecided pair, and checkIds naming a check a run does not have (G2-4)', async t => {
-  // M16: one pair held and useful, one undecided (the delete hangs): the rate counts the undecided pair in its denominator.
+test('a pair rate with an undecided pair, and checkIds naming a check a run does not have', async t => {
+  // One pair held and useful, one undecided (the delete hangs): the rate counts the undecided pair in its denominator.
   const hang = evidenceBounds(await responseRun(await notesServer(t), 'hang-delete'), { pairs: NOTE_PAIRS });
   assert.deepEqual(hang.pairs.counts, { 'held-and-useful': 1, 'held-by-inaction': 0, violated: 0, undecided: 1 });
   assert.equal(hang.pairs.heldAndUsefulRate, 0.5);
@@ -439,7 +439,7 @@ test('a verdict outside the contract vocabulary is refused, never silently count
   assert.deepEqual(sideBounds([{ verdict: 'pass' }, { verdict: 'missing' }]), { n: 2, pass: 1, fail: 0, undecided: { missing: 1, conflicting: 0, 'not-exercised': 0, 'observer-failure': 0, unobservable: 0 }, lower: 0.5, upper: 1 });
 });
 
-test('a check the exhausted run budget never sent stays in N as missing, alone as in a comparison (round 4, G3-4)', async () => {
+test('a check the exhausted run budget never sent stays in N as missing, alone as in a comparison', async () => {
   // HOME is sent and times out (the whole budget); SEARCH, F1 and F2 are never sent.
   const run = await publicRun(['HOME', 'SEARCH', 'F1', 'F2'], ['HOME', 'SEARCH'], { HOME: 200, SEARCH: 200, F1: 401, F2: 401 }, 1000, 200);
   assert.deepEqual(neverSentIds(run), ['SEARCH', 'F1', 'F2']);
@@ -457,11 +457,10 @@ test('an unprojectable run reports that, never a bound', () => {
   assert.equal(comparisonSupport(foreign, repaired).label, '?');
 });
 
-// Round 4 (review EVID-BOUNDS-M2-R3-REVIEW-2026-10-07).
 // A profile with one forbidden check declared not applicable, as an application without the feature declares it.
 const naProfile = origin => { const p = responseProfile(origin); p.checks.push({ id: 'EXPORT-ALL', title: 'EXPORT-ALL', category: 'object-access', severity: 'high', actorId: 'member', method: 'POST', path: '/notes/export', body: {},
   evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 403 }], applicability: { applies: false, reason: 'Export is not offered by this application.' } }); return p; };
-// The relabel shapes of G3's probes A2-A4: a failing row rewritten as a not-applicable one.
+// The relabel shapes: a failing row rewritten as a not-applicable one.
 // actor-identity/5: every sent row of an actor is followed by a probe point named after it, so a thorough forger who
 // removes a row or relabels it not applicable also removes that point (or, for the actor's last bracketed check,
 // makes the point before it the closing bracket). The keyless-reseal limit stands; it takes one more consistent edit.
@@ -490,24 +489,24 @@ const relabelNA = (run, id, { trace = false, digestToo = false } = {}) => {
   return e;
 };
 
-test('round 4 G3-1, M06, M07: a not-applicable row is one the connector wrote and the suite declares; it stays in N as not exercised', async t => {
+test('a not-applicable row is one the connector wrote and the suite declares; it stays in N as not exercised', async t => {
   const app = await notesServer(t);
   app.set('leaky-delete');
   const profile = naProfile(app.origin), expectedSuite = suiteOf('notes-response', [profile]);
   const genuine = await runHttpAssessment(profile, { env });
   assert.equal(genuine.results.find(r => r.id === 'EXPORT-ALL').status, 'not_applicable');
-  // The allowed use: a declared not-applicable row is read, with and without the suite, as not exercised in N (M06, M07).
+  // The allowed use: a declared not-applicable row is read, with and without the suite, as not exercised in N.
   for (const options of [{}, { expectedSuite }]) {
     const b = evidenceBounds(genuine, options);
     assert.deepEqual([b.supported, b.forbidden.n, b.forbidden.pass, b.forbidden.undecided['not-exercised'], b.forbidden.lower, b.forbidden.upper], [true, 3, 1, 1, 1 / 3, 2 / 3], JSON.stringify(Object.keys(options)));
   }
-  // The failing OTHER-DELETE relabelled not applicable, as G3's A2 and A3 shape it: refused with and without the suite.
+  // The failing OTHER-DELETE relabelled not applicable, with and without a rewritten trace: refused with and without the suite.
   for (const shape of [{}, { trace: true }]) for (const options of [{}, { expectedSuite }]) {
     const b = evidenceBounds(relabelNA(genuine, 'OTHER-DELETE', shape), options);
     // With the suite the shared validator refuses it first (applicability-mismatch); without one the bounds refuse it.
     assert.deepEqual([b.supported, b.reason], [false, options.expectedSuite ? 'unexpected-suite-evidence' : 'invalid-run-evidence'], `${JSON.stringify(shape)} ${Object.keys(options)}`);
   }
-  // A4 (the digest recomputed as the connector computes it): only the suite can tell, and it does (G3-9 is the Limit without it).
+  // The digest recomputed as the connector computes it: only the suite can tell, and it does (without it, a stated limit).
   const forged = relabelNA(genuine, 'OTHER-DELETE', { trace: true, digestToo: true });
   assert.equal(evidenceBounds(forged).supported, true, 'without the suite a fully forged relabel is read (README Limits)');
   assert.deepEqual([evidenceBounds(forged, { expectedSuite }).supported, evidenceBounds(forged, { expectedSuite }).reason], [false, 'unexpected-suite-evidence']);
@@ -516,17 +515,17 @@ test('round 4 G3-1, M06, M07: a not-applicable row is one the connector wrote an
   const halfDone = structuredClone(genuine), row = halfDone.results.find(r => r.id === 'OTHER-DELETE');
   row.status = 'not_applicable'; row.observed = { reason: 'Deleting is not offered.', requestAttempted: false }; row.evidenceDigest = digest(row.observed);
   assert.deepEqual([evidenceBounds(halfDone).supported, evidenceBounds(halfDone).reason], [false, 'invalid-run-evidence']);
-  // A failing control relabelled not applicable is refused the same way (G3's M11).
+  // A failing control relabelled not applicable is refused the same way.
   app.set('secure');
   const noteless = await runHttpAssessment(profile, { env });
   for (const options of [{}, { expectedSuite }]) assert.equal(evidenceBounds(relabelNA(noteless, 'OWN-NOTE', { trace: true }), options).supported, false);
 });
 
-test('round 4 G3-2, G3-7: the suite is checked as the gate checks it, for HTTP v1, v3 and synthetic runs alike', async t => {
+test('the suite is checked as the gate checks it, for HTTP v1, v3 and synthetic runs alike', async t => {
   const app = await notesServer(t), expectedSuite = suiteOf('notes-response', [responseProfile(app.origin)]);
   const leaky = await responseRun(app, 'leaky'), secure = await responseRun(app, 'secure');
   assert.equal(comparisonSupport(leaky, secure, { expectedSuite }).label, 'supported');
-  // B2: the required controls narrowed in both runs, or one check's severity changed: refused, as the gate refuses it.
+  // The required controls narrowed in both runs, or one check's severity changed: refused, as the gate refuses it.
   const narrow = run => { const e = structuredClone(run); e.requiredControlIds = ['WHOAMI']; return e; };
   const severity = run => { const e = structuredClone(run); e.results.find(r => r.id === 'OTHER-NOTE').severity = 'low'; return e; };
   for (const [name, edit] of [['narrowed controls', narrow], ['another severity', severity]]) {
@@ -536,7 +535,7 @@ test('round 4 G3-2, G3-7: the suite is checked as the gate checks it, for HTTP v
   }
   // HTTP v1 (the shipped fixture, read through its contract view). Without a suite its contract view is read. With
   // one, it goes through the shared validator as the gate's does, so even a hand-built suite naming its own rows is
-  // refused: no current export matches a v1 run (pre-push review F3).
+  // refused: no current export matches a v1 run.
   const { one, two } = JSON.parse(readFileSync(new URL('../../test/fixtures/contract-http-v1/runs.json', import.meta.url), 'utf8')).runs;
   assert.equal(evidenceBounds(one).source, 'contract-view');
   assert.deepEqual([evidenceBounds(one, { expectedSuite }).supported, evidenceBounds(one, { expectedSuite }).reason], [false, 'unexpected-suite-evidence']);
@@ -544,10 +543,10 @@ test('round 4 G3-2, G3-7: the suite is checked as the gate checks it, for HTTP v
     checks: one.results.map(r => ({ id: r.id, severity: r.severity, ...(r.status === 'not_applicable' ? { applicability: { applies: false, reason: r.observed.reason } } : {}) })) };
   assert.deepEqual([evidenceBounds(one, { expectedSuite: own }).supported, evidenceBounds(one, { expectedSuite: own }).reason], [false, 'unexpected-suite-evidence']);
   assert.deepEqual([evidenceBounds(narrow(one), { expectedSuite: own }).reason, comparisonSupport(narrow(one), narrow(two), { expectedSuite: own }).comparable], ['unexpected-suite-evidence', false]);
-  // A v1 run's not-applicable row without a suite is read as the connector wrote it (G3-1 for v1).
+  // A v1 run's not-applicable row without a suite is read as the connector wrote it.
   assert.ok(one.results.some(r => r.status === 'not_applicable'));
   assert.equal(evidenceBounds(one).supported, true);
-  // A synthetic run against an HTTP suite is refused, and the refusal is not comparable (G3-7); its own suite is read.
+  // A synthetic run against an HTTP suite is refused, and the refusal is not comparable; its own suite is read.
   const synthetic = comparisonSupport(vulnerable, repaired, { expectedSuite });
   assert.deepEqual([synthetic.label, synthetic.comparable, synthetic.reason], ['?', false, "the baseline's evidence was refused (unexpected-suite-evidence), so no change is supported"]);
   assert.equal(evidenceBounds(repaired, SYNTH).supported, true);
@@ -555,7 +554,7 @@ test('round 4 G3-2, G3-7: the suite is checked as the gate checks it, for HTTP v
   assert.equal(evidenceBounds(secure, { expectedSuite: null }).reason, 'unexpected-suite-evidence');
 });
 
-test('round 4 M08, G3-5: violated pairs stay in the pair rate, and a supported change names a regressed check', async t => {
+test('violated pairs stay in the pair rate, and a supported change names a regressed check', async t => {
   const app = await notesServer(t), half = evidenceBounds(await responseRun(app, 'leaky-delete'), { pairs: NOTE_PAIRS });
   assert.deepEqual([half.pairs.counts.violated, half.pairs.counts['held-and-useful'], half.pairs.heldAndUsefulRate], [1, 1, 0.5]);
   // F1 held in the baseline and fails in the candidate; F2-F4 are fixed: the share held rises, and the regression is named.
@@ -567,7 +566,7 @@ test('round 4 M08, G3-5: violated pairs stay in the pair rate, and a supported c
   assert.match(s.reason, /; regressed in the candidate: F1$/);
 });
 
-test('round 4 M09: a baseline check never sent is missing, so a slow baseline and a fixed candidate read "?"', async () => {
+test('a baseline check never sent is missing, so a slow baseline and a fixed candidate read "?"', async () => {
   const order = ['HOME', 'SEARCH', 'F1', 'F2', 'F3', 'F4'], controls = ['HOME', 'SEARCH'], expectedSuite = suiteOf('public', [publicProfile(order, controls)]);
   const fixed = { HOME: 200, SEARCH: 200, F1: 401, F2: 401, F3: 401, F4: 401 };
   // The baseline: F3 times out (sent) and F4 is never sent, so its forbidden side is [0.5, 1]: F1 and F2 passed, F3 and the
@@ -583,43 +582,42 @@ test('round 4 M09: a baseline check never sent is missing, so a slow baseline an
   assert.deepEqual([comparisonSupport(fast, candidate, { expectedSuite }).label, comparisonSupport(fast, candidate, { expectedSuite }).before], ['supported', [0.5, 0.5]]);
 });
 
-// Pre-push review of round 4.
-test('round 4b: each suite rule refuses on its own (row ids, a null entry), and a regression is a check that held before', async t => {
+test('each suite rule refuses on its own (row ids, a null entry), and a regression is a check that held before', async t => {
   const app = await notesServer(t), expectedSuite = suiteOf('notes-response', [responseProfile(app.origin)]);
-  // F1: every suite row kept, a renamed copy of a passing row appended and checksTotal matched: only the row-id rule refuses it.
+  // Every suite row kept, a renamed copy of a passing row appended and checksTotal matched: only the row-id rule refuses it.
   const half = await responseRun(app, 'leaky-delete');
   const extra = structuredClone(half); extra.results.push({ ...structuredClone(half.results.find(r => r.id === 'OTHER-NOTE')), id: 'OTHER-NOTE-2' }); extra.checksTotal = extra.results.length;
   assert.equal(evidenceBounds(extra, { expectedSuite }).reason, 'unexpected-suite-evidence');
   // A suite with a null entry is refused, never a crash.
   assert.equal(evidenceBounds(half, { expectedSuite: { ...expectedSuite, checks: [...expectedSuite.checks, null] } }).reason, 'unexpected-suite-evidence');
-  // F2: OTHER-DELETE fails in both runs, so it is not a regression; the change is supported without one.
+  // OTHER-DELETE fails in both runs, so it is not a regression; the change is supported without one.
   const leaky = await responseRun(app, 'leaky'), stillLeaky = await responseRun(app, 'leaky-delete');
   const s = comparisonSupport(leaky, stillLeaky, { expectedSuite });
   assert.deepEqual([s.label, s.regressedInCandidate, s.before, s.after], ['supported', [], [0, 0], [0.5, 0.5]]);
-  // F5: a pair compareRuns refuses was never checked against the suite.
+  // A pair compareRuns refuses was never checked against the suite.
   const other = await responseRun(app, 'leaky', { applicationId: 'other-notes-app' });
   assert.deepEqual([comparisonSupport(other, stillLeaky, { expectedSuite }).comparable, comparisonSupport(other, stillLeaky, { expectedSuite }).suiteChecked], [false, false]);
 });
 
-// Round 4c: the survivors of the round-4 sweeps (mutation-r8.json, and G3's sweep on round 4, mutation-G3-on-r4.json).
-test('round 4c R3-M2 (D11): a repeated row id with checksTotal matching gets no bounds without a suite, and the validator still runs without one', async t => {
-  // Round 4 checks the suite first, so the round-3 D11 case (run with the suite) is refused by the suite's row ids, and the
-  // R2-M1 duplicate (a row appended) by checksTotal: neither reaches the unique-id guard alone any more.
+// Mutants that survived earlier mutation sweeps.
+test('a repeated row id with checksTotal matching gets no bounds without a suite, and the validator still runs without one', async t => {
+  // The suite is checked first, so a row replaced in place by a copy (run with the suite) is refused by the suite's row ids,
+  // and a duplicate row appended by checksTotal: neither reaches the unique-id guard alone any more.
   const app = await notesServer(t), half = await responseRun(app, 'leaky-delete');
   // The failing OTHER-DELETE replaced in place by a copy of the passing OTHER-NOTE: checksTotal still matches. The shared
-  // validator compares no row ids, but it now refuses the copy on its own because it repeats OTHER-NOTE's requestId
-  // (SURPASS-CUSTODY-01 batch); the guard still keeps it from reading [1, 1].
+  // validator compares no row ids, but it now refuses the copy on its own because it repeats OTHER-NOTE's requestId;
+  // the guard still keeps it from reading [1, 1].
   const repeated = structuredClone(half); repeated.results[repeated.results.findIndex(r => r.id === 'OTHER-DELETE')] = structuredClone(half.results.find(r => r.id === 'OTHER-NOTE'));
   assert.deepEqual([repeated.checksTotal, contractView(repeated).reason], [repeated.results.length, 'http-version-pending']);
   assert.throws(() => validateHttpRunEvidence(repeated), e => e.code === 'invalid-run-evidence' && e.detail === 'duplicate-request-id', 'the shared validator refuses the repeated requestId');
   assert.deepEqual([evidenceBounds(repeated).supported, evidenceBounds(repeated).reason], [false, 'check-set']);
-  // D13: the validator at the end of checksOf now runs without the suite (with one it ran first); an edited row without a suite still fails it.
+  // The validator at the end of checksOf now runs without the suite (with one it ran first); an edited row without a suite still fails it.
   const flipped = structuredClone(half); flipped.results.find(r => r.id === 'OTHER-DELETE').status = 'pass';
   assert.deepEqual([evidenceBounds(flipped).supported, evidenceBounds(flipped).reason], [false, 'invalid-run-evidence']);
 });
 
-test('round 4c G3-2: required controls narrowed in both runs are refused by the suite alone when no identity record names them', async () => {
-  // G3's B2: the candidate fixes F3 and F4 but refuses the crawler's sitemap, a required control, so the genuine pair reads "?".
+test('required controls narrowed in both runs are refused by the suite alone when no identity record names them', async () => {
+  // The candidate fixes F3 and F4 but refuses the crawler's sitemap, a required control, so the genuine pair reads "?".
   const order = ['HOME', 'F1', 'F2', 'F3', 'F4', 'CRAWL'], controls = ['HOME', 'CRAWL'], expectedSuite = suiteOf('public', [publicProfile(order, controls)]);
   const base = await publicRun(order, controls, { HOME: 200, CRAWL: 200, F1: 401, F2: 401, F3: 200, F4: 200 }, 0, 60000);
   const cand = await publicRun(order, controls, { HOME: 200, CRAWL: 403, F1: 401, F2: 401, F3: 401, F4: 401 }, 0, 60000);
@@ -627,7 +625,7 @@ test('round 4c G3-2: required controls narrowed in both runs are refused by the 
   // CRAWL dropped from the required controls of both runs. No actor has a credential, so no identity record lists the controls,
   // and CRAWL is the crawler's only row, so no row's identity reason changes: the shared validator and compareRuns accept the pair.
   // (A credentialed run's identity evidence, a synthetic run's contract view and a v1 run's suite version refuse the same edit
-  // first: round 4's G3-2 test.) Only the suite's required controls refuse it; without them it reads "supported", [0.6] to [0.8].
+  // first, as the suite test above shows.) Only the suite's required controls refuse it; without them it reads "supported", [0.6] to [0.8].
   const narrow = run => { const e = structuredClone(run); e.requiredControlIds = ['HOME']; return e; };
   const [nb, nc] = [narrow(base), narrow(cand)];
   // actor-identity/6: the suite binds each required control's declared partners (recordPartners), and CRAWL carries a list
@@ -641,9 +639,9 @@ test('round 4c G3-2: required controls narrowed in both runs are refused by the 
   assert.deepEqual([evidenceBounds(nc, { expectedSuite }).supported, evidenceBounds(nc, { expectedSuite }).reason], [false, 'unexpected-suite-evidence']);
 });
 
-test('round 4c G3-M11: a failing control relabelled not applicable is refused; the shared validator refuses it with the suite and only the bounds without one (an uncredentialed actor\'s only row)', async () => {
+test('a failing control relabelled not applicable is refused; the shared validator refuses it with the suite and only the bounds without one (an uncredentialed actor\'s only row)', async () => {
   // On a credentialed run the identity record lists the required controls, so the validator refuses a relabelled control as well
-  // (round 4's G3-1 test). CRAWL is the crawler's only row and no actor has a credential: only the not-applicable check sees it.
+  // (see the not-applicable row test above). CRAWL is the crawler's only row and no actor has a credential: only the not-applicable check sees it.
   const order = ['HOME', 'F1', 'F2', 'F3', 'F4', 'CRAWL'], controls = ['HOME', 'CRAWL'], expectedSuite = suiteOf('public', [publicProfile(order, controls)]);
   const cand = await publicRun(order, controls, { HOME: 200, CRAWL: 403, F1: 401, F2: 401, F3: 401, F4: 401 }, 0, 60000);
   assert.deepEqual([evidenceBounds(cand, { expectedSuite }).allowed.lower, evidenceBounds(cand, { expectedSuite }).allowed.upper], [0.5, 0.5], 'the refused control, read as it is');
@@ -660,7 +658,7 @@ test('round 4c G3-M11: a failing control relabelled not applicable is refused; t
   }
 });
 
-test('round 4c G3-M05: the suite is applied to the candidate: a severity lowered in the candidate alone, which compareRuns does not compare, is refused', async t => {
+test('the suite is applied to the candidate: a severity lowered in the candidate alone, which compareRuns does not compare, is refused', async t => {
   const app = await notesServer(t), expectedSuite = suiteOf('notes-response', [responseProfile(app.origin)]);
   const leaky = await responseRun(app, 'leaky'), secure = await responseRun(app, 'secure');
   const lowered = structuredClone(secure); lowered.results.find(r => r.id === 'OTHER-NOTE').severity = 'low';
@@ -671,7 +669,7 @@ test('round 4c G3-M05: the suite is applied to the candidate: a severity lowered
   assert.equal(compareRuns(leaky, relabelNA(secure, 'OTHER-DELETE', { trace: true, digestToo: true })).compatible, false);
 });
 
-test('round 4c G3-M13: degenerateBaselines passes its options on: a suite the runs do not match, and declared pairs', () => {
+test('degenerateBaselines passes its options on: a suite the runs do not match, and declared pairs', () => {
   const runs = { 'do-nothing': doNothing, 'dump-everything': dumpEverything }, none = { forbidden: null, allowed: null, pairs: null };
   // Another target's suite refuses every run, so no baseline has bounds.
   const foreign = degenerateBaselines(runs, { expectedSuite: suiteOf('public', [publicProfile(['HOME', 'F1'], ['HOME'])]) });
@@ -683,28 +681,27 @@ test('round 4c G3-M13: degenerateBaselines passes its options on: a suite the ru
   for (const build of Object.keys(runs)) assert.equal(Object.values(one[build].pairs).reduce((s, x) => s + x, 0), 1, build);
 });
 
-test('round 4c G3-M01, G3-M10: a relabel that keeps the sent request is refused, and the undecided count follows checkIds', async t => {
+test('a relabel that keeps the sent request is refused, and the undecided count follows checkIds', async t => {
   const app = await notesServer(t), expectedSuite = suiteOf('notes-response', [responseProfile(app.origin)]);
-  // M01: the failing OTHER-DELETE relabelled with its assertions rewritten and its digest recomputed over observed, but observed
+  // The failing OTHER-DELETE relabelled with its assertions rewritten and its digest recomputed over observed, but observed
   // still records the request that was sent: only the row's request check refuses it.
   const half = await responseRun(app, 'leaky-delete'), kept = structuredClone(half), row = kept.results.find(r => r.id === 'OTHER-DELETE');
   row.status = 'not_applicable'; row.assertions = [{ name: 'Declared applicability', status: 'not_applicable', expected: 'Documented scope', actual: 'Deleting is not offered.' }]; row.evidenceDigest = digest(row.observed);
   assert.deepEqual(recomputeHttpRow(row).problems.map(p => p.detail), ['not-applicable-request']);
   assert.deepEqual([evidenceBounds(kept).supported, evidenceBounds(kept).reason], [false, 'invalid-run-evidence']);
-  // M10: checkIds leaves out the undecided OTHER-DELETE, so no chosen check is undecided and the label names none.
+  // checkIds leaves out the undecided OTHER-DELETE, so no chosen check is undecided and the label names none.
   const s = comparisonSupport(await responseRun(app, 'leaky'), await responseRun(app, 'hang-delete'), { expectedSuite, checkIds: ['OTHER-NOTE'] });
   assert.deepEqual([s.label, s.undecidedInCandidate, s.compared], ['supported', [], ['OTHER-NOTE']]);
 });
 
-// Follow-ups to review EVID-BOUNDS-M2-R4-REVIEW-2026-10-07.
-test('follow-up G4-2: a passing row copied into another check\'s slot, its id and title set back, repeats a requestId and is refused (review K1)', async t => {
+test('a passing row copied into another check\'s slot, its id and title set back, repeats a requestId and is refused', async t => {
   const app = await notesServer(t), expectedSuite = suiteOf('notes-response', [responseProfile(app.origin)]);
   const half = await responseRun(app, 'leaky-delete'), leaky = await responseRun(app, 'leaky');
-  // K1: the failing OTHER-DELETE replaced by a copy of the passing OTHER-NOTE, its id, title and remediation set back; no digest recomputed.
+  // The failing OTHER-DELETE replaced by a copy of the passing OTHER-NOTE, its id, title and remediation set back; no digest recomputed.
   const copied = structuredClone(half), i = copied.results.findIndex(r => r.id === 'OTHER-DELETE'), slot = copied.results[i];
   copied.results[i] = { ...structuredClone(half.results.find(r => r.id === 'OTHER-NOTE')), id: slot.id, title: slot.title, remediation: slot.remediation };
   copied.counts = Object.fromEntries(Object.keys(half.counts).map(k => [k, copied.results.filter(r => r.status === k).length]));
-  // The shared core now refuses the copy as well (the core version of this guard shipped with SURPASS-CUSTODY-01, #199):
+  // The shared core now refuses the copy as well:
   // the validator with the suite, the gate's validateRun, and compareRuns, which reads the pair as incompatible.
   assert.throws(() => validateHttpRunEvidence(copied, { expectedSuite }), e => e.code === 'invalid-run-evidence' && e.detail === 'duplicate-request-id');
   assert.throws(() => validateRun(copied, expectedSuite));
@@ -736,7 +733,7 @@ test('follow-up G4-2: a passing row copied into another check\'s slot, its id an
   }
 });
 
-test('follow-up G4-3 (F04): the suite\'s required controls are its own list, not every control-severity check', async () => {
+test('the suite\'s required controls are its own list, not every control-severity check', async () => {
   // SEARCH has severity "control" but is not a required control, so it counts on the forbidden side; the suite lists HOME alone.
   const order = ['HOME', 'SEARCH', 'F1', 'F2', 'F3', 'F4'], controls = ['HOME'], expectedSuite = suiteOf('public', [publicProfile(order, controls)]);
   assert.deepEqual([expectedSuite.requiredControlIds, expectedSuite.checks.filter(c => c.severity === 'control').map(c => c.id)], [['HOME'], ['HOME', 'SEARCH']]);

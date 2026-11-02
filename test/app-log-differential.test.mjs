@@ -1,4 +1,4 @@
-// What an app log may change (APP-LOG addendum R1): over the existing example corpus (the onboarding profiles in docs/profiles
+// What an app log may change: over the existing example corpus (the onboarding profiles in docs/profiles
 // and the collateral refund-only profile), each profile is run against the same example app build three times: as shipped, with
 // an app log declared on the app's own action log with "use": "record", and with "use": "admission".
 //   record     every row's status, decision, backend evidence and assertions (custody, settlement, attribution and pairing tags

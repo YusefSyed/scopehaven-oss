@@ -1,4 +1,4 @@
-// Supabase identity rules (NC2 item 3) without a database: the service-role resolver, its note on actor-pinned clauses,
+// Supabase identity rules without a database: the service-role resolver, its note on actor-pinned clauses,
 // and the FAIL-only rls-zero-row reading. supabase-rules.live.test.mjs runs them over a local Supabase stack.
 import test from 'node:test';
 import assert from 'node:assert/strict';

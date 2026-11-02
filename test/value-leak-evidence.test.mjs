@@ -72,7 +72,7 @@ test('validation: every declaration error is refused, and no message carries a d
 });
 
 test('existing profiles keep their contract digest and evaluation; declared values bind the digest', () => {
-  // Pinned on main b003e4f: a profile with no tenantValues digests exactly as before.
+  // Pinned on an earlier build: a profile with no tenantValues digests exactly as before.
   const old = profile({ checks: [allow, chat({ body: { message: 'hello' }, assertions: [{ kind: 'status.equals', expected: 200 }, { kind: 'json.notContains', pointer: '/reply', expected: '@globex.example' }] })] });
   delete old.tenantValues;
   assert.equal(contractDigest(validate(old)), 'be139b52b36a378ba4bd7c393a4c04d83d672f0b6ef5a73e84af3f652b4c266a');
@@ -143,7 +143,7 @@ test('connector: the echo reads the request actually sent (captures filled), and
   validateHttpRunEvidence(broken, { expectedSuite: suiteOf(target) });
 });
 
-test('round 9: a body with repeated member names reads inconclusive, never pass; a foreign identifier the parse keeps still fails', async () => {
+test('a body with repeated member names reads inconclusive, never pass; a foreign identifier the parse keeps still fails', async () => {
   // A real loopback server and the connector's own transport: JSON.parse keeps the last of a repeated name, so the
   // first value is not scanned, and the raw body is the only place the repeat shows.
   const { createServer } = await import('node:http');
@@ -261,7 +261,7 @@ test('docs: the exported limitation, KNOWN-LIMITS and ONBOARDING state the same 
   const source = await read('src/tenant-values.mjs');
   assert.ok(source.includes(`const PUNCT = new Set([...'.,;:!?\\'"()-/@#$']);`));
   assert.doesNotMatch(rule + await read('docs/KNOWN-LIMITS.md') + await read('docs/ONBOARDING.md'), /[\u2013\u2014]/u, 'no en or em dash');
-  // Round 9: no document claims matching the code does not do (folding case, Unicode forms or entities into a match).
+  // No document claims matching the code does not do (folding case, Unicode forms or entities into a match).
   const docs = { onboarding: await read('docs/ONBOARDING.md'), limits: await read('docs/KNOWN-LIMITS.md'), security: await read('SECURITY.md') };
   for (const [name, text] of Object.entries(docs)) assert.ok(!/noForeignValues[^\n]*(?:across case|Unicode forms and entities|as whole tokens across)/u.test(text), `${name} overclaims`);
   const disclosure = docs.onboarding.split('\n').find(line => line.startsWith('- **Disclosure.**'));
@@ -273,10 +273,10 @@ test('docs: the exported limitation, KNOWN-LIMITS and ONBOARDING state the same 
   assert.ok(!/[\u2013\u2014]/u.test(docs.security), 'no en or em dash in SECURITY.md');
 });
 
-// DP3 practice round (2026-10-12), reply-leak class: a clean-looking reply to one company's staff named another company's
+// The reply-leak class: a clean-looking reply to one company's staff named another company's
 // order id. The adjacent sides: the same reply with the staff's own order id passes, and the other company's id glued
 // into a longer token reads partial (inconclusive), never a fail and never a pass.
-test('DP3 shape: a reply to one company\'s staff naming another company\'s declared order id as a whole token fails', async () => {
+test('reply leak: a reply to one company\'s staff naming another company\'s declared order id as a whole token fails', async () => {
   const declared = { tenants: { acme: { identifiers: ['ACM-1007'], attributes: [] }, globex: { identifiers: ['GLX-2041'], attributes: [] } } };
   const ticket = chat({ actorId: 'staff', body: { message: 'Where is my latest order?' } });
   const target = validate(profile({ actors: { anon: { principalId: 'anonymous' }, staff: { principalId: 'globex-staff', tenantId: 'globex' } }, checks: [allow, ticket], tenantValues: declared }));

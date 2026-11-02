@@ -1,4 +1,4 @@
-// The documents describe the model identity behaviour that ships (an earlier review, M1).
+// The documents describe the model identity behaviour that ships.
 // Reads local files only.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,7 +31,7 @@ test('every guide that describes the strict policy names custody and the owned-t
   }
 });
 
-// G1-v4 addendum: what the strict policy cannot see (stored-run edits, calls around the tap), and the file reading's effect.
+// What the strict policy cannot see (stored-run edits, calls around the tap), and the file reading's effect.
 test('the strict sections state the stored-baseline and routing limits, and no guide calls a tap-file reading harmless', async () => {
   for (const path of ['integrations/github-action/README.md', 'integrations/regression-gate/README.md', 'integrations/model-identity/README.md', 'docs/ONBOARDING.md', 'integrations/github-action/action.yml']) {
     const text = await read(path);
@@ -49,30 +49,30 @@ test('the onboarding guide names exactly the files the HTTP evaluator identity h
   const source = await read('src/http-connector.mjs');
   // Paths as the guide writes them: src/ names bare, integration modules from the project root.
   const list = /const evaluatorHash = digest\(\(await Promise\.all\(\[([^\]]+)\]/.exec(source)[1].match(/'[^']+'/g).map(name => name.slice(1, -1).replace(/^\.\.\//, ''));
-  // Core batch v2 adds http-captures, http-lifecycle and http-settlement: nineteen files; core batch v3 adds http-pairing: twenty;
-  // the fast-loop fixes add body-fields (declared body-field capture) and http-claims (claim rules): twenty-two; readiness gap 3a
-  // adds idempotency (keyed retries): twenty-three; readiness gap 5 adds http-attribution (background attribution): twenty-four;
-  // readiness edge E1 adds effect-outcome (the upstream outcome of a forwarded egress send): twenty-five;
-  // readiness gap 2 adds http-timing (the effect horizon and run budget): twenty-six.
-  // readiness edge E3 adds id-closure (attribution through returned ids): twenty-seven.
-  // coverage v2 adds collector-identity (the egress and SMTP collector digest): twenty-eight.
-  // coverage v2 PR-2 adds run-end-drain (the drain record and its rules): twenty-nine.
+  // Captures, lifecycle and settlement add http-captures, http-lifecycle and http-settlement: nineteen files; pairing adds http-pairing: twenty;
+  // declared body fields and claim rules add body-fields and http-claims: twenty-two; keyed retries
+  // add idempotency: twenty-three; background attribution adds http-attribution: twenty-four;
+  // the upstream outcome of a forwarded egress send adds effect-outcome: twenty-five;
+  // the effect horizon and run budget add http-timing: twenty-six.
+  // attribution through returned ids adds id-closure: twenty-seven.
+  // the egress and SMTP collector digest adds collector-identity: twenty-eight.
+  // the run-end drain record and its rules add run-end-drain: twenty-nine.
   // identity option B adds http-rests-on (the restsOn release, actor-identity/6): thirty.
-  // the provider feed (G2) adds provider-feed-rules (its profile rules) and mail-address (the shared recipient rules): thirty-two.
+  // the provider feed adds provider-feed-rules (its profile rules) and mail-address (the shared recipient rules): thirty-two.
   // value-leak adds tenant-values (json.noForeignValues): thirty-three.
   // app logs add app-log-rules (their declaration and line mapping) and app-log-verdicts (their records and binding): thirty-five.
-  // later outcomes PR-2 adds later-outcome (the verdict stage over a provider feed's later outcomes): thirty-six.
+  // later outcomes add later-outcome (the verdict stage over a provider feed's later outcomes): thirty-six.
   // suspend-aware custody time adds suspend-clock (the host suspend record and the settle extension): thirty-seven.
-  // in-doubt resolution IDR-1 adds in-doubt (the resolution core and resolver R0): thirty-eight.
-  // in-doubt resolution IDR-4 adds request-feed-rules (the request feed's declaration and R1's derivation) and key-identity (the key collapse's
-  // identity and retention rule, moved out of idempotency so R1 shares it): forty.
-  // in-doubt resolution IDR-3 adds read-back-rules (read-back's declaration and R2's derivation): forty-one.
-  // FIX-04 adds public-suffix (the registrable domain of a host) and public-suffix-list (the vendored Public Suffix List subset, MPL-2.0):
-  // forty-three.
-  // H1 step 3 adds remote-target (a remote https target's origin form, address classes and DNS pin): forty-four.
+  // in-doubt resolution adds in-doubt (the resolution core and its transport-record resolver): thirty-eight.
+  // the request feed adds request-feed-rules (its declaration and its in-doubt derivation) and key-identity (the key collapse's
+  // identity and retention rule, moved out of idempotency so the request feed shares it): forty.
+  // read-back adds read-back-rules (its declaration and its in-doubt derivation): forty-one.
+  // other names of a declared provider add public-suffix (the registrable domain of a host) and public-suffix-list (the vendored
+  // Public Suffix List subset, MPL-2.0): forty-three.
+  // remote https targets add remote-target (a remote https target's origin form, address classes and DNS pin): forty-four.
   // signed webhooks add webhook-driver (the signed-webhook driver): forty-five.
-  // N13 adds catalog-identity (the run's catalog identity, which the shared validator checks): forty-six.
-  // NC2 item 1 adds two-identities (the single-identity rule and the generated mirror checks): forty-seven.
+  // catalog-identity (the run's catalog identity, which the shared validator checks) makes forty-six.
+  // two-identities (the single-identity rule and the generated mirror checks) makes forty-seven.
   // read-back in HTTP checks adds http-readback (the read-back judgement, seal and recompute) and pg-readback (the declaration, record
   // and judge it uses): forty-nine.
   const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty', 'twenty-one', 'twenty-two', 'twenty-three', 'twenty-four', 'twenty-five', 'twenty-six', 'twenty-seven', 'twenty-eight', 'twenty-nine', 'thirty', 'thirty-one', 'thirty-two', 'thirty-three', 'thirty-four', 'thirty-five', 'thirty-six', 'thirty-seven', 'thirty-eight', 'thirty-nine', 'forty', 'forty-one', 'forty-two', 'forty-three', 'forty-four', 'forty-five', 'forty-six', 'forty-seven', 'forty-eight', 'forty-nine'];

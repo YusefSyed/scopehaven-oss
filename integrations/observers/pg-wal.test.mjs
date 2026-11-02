@@ -49,7 +49,7 @@ test('construction: loopback only, the credential namespace, sensitive names, th
     [{ ignore: ['public.orders'] }, /ignore list/], [{ ignore: ['public'] }, /ignore list/], [{ platform: 'heroku' }, /platform/], [{ tables: [{ table: 'orders', key: 'id' }, { table: 'orders', key: 'id', schema: 'b' }] }, /once/],
     [{ tables: [{ table: 'orders', key: 'id', where: 'x' }] }, /pg-wal table/], [{ barrierMs: 50 }, /barrierMs/]])
     assert.throws(() => createPgWalObserver({ ...base, ...extra }), pattern, JSON.stringify(extra));
-  // The platform list is the shared reader's checked-in one (N12).
+  // The platform list is the shared reader's checked-in one.
   assert.ok(platformList('supabase', 'postgres').entries.some(e => e.schema === 'auth' && e.table === 'audit_log_entries') && platformList('supabase', 'postgres').entries.some(e => e.schema === 'cron' && e.table === 'job_run_details'));
 });
 
@@ -64,7 +64,7 @@ test('a window holds every committed change between the marks: write-and-undo, e
     s.commit([['other', 'public.audit'], ['other', 'auth.sessions'], ['message', null]]);
     s.message('0'); s.message(String(s.xid + 1)); s.commit([['other', 'public.audit']]);
   });
-  // An unlisted table and logical messages keep it from passing an absence (N12); every change it read is still an event.
+  // An unlisted table and logical messages keep it from passing an absence; every change it read is still an event.
   assert.deepEqual([w.coverage, w.reason], ['partial', 'logical-message,unlisted-table-changed']);
   assert.deepEqual(w.events.map(e => `${e.operation} ${e.resource}`), ['insert orders/b', 'delete orders/b', 'update orders/a', 'update orders/a']);
   const t = w.wal.tables[0];
@@ -185,7 +185,7 @@ test('slot and session failures read inconclusive with their reason, never no ch
   assert.deepEqual(outcome(await o.collect(m0, await o.mark())), ['failed', 'permission-denied']);
 });
 
-test('the database\'s catalog fingerprint (N13): start() reads the baseline in its new session; a change against it, or inside a window, reads schema-drift', async () => {
+test('the database\'s catalog fingerprint: start() reads the baseline in its new session; a change against it, or inside a window, reads schema-drift', async () => {
   const kinds = (label = 'base', inst = 'v1') => FAKE_CATALOG.kinds.map(([kind, n]) => [kind, n, sha(`${kind}:${label}`), sha(`${kind}:${label}:${inst}`)]);
   let s = fakeServer();
   s.dbCatalog = { kinds: kinds(), versions: [['16400', '100', '16400']] };
@@ -255,7 +255,7 @@ test('schema drift, a write lock held at the end mark, a TRUNCATE and a key the 
   s = fakeServer();
   assert.equal(await reasonOf(s, () => s.commit([['declared', 'table public.orders: TRUNCATE: (no-flags)']])), 'table-truncated');
   s = fakeServer();
-  assert.equal(await reasonOf(s, () => s.commit([['truncate', 'table public.audit, public.orders: TRUNCATE: restart_seqs cascade']])), 'table-truncated,unlisted-table-changed', 'the other table it names is unlisted (N12)');
+  assert.equal(await reasonOf(s, () => s.commit([['truncate', 'table public.audit, public.orders: TRUNCATE: restart_seqs cascade']])), 'table-truncated,unlisted-table-changed', 'the other table it names is unlisted');
   s = fakeServer();
   const other = make(s); await other.start();
   const t = await window(other, () => s.commit([['truncate', 'table public.audit, "Odd, name".x: TRUNCATE: (no-flags)']]));
@@ -403,11 +403,11 @@ test('a blank-padded char key, or a domain over one, reads without its padding (
   assert.deepEqual(w.events.map(e => e.resource), ['orders/ab']);
 });
 
-// N12: every other table is a declared queue, ignored or unlisted; the end barrier; the shared-database rule.
+// Every other table is a declared queue, ignored or unlisted; the end barrier; the shared-database rule.
 const QUEUE = { queues: [{ table: 'jobs', pending: { column: 'state', in: ['created', 'active'] } }], drainTimeoutMs: 200, pollMs: 20 };
 const ins = id => ['declared', row('INSERT', ` id[text]:'${id}' status[text]:'x' amount[numeric]:1 email[text]:null note[text]:null`)];
 
-test('N12 other tables: an unlisted change or a logical message holds absence back; an ignored or queue change only counts; a declared table is never ignored', async () => {
+test('other tables: an unlisted change or a logical message holds absence back; an ignored or queue change only counts; a declared table is never ignored', async () => {
   for (const [lines, extra, want, counts] of [
     [[['other', 'public.sessions_log']], {}, 'unlisted-table-changed', { ignored: 0, queue: 0, unlisted: 1 }],
     [[['other', 'public.sessions_log']], { ignore: ['public.sessions_log'] }, null, { ignored: 1, queue: 0, unlisted: 0 }],
@@ -432,7 +432,7 @@ test('N12 other tables: an unlisted change or a logical message holds absence ba
   assert.throws(() => make(fakeServer(), { ignore: ['pg_catalog'] }), /system schema/);
 });
 
-test('N12 tables the WAL never carries: an unlogged or foreign table that is neither declared, a queue nor ignored holds absence back', async () => {
+test('tables the WAL never carries: an unlogged or foreign table that is neither declared, a queue nor ignored holds absence back', async () => {
   for (const [notInWal, extra, want] of [[['public.cache'], {}, 'table-not-in-wal'], [['public.cache'], { ignore: ['public.cache'] }, null], [['_analytics.log_events'], { platform: 'supabase' }, null],
     [['remote.orders_fdw'], { platform: 'supabase' }, 'table-not-in-wal'], [[], {}, null]]) {
     const s = fakeServer(), o = make(s, extra); await o.start();
@@ -446,7 +446,7 @@ test('N12 tables the WAL never carries: an unlogged or foreign table that is nei
   assert.equal((await o.collect(m0, m1)).reason, 'table-not-in-wal');
 });
 
-test('N12 end barrier: a drained queue reads complete; pending work, a queue write lock, a failed drain read or a queue change after the drain read does not', async () => {
+test('end barrier: a drained queue reads complete; pending work, a queue write lock, a failed drain read or a queue change after the drain read does not', async () => {
   const run = async (setup, between = () => {}) => { const s = fakeServer(); setup(s); const o = make(s, QUEUE); await o.start(); return window(o, () => between(s)); };
   const clean = await run(s => { s.pending = [0]; });
   assert.deepEqual([clean.coverage, clean.wal.queues.end.clean, clean.wal.queues.end.pending], ['complete', true, [{ queue: 'public.jobs', pending: 0 }]]);
@@ -475,7 +475,7 @@ test('N12 end barrier: a drained queue reads complete; pending work, a queue wri
   assert.ok(statements.some(sql => /sh:writers/.test(sql) && /"public", "jobs"|\('public', 'jobs'\)/.test(sql)), 'the writers read covers the queue tree');
 });
 
-test('N12 shared database: start refuses while another run holds a lease; a lease seen at a mark fails the window; the lease is held in the slot session', async () => {
+test('shared database: start refuses while another run holds a lease; a lease seen at a mark fails the window; the lease is held in the slot session', async () => {
   const s = fakeServer(); s.otherRuns = 1;
   await assert.rejects(make(s).start(), /shared-database/);
   assert.equal(s.slots.size, 0, 'the refused start leaves no slot');
@@ -490,14 +490,14 @@ test('N12 shared database: start refuses while another run holds a lease; a leas
   assert.ok(!u.log.includes('lease') && !u.log.includes('shared'), 'runLease false reads no lease');
 });
 
-// NC9 item 2: without actorCapture the observer is byte-for-byte main's (fbb7c189, before the actor join): every statement it
+// Without actorCapture the observer is byte-for-byte what it was before the actor join: every statement it
 // sends, in order and on which session, and every window and record it returns, in a scenario with a declared queue-free
 // platform list, a run lease, inserts, a write and its revert, other tables and messages. The digest was computed with this
-// same scenario at fbb7c189's pg-wal.mjs. Only what differs per run is normalised: the temporary slot's random name, the
+// same scenario on pg-wal.mjs before the actor join. Only what differs per run is normalised: the temporary slot's random name, the
 // observer's salted column digests (and the event content digests and sealed record digest over them), the run lease's
 // random key (fixed here through its test seam), and the clock (times, and the barrier's measured wait).
 const WAL_MAIN_DIGEST = '79fe3b530ecd606b26069371df1d12537f405f5006bae9facebef0663dc3586d';
-test('without actorCapture, pg-wal sends and returns exactly what main\'s pg-wal did (NC9 item 2 pin)', async () => {
+test('without actorCapture, pg-wal sends and returns exactly what it did before the actor join', async () => {
   const s = fakeServer(), sent = [];
   const connect = async (...args) => { const c = await s.connect(...args), id = sent.length; sent.push([id, 'open']);
     return Object.assign(Object.create(c), { query: (sql, opts) => { sent.push([id, sql]); return c.query(sql, opts); }, close: () => { sent.push([id, 'close']); return c.close(); } }); };
@@ -514,13 +514,13 @@ test('without actorCapture, pg-wal sends and returns exactly what main\'s pg-wal
   await o.stop();
   const scrub = value => JSON.parse(JSON.stringify(value, (k, v) => (k === 'digests' && v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).map(n => [n, 'hmac'])) : ['observedAt', 'at', 'waitedMs'].includes(k) ? 'time' : k === 'contentDigest' ? 'over-hmac' : v))
     .replace(/scopehaven_wal_[0-9a-f]{16}/g, 'slot')
-    // NC9 item 4 gave the observer a source of its own (sql-wal); main's windows carried sql-snapshot. The rename is the only difference.
+    // The observer now has a source of its own (sql-wal); before, its windows carried sql-snapshot. The rename is the only difference.
     .replace(/"sql-wal"/g, '"sql-snapshot"'));
   const view = scrub({ sent, scope: o.scope, source: o.source, kind: o.kind, windows: [w, w2].map(x => ({ ...x, wal: (({ digest: _sealed, ...rest }) => rest)(x.wal) })), record });
   assert.equal(sha(JSON.stringify(view)), WAL_MAIN_DIGEST, `view digest ${sha(JSON.stringify(view))}`);
 });
 
-// NC9 item 2 (PR518 review MINOR 1, NC2's F-R4-5): the per-write join with an intact capture answered through the connect seam: each
+// The per-write join with an intact capture answered through the connect seam: each
 // decoded write named by its own transaction, a write the capture never saw named by no one, and the capture's own audit rows
 // counted apart (others.capture), never unlisted.
 test('with an intact actor capture, each decoded write is its own transaction\'s actor, and the capture\'s audit rows are counted apart', async () => {
@@ -557,7 +557,7 @@ test('with an intact actor capture, each decoded write is its own transaction\'s
   assert.deepEqual(w.actors, { schema: PG_ACTOR_SCHEMA, capture: { start: 'intact', end: 'intact', window: 'intact' }, attributed: 4, unattributed: 1, ambiguous: 0 });
 });
 
-// PR518-520-521 stack review MINOR 1: the capture reads intact only when both marks verified it (pg-wal.mjs collect). Its definitions
+// The capture reads intact only when both marks verified it (pg-wal.mjs collect). Its definitions
 // altered before the end mark (a capture function replaced in the window) name no one in that window, as pg-actor-join.test.mjs test 3
 // pins for pg-snapshot.
 test('a capture altered at the end mark names no one in that window', async () => {

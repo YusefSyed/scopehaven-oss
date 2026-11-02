@@ -1,4 +1,4 @@
-// CMP-ROE-01 wiring: every entry point that sends requests to a target the operator configured (assess, the
+// Authorization record wiring: every entry point that sends requests to a target the operator configured (assess, the
 // regression gate, the dashboard's run path, sequences and conversation specs) refuses it without an authorization
 // record that covers it now, before any connection is made, and stamps the run it authorized. Built-in fixture
 // targets are unchanged. A loopback notes app in this process counts every connection it accepts; the CLI runs as
@@ -118,7 +118,7 @@ const postRun = (server, body) => new Promise((resolve, reject) => {
   });
   req.on('error', reject); req.end(payload);
 });
-// A window that ends mid-run (the decision on the review's m1), at a moment the test chooses rather than a wall-clock
+// A window that ends mid-run, at a moment the test chooses rather than a wall-clock
 // deadline (test/support/window-clock.mjs). The record is valid from a day ago until a minute from now, so no entry point,
 // however slow to start on a loaded machine, is refused at the start. At the run's first request the target ends the
 // window: the guard's clock (in this process, or the assess child's) jumps past validUntil, and that response is held
@@ -150,7 +150,7 @@ const notesSequence = () => ({ schema: 'scopehaven-sequence/1', id: 'NOTES-SEQ',
 const notesSpec = origin => ({ schema: CONVERSATION_SCHEMA, id: 'notes-chat', origin, applicationId: 'notes-app', build: 'b1', contextId: 'ctx',
   actors: { member: { principalId: 'member-1', credentialEnv: 'SCOPEHAVEN_TARGET_MEMBER', identity: { path: '/me', pointer: '/user', value: 'member-1' } } },
   conversations: [{ id: 'reply-ok', title: 'Control: the app answers', severity: 'control', actorId: 'member', turns: [{ path: '/me', mode: 'json', body: { message: 'hi' }, replyPointer: '/user', expect: [{ kind: 'status.in', codes: [200] }] }] }] });
-// Round 2 (R2-M1): profiles whose last contact with the target is an observer read, or a single request.
+// Profiles whose last contact with the target is an observer read, or a single request.
 // auditedProfile: three observed checks, with an http-audit observer reading the application's own /audit on its origin.
 // oneRequestProfile: one check, no identity probe and no observer, so its one request is the run's last contact.
 const AUDIT_OBSERVER = origin => ({ id: 'audit', type: 'http-audit', origin, path: '/audit', credentialEnv: 'SCOPEHAVEN_TARGET_MEMBER', itemsPointer: '/items', pageLimit: 100,
@@ -301,7 +301,7 @@ test('a sequence run needs a record naming the sequence, --origin, the hold gate
   const { validateSequenceNativeRun } = await import('../integrations/sequences/native.mjs');
   const { authorization: _stamp, ...unstamped } = saved;
   assert.doesNotThrow(() => validateSequenceNativeRun(saved)); assert.doesNotThrow(() => validateSequenceNativeRun(unstamped));
-  // So does the build that made it (security review F9), which is also outside the sealed run: a run saved before the field validates.
+  // So does the build that made it, which is also outside the sealed run: a run saved before the field validates.
   const { PRODUCER_RELEASE } = await import('../src/producer.mjs');
   assert.deepEqual(saved.producer, { release: PRODUCER_RELEASE });
   const { producer: _build, ...unnamed } = saved;
@@ -358,7 +358,7 @@ test('the roe CLI seals a draft into a new file (never overwriting) and checks a
   for (const [args, code] of [[['--at', ago(40)], 'authorization-window'], [['--at', 'not-a-time'], 'authorization-clock'],
     // --at is read as the record's instants are: no 02-31 rolled over to March, no hour 24.
     [['--at', '2026-02-31T00:00:00Z'], 'authorization-clock'], [['--at', '2026-10-07T24:00:00Z'], 'authorization-clock'],
-    // The GitHub Action's wait-url: its origin must be one of the record's origins (R2-m1).
+    // The GitHub Action's wait-url: its origin must be one of the record's origins.
     [['--wait-url', 'http://127.0.0.1:1/health'], 'authorization-origin'], [['--wait-url', 'https://example.com/health'], 'authorization-origin']]) {
     [o, streams] = io();
     assert.equal(await roe(['check', sealedPath, '--config', s.profiles, '--target', 'notes', ...args], streams), 2);
@@ -539,7 +539,7 @@ test('a conversation spec stops sending when the window ends mid-run: refused (a
   assert.equal(existsSync(data), false, 'no run was saved');
 });
 
-// Round 2 (R2-M1, the rule: a run with any request outside the window is never saved or stamped as authorized).
+// The rule: a run with any request outside the window is never saved or stamped as authorized.
 test('every observer call except stop checks the window first: refused calls never reach the observer, stop always runs', async () => {
   let now = 1000, calls = [];
   const record = checksumAuthorization({ schema: AUTHORIZATION_SCHEMA, id: 'guard-observer', target: { id: 'notes', applicationId: 'notes-app' }, origins: ['http://127.0.0.1:4100'], identities: ['member-1'],
@@ -691,7 +691,7 @@ test('a record that repeats a field name is refused (authorization-duplicate-key
   assert.equal(app.connections(), 0);
 });
 
-test('H1 step 2: an operator-forwarded target runs only under a record naming the forwarder\'s destination, and a forwarded pass needs a same-route control', async t => {
+test('an operator-forwarded target runs only under a record naming the forwarder\'s destination, and a forwarded pass needs a same-route control', async t => {
   const app = await notesApp(t), s = setup(t, app.origin);
   // The boundary check reads GET /admin/settings (the app refuses it), with no required control on that route.
   const base = notesProfile(app.origin);
@@ -730,7 +730,7 @@ test('H1 step 2: an operator-forwarded target runs only under a record naming th
   assert.equal(app.connections(), before);
 });
 
-test('H1 step 2 on the reviewed #451: a forwarded target is held to the same window: no request after validUntil, and a run whose window ends after its last request is refused before it is saved', async t => {
+test('a forwarded target is held to the same window: no request after validUntil, and a run whose window ends after its last request is refused before it is saved', async t => {
   const app = await slowNotesApp(t), s = setup(t, app.origin);
   const forwarded = profile => ({ ...profile, targetContext: 'operator-forwarded', targetLabel: 'Notes staging (forwarded)' });
   // Every record names the forwarder's destination, as a forwarded target needs, so only the window refuses these runs.

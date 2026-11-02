@@ -1,4 +1,4 @@
-// The stage-2 key reader (N14, STAGE-2.md "What Yusef provides" step 3): reads one generic password from the macOS Keychain with
+// The stage-2 key reader: reads one generic password from the macOS Keychain with
 // `security find-generic-password -a <account> -s <service> -w` into memory and returns it. The value is never printed, logged,
 // written or put in an error message: a failure says only which item and why (missing, unreadable, empty or malformed). describeKey()
 // is what may be shown: whether a value is present, its prefix class and its length, never any of its characters.

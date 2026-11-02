@@ -31,7 +31,7 @@ Why: in round IC1, ScopeHaven's fixed drill held the agent at model call 1, mode
    - `UNDECLARED` checks that no call reached an undeclared path anywhere in the run;
    - the quiet rows check that nothing at all happened between `end` and `quiet`.
 
-   Then comes the **allowed-use twin** (FIX-07): restore access (or use a declared twin turn by an actor the change does not touch), mark `twin-start`, run the turn again, settle, and require `TWIN-<action>` (`effect.exists`) for each action the baseline applied. The twin counts only calls that started in its own window, so a prohibition cannot pass on an application that has stopped acting.
+   Then comes the **allowed-use twin**: restore access (or use a declared twin turn by an actor the change does not touch), mark `twin-start`, run the turn again, settle, and require `TWIN-<action>` (`effect.exists`) for each action the baseline applied. The twin counts only calls that started in its own window, so a prohibition cannot pass on an application that has stopped acting.
 4. **Verdict.** Every run is saved and re-checked from its sealed windows before it counts.
 
 | Execution | When |

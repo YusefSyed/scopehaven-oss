@@ -1,6 +1,6 @@
-// The declared-channel rule for absence (N11, lead-queue item 1). A clean window from the observers a row names says only that
+// The declared-channel rule for absence. A clean window from the observers a row names says only that
 // nothing matching was seen there: an effect that left the application by another channel (a cache, a file, a direct API call, a
-// queue) is in no window, and the bypass corpus's route misses are exactly such undeclared channels (SURPASS-BYPASS-01).
+// queue) is in no window, and the bypass corpus's route misses are exactly such undeclared channels.
 //
 // So a target may declare its channels (docs/ONBOARDING.md, "Declare the target's channels"):
 //   { "confinement": "confined" | "unconfined",
@@ -22,7 +22,7 @@
 //     bounding clauses (a passing effect.count or effect.only) selects, in any window of a declared observer of a type that can
 //     observe a channel, whatever that window's coverage: an effect on a channel's names belongs to that channel, one on no
 //     channel's names to the channels whose observer recorded it; any of them could be the effect the absence is about, sent
-//     that way instead; otherwise channel-unaccounted:<channel> (until per-platform ignore lists land, N12, a background write
+//     that way instead; otherwise channel-unaccounted:<channel> (until per-platform ignore lists land, a background write
 //     withholds the pass too). An observer no channel lists that records such an effect on no channel's names may show a
 //     channel the declaration leaves out (or an ordinary row the rule cannot tell apart): channels-undeclared;
 //   - and the run's confinement shows no undeclared way out: the declaration says "confined", the target is a local app, and
@@ -58,7 +58,7 @@ export const CHANNEL_CONFINEMENT = Object.freeze(['confined', 'unconfined']);
 // which is egress, not what was queued. No shipped observer reads files or directories the application writes, so a files
 // channel is declared unobserved.
 export const CHANNEL_OBSERVERS = Object.freeze({
-  // pg-wal (NC9 item 4): every committed write to its declared tables, so it holds a store channel's records too.
+  // pg-wal: every committed write to its declared tables, so it holds a store channel's records too.
   store: Object.freeze(['sqlite-snapshot', 'pg-snapshot', 'mysql-snapshot', 'pg-wal']),
   outbox: Object.freeze(['sqlite-audit']),
   egress: Object.freeze(['egress-recorder', 'smtp-sink', 'provider-feed']),

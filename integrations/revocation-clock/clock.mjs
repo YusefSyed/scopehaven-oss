@@ -1,4 +1,4 @@
-// Revocation clock (SURPASS-REVOKE-MS-01): how long an agent kept acting after its access
+// Revocation clock: how long an agent kept acting after its access
 // was removed, in milliseconds, with an error bound, from one monotonic clock.
 //
 // One clock in the observer host (process.hrtime.bigint) stamps:

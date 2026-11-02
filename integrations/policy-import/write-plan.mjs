@@ -1,7 +1,7 @@
-// Write plan (goal 03, scopehaven-write-plan/1), stage 1: the inventory of variants and their classification. Every
+// Write plan (scopehaven-write-plan/1), stage 1: the inventory of variants and their classification. Every
 // statement rule, write-binding route and matrix cell is expanded over relation, creator and state; a variant whose
 // deciding rule has a limit is expanded over its under, at and over points, and one whose rule has a lifecycle over its
-// phases. Every variant gets either its stated decision (a case can be drafted for it) or exactly one reason it cannot. Only a statement rule creates a case (R9): a matrix cell or a route alone
+// phases. Every variant gets either its stated decision (a case can be drafted for it) or exactly one reason it cannot. Only a statement rule creates a case: a matrix cell or a route alone
 // adds variants to the inventory, never intent. Above the inventory limit, generation refuses and names the dimension;
 // it never truncates. Nothing here reads an application or sends a request.
 import { cellKey, canonical, isMatrix, sha256 } from './matrix.mjs';
@@ -199,7 +199,7 @@ export function writeInventory({ statement, binding, matrices = [] }) {
     draftable: variants.filter(v => v.stated && !v.reason).length, reasons, binding: b };
 }
 
-// Accounting cells for the inventory, the shape ../coverage-report/accounting.mjs reads (after M5, #224): one per
+// Accounting cells for the inventory, the shape ../coverage-report/accounting.mjs reads: one per
 // variant, keyed by the variant key. A variant with a reason carries it; a draftable one carries none (the accounting
 // reads it as not drafted until a case is).
 export function inventoryCells(inventory) {
@@ -462,7 +462,7 @@ export function verifyPlanId(plan) {
   return plan.schema === WRITE_PLAN_SCHEMA && planId === sha256(canonical(body));
 }
 
-// Accounting input for a plan (read by the coverage accounting after M5, #224): one cell per variant (with the plan's
+// Accounting input for a plan (read by the coverage accounting): one cell per variant (with the plan's
 // reason), and one drafted, unconfirmed case per case.
 export function planAccounting(plan, inventory) {
   const reasonOf = new Map(plan.variants.map(v => [v.key, v.reason]));

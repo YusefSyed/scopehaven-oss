@@ -1,7 +1,7 @@
 {
  "schema": "scopehaven-claim-reader-set/1",
  "role": "review",
- "written": "2026-10-18, by a read-only reviewer, as adversarial probes against b7b0593d; 71 of them were wrong reads then. Labels are the reviewer's. Regression set from the #392 review fixes on; never a result.",
+ "written": "2026-10-18, by a read-only reviewer, as adversarial probes against an earlier build; 71 of them were wrong reads then. Labels are the reviewer's. Regression set from the fixes that followed; never a result.",
  "labels": "As claim-reader-dev.json.",
  "tasks": "claim-reader-dev.json",
  "cases": [

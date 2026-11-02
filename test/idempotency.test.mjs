@@ -1,4 +1,4 @@
-// Gap 3 (W6): keyed retries. Declaration, key reading, records, window consistency and the application interval.
+// Keyed retries. Declaration, key reading, records, window consistency and the application interval.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { consistentIdempotencyRun, validateIdempotencyDeclaration, validIdempotencyMap, idempotencyRecordOf, readIdempotencyKey, foldKey, headText, validateIdempotencyRecord, countApplications, applicationsVerdict,

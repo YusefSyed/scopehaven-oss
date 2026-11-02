@@ -1,4 +1,4 @@
-// Signed by default (NC1 item 4): `scopehaven export` signs every export into a DSSE envelope beside it (integrations/attest)
+// Signed by default: `scopehaven export` signs every export into a DSSE envelope beside it (integrations/attest)
 // with a local Ed25519 key made on first use, unless --unsigned. Owned synthetic fixture over loopback only; every file is
 // written under a fresh private temporary directory, and the key directory is always --signing-key-dir or a temporary HOME,
 // never this user's ~/.config. The signed-by-default promise is the command's: library callers of exportRun() and main() sign only

@@ -1,4 +1,4 @@
-// The actor capture's joins through the observers, scripted (NC9 item 2, PR518 review MINOR 1 and MAJOR 1): pg-snapshot driven over the
+// The actor capture's joins through the observers, scripted: pg-snapshot driven over the
 // scripted fake Postgres with an intact capture answered through its connect seam (the capture's definitions as an intact installation
 // returns them, and a scripted ledger), so the net join's attributions, and what they decide, are checked without a database.
 import test from 'node:test';
@@ -54,7 +54,7 @@ test('an intact capture names the one actor who wrote a row; two actors, or a la
   assert.deepEqual(unseen.events, [['update', 'Chat/c1', null]]);
 });
 
-test('the net join accounts for the net operation: a write the capture never saw is never credited to the captured writer (PR518 review MAJOR 1)', async t => {
+test('the net join accounts for the net operation: a write the capture never saw is never credited to the captured writer', async t => {
   // A: alice's captured UPDATE of c1, then a DELETE the capture never saw (a replica-role session, a write sent to a partition).
   const gone = [['c2', '701', 'h2']];
   const a = await windowOf(t, { states: [S('800:800:', START), S('800:800:', START), S('805:805:', gone), S('805:805:', gone)], ledgers: [[], [entry(1, 802, 'c1', 'UPDATE', 'sub-alice', '802')]] });

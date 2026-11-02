@@ -4,7 +4,7 @@
 //   checks.json    the check templates (scopehaven-pack-checks/1) and the required controls they add
 //   cases.json     its known-negative self-test cases (scopehaven-pack-cases/1): parameter sets, each with the outcome
 //                  src/known-negative.mjs must give every check, so the pack's own checks are shown able to fail
-// Packs are named by the behaviour they check, never by a regulation, until the claims register approves a mapping
+// Packs are named by the behaviour they check, never by a regulation, until a mapping is approved
 // ("regulation": null in every shipped manifest).
 // A template is plain profile JSON. A string that is exactly "{{name}}" becomes the parameter's value (any type); a
 // string with "{{name}}" inside it takes a string or integer value in place; "{{actor.principalId}}" reads a field of the
@@ -81,8 +81,8 @@ export function validateManifest(m) {
   if (typeof m.name !== 'string' || !NAME.test(m.name)) refuse('pack-manifest-invalid', 'name is 2-48 lower-case letters, digits or "-"');
   if (typeof m.version !== 'string' || !VERSION.test(m.version)) refuse('pack-manifest-invalid', `${m.name}: version is MAJOR.MINOR.PATCH`);
   if (typeof m.behaviour !== 'string' || !m.behaviour.trim() || m.behaviour.length > 400) refuse('pack-manifest-invalid', `${m.name}: behaviour is one sentence`);
-  // Named by behaviour: a regulation mapping waits for the claims register.
-  if (m.regulation !== null) refuse('pack-manifest-invalid', `${m.name}: "regulation" stays null until the claims register approves a mapping`);
+  // Named by behaviour: a regulation mapping waits for approval.
+  if (m.regulation !== null) refuse('pack-manifest-invalid', `${m.name}: "regulation" stays null until a mapping is approved`);
   if (!Array.isArray(m.derivedFrom) || !m.derivedFrom.length || !m.derivedFrom.every(s => typeof s === 'string' && s.length <= 300)) refuse('pack-manifest-invalid', `${m.name}: derivedFrom names the checks it was built from`);
   if (!plain(m.parameters) || Object.keys(m.parameters).length > PACK_LIMITS.parameters) refuse('pack-manifest-invalid', `${m.name}: parameters is an object of at most ${PACK_LIMITS.parameters}`);
   for (const [name, p] of Object.entries(m.parameters)) {

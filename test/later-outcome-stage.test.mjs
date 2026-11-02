@@ -1,4 +1,4 @@
-// Later outcomes PR-2, the verdict stage (src/later-outcome.mjs; PROVIDER-LATER-OUTCOME design with ADDENDUM-R1 and the R1 review;
+// Later outcomes, the verdict stage (src/later-outcome.mjs;
 // collector provider-feed/6), over synthetic windows run through the same steps the connector and the validator run: decide, settle,
 // attribute, then the stage. Pure: no socket, no file, no clock. Each property sits beside the adjacent case it must not touch.
 import test from 'node:test';
@@ -36,7 +36,7 @@ function judge({ rows, gaps, later, attribution = null, label = 'provider-feed/6
 }
 const one = (effect, windows, words, extra = {}) => { const r = judge({ rows: [{ effects: [effect], windows, role: extra.role }], later: laterOf(words, extra.clear), attribution: extra.attribution ?? null, label: extra.label }); return { main: r.main[0][0], staged: r.staged[0][0] }; };
 
-test('stage Q1: an expected send the provider later failed is not the expected effect: exists fails on a decided window, missing on a partial one', () => {
+test('stage: an expected send the provider later failed is not the expected effect: exists fails on a decided window, missing on a partial one', () => {
   const s = send();
   const { main, staged } = one(exists(sel({ resource: VIP })), [feedWindow([s])], [[s, ['failed']]]);
   assert.equal(main.verdict, 'pass');
@@ -46,7 +46,7 @@ test('stage Q1: an expected send the provider later failed is not the expected e
   assert.deepEqual([partial.main.verdict, partial.staged.verdict, partial.staged.later], ['pass', 'missing', 'effect-later-failed']);
 });
 
-test('stage Q2 to Q5, Q16: each reading of a matched send, and the success strength', () => {
+test('stage: each reading of a matched send, and the success strength', () => {
   const cases = [
     [['succeeded', 'failed'], true, 'fail', 'effect-later-failed', undefined],
     [['failed', 'succeeded'], true, 'inconclusive', 'effect-later-conflicting', undefined],
@@ -68,7 +68,7 @@ test('stage Q2 to Q5, Q16: each reading of a matched send, and the success stren
   }
 });
 
-test('stage Q6, Q7, Q8: absence clauses and effect.only count every accepted attempt; a count over-run stays a fail', () => {
+test('stage: absence clauses and effect.only count every accepted attempt; a count over-run stays a fail', () => {
   const s = send();
   const none = one({ kind: 'effect.none', select: sel({ resource: VIP }) }, [feedWindow([s])], [[s, ['failed']]]);
   assert.equal(none.main.verdict, 'fail');
@@ -85,14 +85,14 @@ test('stage Q6, Q7, Q8: absence clauses and effect.only count every accepted att
   assert.equal(over.staged, over.main, 'two attempts, one bounced: still a fail against expected 1');
 });
 
-test('stage Q13: an allowed-use control whose send later failed is withheld, tagged, never failed', () => {
+test('stage: an allowed-use control whose send later failed is withheld, tagged, never failed', () => {
   const s = send();
   const { main, staged } = one(exists(sel({ resource: VIP })), [feedWindow([s])], [[s, ['failed']]], { role: 'control' });
   assert.equal(main.verdict, 'pass');
   assert.deepEqual([staged.verdict, staged.later], ['inconclusive', 'effect-later-failed']);
 });
 
-test('stage Q17 (review B1 a): a record the application wrote never keeps a pass whose provider copy later failed', () => {
+test('stage: a record the application wrote never keeps a pass whose provider copy later failed', () => {
   for (const role of ['boundary', 'control']) {
     const s = send(), l = logged();
     const { main, staged } = one(exists({ operation: 'send', name: EXT, resource: VIP }), [feedWindow([s]), logWindow([l])], [[s, ['failed']]], { role });
@@ -106,16 +106,16 @@ test('stage Q17 (review B1 a): a record the application wrote never keeps a pass
   assert.equal(kept.staged, kept.main);
 });
 
-test('stage Q18 (review B1 b): judged again on the sends that remain, settlement\'s ambiguity rule applies to them', () => {
+test('stage: judged again on the sends that remain, settlement\'s ambiguity rule applies to them', () => {
   const ken1 = send(KEN), kenLate = send(KEN), amy = send(AMY);
   const rows = [{ effects: [exists(sel({ resource: KEN }))], windows: [feedWindow([ken1])] }, { effects: [exists(sel({}))], windows: [feedWindow([kenLate, amy])] }];
   const { main, staged } = judge({ rows, later: laterOf([[amy, ['failed']]]) });
-  assert.equal(main[1][0].verdict, 'pass', 'main: AMY fits no earlier selector, so the pass stands');
+  assert.equal(main[1][0].verdict, 'pass', 'before the stage: AMY fits no earlier selector, so the pass stands');
   assert.deepEqual([staged[1][0].verdict, staged[1][0].settlement, staged[1][0].later], ['inconclusive', 'effect-ambiguous-attribution', 'effect-later-failed']);
   assert.equal(staged[0][0], main[0][0]);
 });
 
-test('stage Q19 (review B1 d): a fail the stage reaches goes through attribution: a later fitting send makes it late-unattributed', () => {
+test('stage: a fail the stage reaches goes through attribution: a later fitting send makes it late-unattributed', () => {
   const s = send(), late = send();
   const r = judge({ rows: [{ effects: [exists(sel({ resource: VIP }))], windows: [feedWindow([s])] }], gaps: [[], [feedWindow([late])]], later: laterOf([[s, ['failed']]]), attribution: { background: [], lateFails: true } });
   assert.equal(r.main[0][0].verdict, 'pass');
@@ -126,13 +126,13 @@ test('stage Q19 (review B1 d): a fail the stage reaches goes through attribution
   assert.equal(plain.staged[0][0].verdict, 'fail');
 });
 
-test('stage M4: under provider-feed/5 the records are inert; only /6 judges them', () => {
+test('stage: under provider-feed/5 the records are inert; only /6 judges them', () => {
   const s = send();
   const inert = one(exists(sel({ resource: VIP })), [feedWindow([s])], [[s, ['failed']]], { label: 'provider-feed/5' });
   assert.equal(inert.staged, inert.main);
 });
 
-test('stage Q23 (review m1): the fold, over every order of succeeded, failed and contested up to three words', () => {
+test('stage: the fold, over every order of succeeded, failed and contested up to three words', () => {
   // A reference written from the rule's words, not from the code: conflicting once a success follows a failure; else withdrawn after
   // any failure; else contested when a contested word stands; else succeeded; else pending.
   const reference = words => {
@@ -151,7 +151,7 @@ test('stage Q23 (review m1): the fold, over every order of succeeded, failed and
 
 // A small seeded generator (no clock), so a failure names its seed.
 const prng = seed => () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
-test('stage Q10, the differential: over random runs a verdict only moves from pass to not-pass, only on a positive clause', () => {
+test('stage, the differential: over random runs a verdict only moves from pass to not-pass, only on a positive clause', () => {
   const WORDS = [[], ['succeeded'], ['failed'], ['succeeded', 'failed'], ['failed', 'succeeded'], ['contested'], ['ambiguous'], ['deferred'], ['complained', 'succeeded']];
   let moved = 0, checked = 0;
   for (let run = 0; run < 400; run++) {
@@ -198,7 +198,7 @@ test('stage: past the per-run bound, a clause that needs judging again reads inc
   assert.equal(staged.at(-1)[0].later, 'effect-later-limit');
 });
 
-test('stage Q11: the copy is read as its window is: a scoped late entry that cannot be the expected send leaves the judgement decided (fail); one that could keeps it missing', () => {
+test('stage: the copy is read as its window is: a scoped late entry that cannot be the expected send leaves the judgement decided (fail); one that could keeps it missing', () => {
   const scoped = (events, resource) => admitScoped({ ...feedWindow(events, 'partial'), reason: FEED_LATE_CODE, scoped: [{ name: EXT, resource, codes: [FEED_LATE_CODE] }] });
   const s = send();
   const other = one(exists(sel({ resource: VIP })), [scoped([s], KEN)], [[s, ['failed']]]);
@@ -209,7 +209,7 @@ test('stage Q11: the copy is read as its window is: a scoped late entry that can
   assert.deepEqual([could.main.verdict, could.staged.verdict], ['pass', 'missing']);
 });
 
-test('stage Q26 (review m10): rests-on reads a clause the stage tagged as tagged, so a withheld control never anchors a release', () => {
+test('stage: rests-on reads a clause the stage tagged as tagged, so a withheld control never anchors a release', () => {
   const rowWith = extra => ({ id: 'C', severity: 'control', status: 'inconclusive', assertions: [],
     trace: [{ type: 'http-observation', data: { actorId: 'a', method: 'GET', httpStatus: 200, transportOutcome: 'complete', jsonParsed: true } }, { data: { effects: [{ kind: 'effect.exists', select: sel({ resource: VIP }), verdict: 'inconclusive', ...extra }] } }] });
   const untagged = extra => restsOnView([rowWith(extra)], { required: ['C'], failed: () => false, refusalStatusesOf: () => [], codesOf: () => [], principals: {} }).rows[0].untagged;

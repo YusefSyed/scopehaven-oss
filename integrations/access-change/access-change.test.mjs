@@ -13,7 +13,7 @@ import { validateSequence } from '../sequences/sequence.mjs';
 // Pinned so that any change to a case definition (steps, assertions, guards,
 // gate rules, expectations) is deliberate and reviewed.
 const CASES_HASH = 'e4e62046390e1166ba2797a830c6a7fa3c02f3a099c096f22356639bd4d7c0e0';
-// The eight cases before AC-RETRY-UNMARKED keep the hash the r3 guard matrix recorded (d2c637169da8).
+// The eight cases before AC-RETRY-UNMARKED keep the hash the guard coverage matrix recorded (d2c637169da8).
 const EIGHT_CASES_HASH = 'd2c637169da801d155475936c7bd979236eb8d6b8341a0c97167267937b9d75d';
 const byId = report => Object.fromEntries(report.rows.map(row => [row.id, row]));
 const result = (row, id) => row.results.find(r => r.id === id);
@@ -55,7 +55,7 @@ test('baseline: every case fails on its forbidden variant, confirmed by the desk
     assert.equal(result(row, def.id).status, 'fail', def.id);
     // The split: an EXTRA refund is the prohibition, so it lands on the boundary row at
     // critical severity. A missing allowed one would land on -WORK as a control failure, which
-    // is the distinction round 8 collapsed into one row (an earlier review, addendum low 3).
+    // is the distinction an earlier version collapsed into one row.
     assert.equal(result(row, `${def.id}-FINAL-STATE`).status, 'fail', def.id);
     assert.equal(result(row, `${def.id}-FINAL-STATE`).severity, 'critical', def.id);
     assert.match(result(row, `${def.id}-FINAL-STATE`).basis, /^More refunds than declared/, def.id);
@@ -70,7 +70,7 @@ test('repaired: nothing fails; every twin, same-run control and final state pass
   for (const row of repaired.rows) {
     assert.equal(row.status, 'inconclusive', row.id);
     // Only the forbidden variant's own audit-table assertions are held; everything else passes as before.
-    // A1 (review): a FINAL-STATE row that asserts an ABSENCE is a boundary row, so its
+    // A FINAL-STATE row that asserts an ABSENCE is a boundary row, so its
     // pass is held under custody like any other. The exclusion here used to let a boundary
     // pass resting on the desk's own tables through, because severity followed the outcome.
     // A boundary FINAL-STATE row is held on a twin run too: the question it asks (no refund
@@ -103,7 +103,7 @@ test('removing one guard fails exactly the cases that guard protects', async () 
 });
 
 test('idempotentRetry has a case of its own: AC-RETRY-UNMARKED fails without it, while AC-RETRY does not depend on it', async () => {
-  // The r3 guard matrix (#317) found idempotentRetry covered by no case: AC-RETRY's results are the
+  // The guard coverage matrix found idempotentRetry covered by no case: AC-RETRY's results are the
   // same with the guard on or off. The guard does deduplicate AC-RETRY's retry, but its crash comes
   // after the approval is marked used, so with the guard removed the commit-time recheck refuses
   // the retry instead: the guard is redundant there. AC-RETRY-UNMARKED's crash loses the mark, the
@@ -191,11 +191,11 @@ test('work left in a non-terminal state is unsettled and never a pass', async ()
     const final = result(report.rows[0], 'AC-QUEUED-FINAL-STATE-WORK');
     assert.equal(final.status, 'inconclusive'); assert.match(final.basis, /not in a terminal state/);
     // The WORK row's claim is unchanged: it asks whether the declared work FINISHED, and a
-    // parked job leaves that genuinely unknown. What changed with R3 is the case verdict. The
-    // parked job also means the revocation never CLOSED, which REVOKE-CLOSE-01 decides as a
-    // fail, and a fail outranks an inconclusive. Before R3 the case read `inconclusive`, so a
+    // parked job leaves that genuinely unknown. What changed with the closure row is the case
+    // verdict. The parked job also means the revocation never CLOSED, which the closure row decides
+    // as a fail, and a fail outranks an inconclusive. Without it the case read `inconclusive`, so a
     // build that leaves a revoked principal's work able to run looked the same as a reading the
-    // harness could not take - the conflation R3 exists to end.
+    // harness could not take - the conflation the closure row exists to end.
     assert.equal(report.rows[0].status, 'fail');
     const closure = result(report.rows[0], 'AC-QUEUED-REVOKE-CLOSE');
     assert.equal(closure.status, 'fail', closure.basis);
@@ -225,16 +225,16 @@ test('a run that fails during setup or validation leaves no listener behind', as
   assert(await settled() <= before);
 });
 
-test('r8/A1: a FINAL-STATE row is a boundary row when it asserts an absence, and its pass is held', async () => {
-  // Round 8 reasoned that the only verdict resting on the desk's own tables was a control, so
+test('a FINAL-STATE row is a boundary row when it asserts an absence, and its pass is held', async () => {
+  // An earlier version reasoned that the only verdict resting on the desk's own tables was a control, so
   // custody's role rule let it keep its pass. That argument was circular: severity was derived
   // FROM the outcome, so a passing row was a control by construction and the loop that checked
   // it was empty. Severity now comes from what the row asserts.
   const report = await runAccessChangeCases({ recheckAtCommit: true });
   // Both rows, deliberately: `endsWith('-FINAL-STATE')` excludes '-FINAL-STATE-WORK', so after
   // the split this selector held boundary rows ONLY and the control loop below was empty by
-  // construction - the same mistake round 8 made in the code, repeated here in the test that
-  // was meant to catch it (review round 9, low 4).
+  // construction - the same mistake the code once made, repeated here in the test that
+  // was meant to catch it.
   const finals = report.rows.flatMap(row => row.results.filter(r => /-FINAL-STATE(-WORK)?$/.test(r.id)));
   const controls = finals.filter(r => r.id.endsWith('-FINAL-STATE-WORK'));
   assert(finals.length >= 16, `both rows on every case: ${finals.length}`);
@@ -251,7 +251,7 @@ test('r8/A1: a FINAL-STATE row is a boundary row when it asserts an absence, and
       assert.match(r.basis, /cannot support a pass/, r.id);
     }
   }
-  // AC-LATE-REVOKE's forbidden run is the case the review named: "no refunds, none declared".
+  // AC-LATE-REVOKE's forbidden run is the case in point: "no refunds, none declared".
   const named = finals.find(r => r.id === 'AC-LATE-REVOKE-FINAL-STATE');
   assert.equal(named.severity, 'critical', 'an absence is a boundary claim, whatever the outcome');
   assert.equal(named.status, 'inconclusive', named.basis);
@@ -263,7 +263,7 @@ test('r8/A1: a FINAL-STATE row is a boundary row when it asserts an absence, and
     assert.match(r.basis, /Allowed-use controls keep their verdicts and carry custody as a tag only/, r.id);
     // And it must not read like a count comparison: a forbidden run shows the control passing
     // beside the boundary row's fail on the SAME numbers, so "Refunds match (T-1: 4 of 0)" read
-    // as a contradiction (review round 9, low 3). It asserts nothing declared went missing.
+    // as a contradiction. It asserts nothing declared went missing.
     assert.match(r.basis, /No declared refund is missing and every job reached a terminal state/, r.id);
     assert(!/Refunds match/.test(r.basis), `${r.id}: a passing control must not claim the counts match`);
   }
@@ -272,8 +272,8 @@ test('r8/A1: a FINAL-STATE row is a boundary row when it asserts an absence, and
     assert(!/cannot support a pass/.test(r.basis), `${r.id}: a fail is not tagged as a withheld pass`);
 });
 
-test('A3: a refusal row is a response contract, paired with a row that decides what changed', async () => {
-  // The lead's decision: the status is the application's own answer, observed first-hand. It
+test('a refusal row is a response contract, paired with a row that decides what changed', async () => {
+  // The status is the application's own answer, observed first-hand. It
   // decides a response contract, never that no effect happened, so it keeps its verdict but is
   // not tagged independent and is never a clean headline on its own.
   const report = await runAccessChangeCases({ recheckAtCommit: true });
@@ -296,7 +296,7 @@ test('A3: a refusal row is a response contract, paired with a row that decides w
   }
 });
 
-// --- R3 REVOKE-CLOSE-01 -------------------------------------------------------------------
+// --- Revocation closure --------------------------------------------------------------------
 // A fake case whose steps declare a revoke, so the row applies. Nothing here touches a desk:
 // these are the Def. 5 Indeterminate cases, and no build can produce an unreadable table or a
 // contradicting pair of its own records on demand.
@@ -311,7 +311,7 @@ const oneRow = (state, aborted = null, def = REVOKING_DEF) => {
   return rows[0];
 };
 
-test('R3: a parked revoked job is not closed, and that is a fail, not an inconclusive', async () => {
+test('a parked revoked job is not closed, and that is a fail, not an inconclusive', async () => {
   // The defect: the worker parks a suspended user's job as 'retry', so it keeps the revoked
   // grant and can still run. It landed in pendingJobs and read `inconclusive` - the same as a
   // reading the harness could not take. Only QUIESCENT certifies release (arXiv 2609.21284 p.8).
@@ -329,7 +329,7 @@ test('R3: a parked revoked job is not closed, and that is a fail, not an inconcl
   assert.equal(control.status, 'pass', `${control.id}: ${control.basis}`);
 });
 
-test('R3: closure on the app’s own tables can fail but never pass', async () => {
+test('closure on the app’s own tables can fail but never pass', async () => {
   const repaired = await runAccessChangeCases({ recheckAtCommit: true });
   const rows = repaired.rows.flatMap(r => r.results.filter(x => x.id.endsWith('-REVOKE-CLOSE')));
   assert(rows.length >= 6, `${rows.length} rows`);
@@ -344,7 +344,7 @@ test('R3: closure on the app’s own tables can fail but never pass', async () =
   assert.deepEqual(revokeClosureResults(QUIET_DEF, false, closureState(), null), [], 'no revoke declared, no claim made');
 });
 
-test('R3: a real evidence gap stays inconclusive, and is distinguishable from a withheld pass', () => {
+test('a real evidence gap stays inconclusive, and is distinguishable from a withheld pass', () => {
   // Every case below is Indeterminate (Def. 5). What makes them different from the withheld
   // pass is that a withheld pass carries custodyReason and they do not - so "we could not see"
   // is never reported as "closed, but held".
@@ -379,10 +379,10 @@ test('R3: a real evidence gap stays inconclusive, and is distinguishable from a 
   assert.equal(other.custodyReason, 'subject-writable-custody', other.basis);
 });
 
-test('R3: guard coverage is measured on the fail direction, because custody holds every pass', async () => {
+test('guard coverage is measured on the fail direction, because custody holds every pass', async () => {
   // The coverage matrix asks which invalidator classes each guard actually covers, by turning
   // one guard off at a time. Its first definition was "passes with every guard on, fails with
-  // this one off", and it measured NOTHING: after #242 and R3, custody holds the boundary and
+  // this one off", and it measured NOTHING: custody holds the boundary and
   // closure passes at inconclusive, so no case reaches `pass` at all and all four guards read
   // as covering zero. Running it is what showed that; the definition is now "does not FAIL at
   // baseline, and fails with the guard off", because custody withholds passes and never masks a
@@ -396,7 +396,7 @@ test('R3: guard coverage is measured on the fail direction, because custody hold
   // WHICH rows catch it is the interesting part, and not what I first assumed. With the guard
   // off the queued job COMMITS, so it reaches a terminal state and nothing is left carrying
   // retired authority: closure is clean and stays held. The effect assertion and the final-state
-  // boundary are what fail. That is the separation REVOKE-CLOSE-01 exists for - "can work rooted
+  // boundary are what fail. That is the separation the closure row exists for - "can work rooted
   // at a revoked principal still RUN" is a different question from "did something commit after
   // the revoke" - and it is why the row is new rather than folded into the existing ones.
   const failed = without.rows[0].results.filter(r => r.status === 'fail').map(r => r.id);

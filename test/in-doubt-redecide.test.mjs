@@ -1,8 +1,8 @@
-// In-doubt resolution IDR-2, the run-end re-decide stage, as built: the later resolvers, R1 (IDR-4) and R2 (IDR-3), apply only in a window whose
-// recorder declares a request feed or read-back, so with neither declared the stage is inert (IN-DOUBT-DESIGN-ADDENDUM-R1 1.6 and section 8,
-// ADDENDUM-R2 m7, IN-DOUBT-REVIEW-R2's IDR-2 gate). test/in-doubt-r1.test.mjs and test/in-doubt-r2.test.mjs exercise R1 and R2. Checked: the
-// table holds R0, R1 and R2, and without either declaration every late record is dropped by the connector and refused by the validator; markUnfollowed marks a window and copies no event (m7); a seeded differential against main
-// frozen at 8eaa589: with any record an observer could return, every verdict, decision record and sealed byte equals main's, at seal time,
+// In-doubt resolution, the run-end re-decide stage, as built: the later resolvers, the request feed (r1) and read-back (r2), apply only in a
+// window whose recorder declares a request feed or read-back, so with neither declared the stage is inert. test/in-doubt-r1.test.mjs and
+// test/in-doubt-r2.test.mjs exercise r1 and r2. Checked: the table holds r0, r1 and r2, and without either declaration every late record is
+// dropped by the connector and refused by the validator; markUnfollowed marks a window and copies no event; a seeded differential against a
+// frozen earlier evaluator: with any record an observer could return, every verdict, decision record and sealed byte equals the frozen one's, at seal time,
 // under the follow rule and after the stage, and the validator recomputes them; end to end, a run whose recorder returns late records equals
 // the same run without them, and a run that carries one is refused. test/in-doubt-redecide-stub.test.mjs exercises the stage with records.
 // Owned synthetic data only. No socket is opened: observers and transports are injected.
@@ -26,7 +26,7 @@ const send = upstream => { seq++; return makeEffect({ source: 'http-egress', obs
 const win = events => admitInDoubt({ source: 'http-egress', instanceId: INST, scope: { operations: ['send'], names: [C.ALT, CRM], actorAttribution: 'none', evidence: 'authoritative', forward: C.RECORDS.plain.forward }, coverage: 'complete', reason: null, events });
 const anyRecord = e => ({ observer: INST, seq: e.seq, records: [{ resolver: 'r1', status: 'succeeded', result: 'refutes' }] });
 
-test('1. with no request feed or read-back declared, R1 and R2 (the later resolvers) apply to nothing: every late record is dropped by the connector side and refused by the validator side', () => {
+test('1. with no request feed or read-back declared, r1 and r2 (the later resolvers) apply to nothing: every late record is dropped by the connector side and refused by the validator side', () => {
   assert.deepEqual(Object.keys(RESOLVER_TABLE), ['r0', 'r1', 'r2']);
   assert.deepEqual(LATER_RESOLVER_NAMES, ['r1', 'r2']);
   const reset = send(UP.reset), w = win([reset]);
@@ -47,7 +47,7 @@ test('1. with no request feed or read-back declared, R1 and R2 (the later resolv
   recomputeEffectTrace(JSON.parse(JSON.stringify(trace)), undefined, [C.RECORDS.plain]);
 });
 
-test('2. ADDENDUM-R2 m7: markUnfollowed adds the window to a set and copies nothing, so events keep their identity (and any overlay bound on them)', () => {
+test('2. markUnfollowed adds the window to a set and copies nothing, so events keep their identity (and any overlay bound on them)', () => {
   const events = [send(UP.reset), send(UP.applied)];
   const w = admitScoped(win(events));
   Object.assign(w, { coverage: 'partial', reason: C.AFTER, scoped: [{ name: CRM, resource: 'POST /tickets/T-1/close', codes: [C.AFTER] }] });
@@ -58,12 +58,12 @@ test('2. ADDENDUM-R2 m7: markUnfollowed adds the window to a set and copies noth
   assert.deepEqual(Object.keys(marked).sort(), ['coverage', 'events', 'instanceId', 'reason', 'scope', 'scoped', 'source']);
 });
 
-// --- Seeded differential against main frozen at 8eaa589 -------------------------------------------------------------------------------
+// --- Seeded differential against a frozen earlier evaluator ------------------------------------------------------------------------------
 const BOTH = { scoped: [admitScoped, main.events.admitScoped], inDoubt: [admitInDoubt, main.inDoubt.admitInDoubt] };
 const RUNS = 3000;
 const scrubbed = trace => JSON.parse(JSON.stringify(trace));
 
-test('3. differential: with any record an observer could return, every decision and every sealed byte equals main\'s (8eaa589) at seal time, under the follow rule and after the stage, and the validator recomputes them', t => {
+test('3. differential: with any record an observer could return, every decision and every sealed byte equals the frozen evaluator\'s at seal time, under the follow rule and after the stage, and the validator recomputes them', t => {
   const g = C.rng(61);
   const n = { runs: 0, decisions: 0, opted: 0, supplied: 0, unfollowed: 0, short: 0, scoped: 0, keyed: 0, mainRecomputed: 0 };
   for (let i = 0; i < RUNS; i++) {
@@ -82,7 +82,7 @@ test('3. differential: with any record an observer could return, every decision 
     const sealed = effectTrace(live, windows, C.META), sealedMain = main.effects.effectTrace(was, windows, C.META);
     assert.deepEqual(sealed, sealedMain, 'the sealed trace');
     assert.equal(digest(sealed.data), digest(sealedMain.data));
-    // The validator recomputes the sealed trace; main's validator does too, on windows it alone binds (no destination-scoped entry, which
+    // The validator recomputes the sealed trace; the frozen evaluator's validator does too, on windows it alone binds (no destination-scoped entry, which
     // only one module instance would admit: the frozen http-effects reads custody through the live src/custody.mjs).
     const again = recomputeEffectTrace(scrubbed(sealed), undefined, [C.recordOf(c)], { role: c.role, unfollowed: C.unfollowedOf(c) });
     assert.deepEqual(again.decisions.map(d => d.verdict), live.map(d => d.verdict));

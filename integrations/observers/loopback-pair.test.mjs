@@ -1,4 +1,4 @@
-// FIX-02 (SURPASS-BYPASS-01 A-21; egress-recorder/10, smtp-sink/2): a routed loopback sink holds its port on both loopback addresses,
+// Exclusive binds on both loopback addresses (egress-recorder/10, smtp-sink/2): a routed loopback sink holds its port on both addresses,
 // 127.0.0.1 and [::1], each bound exclusively. A route written with a name (localhost) may resolve to ::1 first, so a listener another
 // process held on [::1] at the sink's port would take the app's routed traffic while it relayed only the witness to 127.0.0.1. If either
 // bind fails, the sink does not start; a listener that comes later cannot bind. Every listener and connection here is on 127.0.0.1 or ::1.
@@ -185,7 +185,7 @@ test('payments double: it holds its port on 127.0.0.1 and [::1] and answers over
 });
 
 // End to end (the connector, the factory's recorder and the validator), with a small app whose routes are written as localhost.
-// prior: the app holds [::1] at the sink's port before the run (A-21). late: it tries to take it during the check (FIX-02's twin).
+// prior: the app holds [::1] at the sink's port before the run. late: it tries to take it during the check.
 async function squatApp(t, sinkPort, when) {
   let squat = null;
   const takeV6 = () => new Promise(resolve => {

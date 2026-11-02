@@ -153,7 +153,7 @@ test('the module runs as a script from a path containing a space', async t => {
 });
 
 test('a trace with nothing in it exits 3, because judging nothing is not a clean run', t => {
-  // The defect this replaces, found by the probe on v1 of this file: a zero-byte trace
+  // The defect this replaces, found by a probe on an earlier version of this file: a zero-byte trace
   // printed "0 alerts", "Coverage gaps: 0" and exited 0 — byte for byte the output of a clean
   // run. A CI step pointed at a trace that was never written, or truncated to nothing, read
   // green. Exit 0 now requires having observed something.
@@ -186,7 +186,7 @@ test('a trace with nothing in it exits 3, because judging nothing is not a clean
 });
 
 // Exit 0 promised "nothing left unjudged" and counted only coverageGaps. The report keeps three
-// more counters outside coverageGaps, and a run with any of them exited 0 (claims register DR18).
+// more counters outside coverageGaps, and a run with any of them exited 0.
 // One test per cause, each cause alone, then the guard that keeps exit 0 reachable.
 
 test('exit 4 for a commit whose commit-time authority was never observed (unjudgedAuthority)', t => {
@@ -252,9 +252,9 @@ test('each unjudged counter decides a nonzero exit on its own, and an alert stil
   assert.equal(exitCodeFor({ ...judged, unjudgedAuthority: 1, alerts: 1 }), 1);
 });
 
-// PR 349 review, major 2: honest saved traffic and an empty trace both exited 3, so a CI step
-// that had to accept 3 for the first also accepted a trace that was never written, which is the
-// wrong green #255 closed. They now exit 4 and 3, and the step accepts 0 and 4 only.
+// Honest saved traffic and an empty trace both used to exit 3, so a CI step that had to accept
+// 3 for the first also accepted a trace that was never written, which is the wrong green the
+// empty-trace rule above closes. They now exit 4 and 3, and the step accepts 0 and 4 only.
 test('honest saved traffic exits 4 and an empty trace exits 3, so CI tells them apart by the code alone', t => {
   const dir = temporary(t);
   const honestTraffic = run([traceFile(dir, [honest('a'), { ...honest('b'), authority: START_ONLY }])], t);
@@ -269,12 +269,12 @@ test('honest saved traffic exits 4 and an empty trace exits 3, so CI tells them 
   assert.equal(exitCodeFor({ alerts: 0, observed: 0, coverageGaps: 0, unjudgedAuthority: 5, unreadableClaims: 0, ruleErrors: 0 }), 3);
 });
 
-// PR 349 review, medium 3 (older than the PR): two ways a run that did not judge everything
-// still exited 0. One twin per case, each beside an honest line so the case is the only reason.
+// Two ways a run that did not judge everything still exited 0. One twin per case, each beside
+// an honest line so the case is the only reason.
 
 test('a line with no ledger reading is counted, named and skipped, so it cannot read as nothing committed', t => {
   const dir = temporary(t);
-  // The review's probes: no committed list and no ledgerReadable, then ledgerReadable true with
+  // The probes: no committed list and no ledgerReadable, then ledgerReadable true with
   // no committed list. Each exited 0 and printed "Coverage gaps: 0".
   const bare = { principalId: 'p', operation: 'refund' };
   const readableButNoList = { principalId: 'p', operation: 'refund', requestId: 'x', ledgerReadable: true };
@@ -298,7 +298,7 @@ test('a line with no ledger reading is counted, named and skipped, so it cannot 
 test('a negative droppedEffects is counted, named and skipped, and can no longer cancel a real gap', t => {
   const dir = temporary(t);
   const minus = { ...honest('b'), droppedEffects: -1 };
-  // The review's probes: beside a malformed line, and beside an unreadable ledger. Each exited 0.
+  // The probes: beside a malformed line, and beside an unreadable ledger. Each exited 0.
   const besideMalformed = run([traceFile(dir, [minus, '{not json'])], t);
   assert.equal(besideMalformed.code, 3, besideMalformed.stdout);
   assert.match(besideMalformed.stdout, /Line carrying a droppedEffects that is negative or not a whole number counted and skipped: 1\./);

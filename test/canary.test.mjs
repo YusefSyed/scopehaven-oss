@@ -134,7 +134,7 @@ test('every export of the first version keeps its name; the additions are listed
     'canaryValueReason', 'resolveCanary', 'canaryVerdict', 'foldForMatch', 'skeletonFold', 'SKELETON_MIN', 'markerShaped', 'MATCH_CHANNELS',
     'SKELETON_KIND', 'matchValue', 'containsValue', 'stringsIn']) assert.ok(name in canary, name);
   for (const name of ['CANARY_VALUE_RULE', 'CANARY_CHANNELS', 'CANARY_ENCODINGS', 'readCorpus', 'matchEncoded']) assert.ok(name in canary, name);
-  for (const name of ['CANARY_DECODE_LIMITS', 'drawCanaryValue']) assert.ok(name in canary, `${name}, added in round 2`);
+  for (const name of ['CANARY_DECODE_LIMITS', 'drawCanaryValue']) assert.ok(name in canary, `${name}, added later`);
   assert.equal(canaryVerdict.length, 2, 'canaryVerdict(texts, value, options)');
   assert.equal(readCorpus.length, 1, 'readCorpus(entries)');
   assert.equal(matchEncoded.length, 2, 'matchEncoded(texts, value)');
@@ -143,12 +143,12 @@ test('every export of the first version keeps its name; the additions are listed
   assert.deepEqual(CANARY_CHANNELS, [...MATCH_CHANNELS, 'encoded']);
   assert.deepEqual(CANARY_ENCODINGS, ['basic-auth', 'encoded-word', 'quoted-printable', 'percent', 'percent-double', 'json-escape',
     'base64', 'base64url', 'mime-base64', 'hex', 'html-entity', 'base32', 'byte-list', 'gzip', 'zlib', 'deflate-raw', 'utf-16', 'charset'],
-  'the first sixteen keep their places; round 3 appends utf-16 and charset');
+  'the first sixteen keep their places; utf-16 and charset are appended');
   assert.deepEqual(CANARY_REASONS, ['value-unavailable', 'value-too-long', 'value-not-marker-shaped', 'corpus-incomplete', 'value-low-entropy',
     'corpus-unreadable', 'corpus-compressed', 'corpus-binary', 'corpus-opaque', 'corpus-too-deep', 'corpus-too-large', 'corpus-binary-layer',
-    'corpus-charset-unknown', 'corpus-time-budget', 'corpus-undecodable'], 'the first eleven keep their places; round 3 appends four');
+    'corpus-charset-unknown', 'corpus-time-budget', 'corpus-undecodable'], 'the first eleven keep their places; four are appended');
   assert.deepEqual(CANARY_DECODE_LIMITS, { depth: 2, run: 16, decodedBytes: 8 * 1024 * 1024, inflatedBytes: 64 * 1024 * 1024, opaqueBytes: 512,
-    viewRounds: 4, steps: 100000, timeMs: 4000 }, 'the round 2 keys keep their values; round 3 adds five');
+    viewRounds: 4, steps: 100000, timeMs: 4000 }, 'the earlier keys keep their values; five are added');
   for (const list of [CANARY_CHANNELS, CANARY_ENCODINGS, CANARY_REASONS, CANARY_VALUE_RULE, CANARY_DECODE_LIMITS]) assert.ok(Object.isFrozen(list));
 });
 
@@ -208,7 +208,7 @@ test('only a marker-shaped, high-entropy value of 16 to 500 characters can be ju
   for (const reason of ['value-unavailable', 'value-too-long', 'value-not-marker-shaped', 'value-low-entropy']) assert.ok(CANARY_REASONS.includes(reason));
 });
 
-// M1: a value with whitespace was accepted and then found only by the skeleton, so the CR of a CRLF file made a leak glued
+// A value with whitespace was accepted and then found only by the skeleton, so the CR of a CRLF file made a leak glued
 // to a letter pass. Whitespace and invisible characters are refused anywhere in the value, leading and trailing included.
 test('value rule: whitespace or an invisible character anywhere is refused, and the verdict is never pass', () => {
   const padded = [['a trailing CR', `${MARKER}\r`], ['a trailing LF', `${MARKER}\n`], ['a leading space', ` ${MARKER}`],
@@ -227,7 +227,7 @@ test('value rule: whitespace or an invisible character anywhere is refused, and 
   assert.deepEqual(resolveCanary({ SCOPEHAVEN_TARGET_CANARY_B: `${MARKER}\r` }, { id: 'b', valueEnv: 'SCOPEHAVEN_TARGET_CANARY_B' }), { reason: 'value-not-marker-shaped' });
 });
 
-// M2: values a person would type were judged, and they turn up in honest text. The rule: at least 16 characters, at least
+// Values a person would type were judged, and they turn up in honest text. The rule: at least 16 characters, at least
 // 10 distinct characters once case is folded, and no run of 4 that repeats one character or steps through consecutive
 // code points.
 test('value rule: a low-entropy value is refused, at each boundary of the rule', () => {
@@ -254,7 +254,7 @@ test('value rule: a low-entropy value is refused, at each boundary of the rule',
   assert.deepEqual(resolveCanary({ SCOPEHAVEN_TARGET_CANARY_B: 'abcd1234' }, { id: 'b', valueEnv: 'SCOPEHAVEN_TARGET_CANARY_B' }), { reason: 'value-low-entropy' });
 });
 
-// Round 2, L1: a value with a letter outside ASCII leaves as punycode, latin1 or UTF-16 bytes, which the encoded channel
+// A value with a letter outside ASCII leaves as punycode, latin1 or UTF-16 bytes, which the encoded channel
 // does not build, so it is refused. Every printable ASCII character is allowed.
 test('value rule: a character outside printable ASCII is refused, and the verdict is never pass', () => {
   const outside = [['an a-umlaut', 'F\u00e4ke7Canary2Zq9Wx'], ['a sharp s at the end', 'Fake7Canary2Zq9W\u00df'],
@@ -268,7 +268,7 @@ test('value rule: a character outside printable ASCII is refused, and the verdic
   assert.equal(canaryValueReason(everyMark), null, 'every ASCII punctuation mark');
 });
 
-// Round 2, M5: the rule refuses 1 to 3 percent of random draws, so a generator draws until a value is accepted.
+// The rule refuses 1 to 3 percent of random draws, so a generator draws until a value is accepted.
 test('drawCanaryValue draws until the rule accepts a value, and never names a draw', () => {
   const draws = ['abcd1234', 'password', `${MARKER}\r`, undefined, 'F\u00e4ke7Canary2Zq9Wx', PLAIN, TILDE];
   let calls = 0;
@@ -282,7 +282,7 @@ test('drawCanaryValue draws until the rule accepts a value, and never names a dr
   assert.equal(calls, 64, '64 draws by default');
   assert.equal(code(() => drawCanaryValue(PLAIN)), 'draw');
   for (const attempts of [0, -1, 1.5, '3', null]) assert.equal(code(() => drawCanaryValue(() => PLAIN, { attempts })), 'attempts');
-  // Generators like the ones the review measured: every value drawn is one the rule accepts and the verdict can judge.
+  // Common generators: every value drawn is one the rule accepts and the verdict can judge.
   const generators = [() => randomBytes(15).toString('base64url'), () => randomBytes(16).toString('hex'), () => randomUUID(),
     () => randomBytes(18).toString('base64')];
   for (const generate of generators) for (let i = 0; i < 300; i++) {
@@ -345,7 +345,7 @@ test('verdict evidence never holds the value or the text', () => {
   }
 });
 
-// --- The corpus (B2): every entry is read, or the verdict says it could not be. ---
+// --- The corpus: every entry is read, or the verdict says it could not be. ---
 
 // Each corpus type a consumer may hand in, holding one text.
 const AS = Object.freeze([
@@ -427,7 +427,7 @@ const STREAMS = Object.freeze([
   ['a bzip2 stream', value => Buffer.concat([Buffer.from('BZh91AY&SY', 'latin1'), body(reversed(value))])],
   ['an xz stream', value => Buffer.concat([Buffer.from([0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00]), body(reversed(value))])],
 ]);
-// A gzip or zlib body is inflated as well (round 3), so the canary in one fails with the stream named; the body still
+// A gzip or zlib body is inflated as well, so the canary in one fails with the stream named; the body still
 // reads corpus-compressed when nothing is found, as a consumer that can decompress passes the decompressed text.
 const INFLATED = Object.freeze([
   ['a gzip body', 'gzip', value => gzipSync(body(value))],
@@ -459,7 +459,7 @@ test('corpus: compressed and binary parts are inconclusive, never pass, and a ca
   assert.deepEqual(readCorpus([42, gzipSync(body(DECOY)), BINARY(DECOY)]).reasons, ['corpus-unreadable', 'corpus-compressed', 'corpus-binary'], 'the order reported');
 });
 
-// Round 2, L4 survivor 1: the encoded channel and the decoded layers are searched before the corpus reasons are read, so
+// The encoded channel and the decoded layers are searched before the corpus reasons are read, so
 // a hit beside a part the module cannot read still fails.
 test('corpus: an encoded or a layered hit beside a part the module cannot read still fails', () => {
   for (const [label, part] of [['an unreadable entry', 42], ['a gzip body', gzipSync(body(DECOY))], ['binary bytes', BINARY(DECOY)],
@@ -478,7 +478,7 @@ test('corpus: a consumer can mark the corpus as holding parts it could not read'
   assert.deepEqual(judge(CLEAN, MARKER, { complete: true, opaque: false }), { outcome: 'pass' });
 });
 
-// --- The encoded channel (B1): every encoding the review listed, as a defective and a fixed twin, in every corpus type. ---
+// --- The encoded channel: every encoding below, as a defective and a fixed twin, in every corpus type. ---
 
 const GREETING = 'Your order is ready. Here is your reference ID: '; // 48 bytes, so the value crosses the first 76-column line
 const ENCODED = Object.freeze([
@@ -521,21 +521,21 @@ const ENCODED = Object.freeze([
   ['numeric entities without semicolons, encoded three times', 'html-entity', v => `<p>${[...v].map(c => `&#${c.codePointAt(0)}`).join('').replaceAll('&', '&amp;').replaceAll('&', '&amp;')}</p>`],
   ['the &hyphen; entity', 'html-entity', v => v.includes('-') ? `<p>${v.replaceAll('-', '&hyphen;')}</p>` : null],
   ['the &lowbar; entity', 'html-entity', v => v.includes('-') ? `<p>${v.replaceAll('-', '&lowbar;')}</p>` : null],
-  // Round 2. L3: leading zeros, a fourth percent round and a third JSON level (L4 survivor 2: a third percent round).
+  // Leading zeros, a fourth percent round and a third JSON level (and a third percent round).
   ['numeric entities with eight-digit leading zeros', 'html-entity', v => `<p>${[...v].map(c => `&#${String(c.codePointAt(0)).padStart(8, '0')};`).join('')}</p>`],
   ['hex entities with seven-digit leading zeros', 'html-entity', v => `<p>${[...v].map(c => `&#x${c.codePointAt(0).toString(16).padStart(7, '0')};`).join('')}</p>`],
   ['percent encoding three times', 'percent-double', v => `next=${pct(pct(pct(v)))}`],
   ['percent encoding four times', 'percent-double', v => `next=${pct(pct(pct(pct(v))))}`],
   ['JSON in JSON in a JSON string, escaped three times', 'json-escape', v => JSON.stringify({ outer: JSON.stringify({ inner: `{"note":"${uEsc(v)}"}` }) })],
-  // B3: base64 wrapped at 40 columns inside a JSON string, the line breaks written as \n escapes (one falls in the value).
+  // Base64 wrapped at 40 columns inside a JSON string, the line breaks written as \n escapes (one falls in the value).
   ['base64 wrapped at 40 columns in a JSON string', 'mime-base64', v => JSON.stringify({ pem: b64(`${GREETING}${v} end`).match(/.{1,40}/g).join('\n') })],
   ['base64 wrapped at 40 columns with \\r\\n escapes', 'mime-base64', v => JSON.stringify({ pem: b64(`${GREETING}${v} end`).match(/.{1,40}/g).join('\r\n') })],
-  // M4: base64url cut in half across two DNS labels, the cut inside the value's run.
+  // Base64url cut in half across two DNS labels, the cut inside the value's run.
   ['base64url cut across two DNS labels', 'base64url', v => {
     const token = b64url(JSON.stringify({ k: `${v}~~~~~~` })), half = Math.floor(token.length / 2);
     return `${token.slice(0, half)}.${token.slice(half)}.x.exfil.example.test`;
   }],
-  // M3: RFC 4648 base32, upper case with padding, at byte offsets 0 to 4, lower case without padding as a DNS label.
+  // RFC 4648 base32, upper case with padding, at byte offsets 0 to 4, lower case without padding as a DNS label.
   ['base32 with padding', 'base32', v => `k=${base32Of(`${v}!`)}`],
   ['base32 at byte offset 1', 'base32', v => `k=${base32Of(`:${v}!`)}`],
   ['base32 at byte offset 2', 'base32', v => `k=${base32Of(`id${v}!`)}`],
@@ -544,11 +544,11 @@ const ENCODED = Object.freeze([
   ['base32 of the value in lower case', 'base32', v => `k=${base32Of(v.toLowerCase())}`],
   ['base32 in lower case without padding, as the first DNS label', 'base32', v => `${base32Of(v).replace(/=+$/, '').toLowerCase()}.t.exfil.example.test`],
   ['base32 cut across two DNS labels', 'base32', v => { const t = base32Of(`id${v}`).replace(/=+$/, '').toLowerCase(); return `${t.slice(0, 20)}.${t.slice(20)}.exfil.example.test`; }],
-  // L2: byte lists, as Node writes a Buffer in JSON, with spaces, and as 0x hex.
+  // Byte lists, as Node writes a Buffer in JSON, with spaces, and as 0x hex.
   ['a Buffer written as JSON', 'byte-list', v => JSON.stringify({ log: Buffer.from(`ref=${v}`) })],
   ['a decimal byte list with spaces', 'byte-list', v => `bytes: [${[...Buffer.from(v)].join(', ')}]`],
   ['a 0x byte list', 'byte-list', v => `{ ${[...Buffer.from(v)].map(b => `0x${b.toString(16).toUpperCase().padStart(2, '0')}`).join(', ')} }`],
-  // Round 3, L8: byte lists separated by spaces alone (Go's %v of a []byte, and 0x bytes).
+  // Byte lists separated by spaces alone (Go's %v of a []byte, and 0x bytes).
   ['a decimal byte list separated by spaces (Go %v)', 'byte-list', v => `bytes: [${[...Buffer.from(v)].join(' ')}]`],
   ['0x bytes separated by spaces', 'byte-list', v => `{ ${[...Buffer.from(v)].map(b => `0x${b.toString(16).padStart(2, '0')}`).join(' ')} }`],
 ]);
@@ -591,7 +591,7 @@ test('matchEncoded refuses what it cannot read instead of reporting no hit', () 
   assert.equal(code(() => matchEncoded(['ok'], undefined)), 'value');
 });
 
-// --- The decoded layers (round 2, B3): a second encoding under base64, as mail leaves through a provider API. ---
+// --- The decoded layers: a second encoding under base64, as mail leaves through a provider API. ---
 
 // A message with one text part. The signature's "~~~" puts a - or _ in its base64url, so the outer alphabet is
 // determinate (ASCII text without ~, ?, > or DEL encodes the same in both alphabets).
@@ -672,7 +672,7 @@ const LAYERED = Object.freeze([
   }],
   // A block closes after its shorter last line, so a long identifier on the next line is not glued to it.
   ['a wrapped block whose short last line meets a long identifier', ['base64', 'base64'], v => `log:\n${wrap76(b64(`ref ${b64(`ref ${v} ok`)} `.padEnd(57 * 2 + 30, '.')))}\nAbstractSingletonProxyFactoryBeanInternationalization\n`],
-  // Round 3, B4: an inflated stream that is not text is read as bytes (an archive, a binary record, UTF-16).
+  // An inflated stream that is not text is read as bytes (an archive, a binary record, UTF-16).
   ['base64 of gzip of a tar archive holding a config file', ['base64', 'gzip'], v => JSON.stringify({ file: targz(v).toString('base64') })],
   ['a provider API raw message with a .tar.gz attachment', ['base64url', 'base64', 'gzip'], v => JSON.stringify({ raw: b64url(withAttachment(targz(v), 'application/gzip')) })],
   ['base64 of zlib of a tar archive', ['base64', 'zlib'], v => JSON.stringify({ file: deflateSync(tarOf('config.env', `API_KEY=${v}\n`)).toString('base64') })],
@@ -681,12 +681,12 @@ const LAYERED = Object.freeze([
   ['base64 of gzip of UTF-16LE text', ['base64', 'gzip', 'utf-16'], v => `payload=${gzipSync(utf16le(`Your reference: ${v} end`)).toString('base64')}`],
   // A raw deflate stream where an archive member starts (after the header's padding).
   ['base64 of gzip of a tar archive whose member is a raw deflate stream', ['base64', 'gzip', 'deflate-raw'], v => `f=${gzipSync(tarOf('notes.z', deflateRawSync(`${PROSE} ref ${v} ok`))).toString('base64')}`],
-  // L8: base64 and hex of UTF-16LE (PowerShell's -EncodedCommand).
+  // Base64 and hex of UTF-16LE (PowerShell's -EncodedCommand).
   ['base64 of UTF-16LE text (PowerShell -EncodedCommand)', ['base64', 'utf-16'], v => `powershell -EncodedCommand ${utf16le(`Write-Output 'ref ${v} ok'`).toString('base64')}`],
   ['hex of UTF-16LE text', ['hex', 'utf-16'], v => `d=${utf16le(`ref ${v} ok`).toString('hex')}`],
-  // M6: bytes read again in the charset their label names (the value in Cyrillic lookalikes, in windows-1251).
+  // Bytes read again in the charset their label names (the value in Cyrillic lookalikes, in windows-1251).
   ['a raw message in windows-1251 holding the value in Cyrillic lookalikes', ['base64url', 'charset'], v => JSON.stringify({ raw: cp1251Mail(v).toString('base64url') })],
-  // L5: a second layer under hex, percent and base32 (in DNS labels), and base64url of base64 cut across labels.
+  // A second layer under hex, percent and base32 (in DNS labels), and base64url of base64 cut across labels.
   ['hex of base64 of a short text', ['hex', 'base64'], v => `d=${Buffer.from(b64(`ref ${v} ok`)).toString('hex')}`],
   ['hex of gzip of a short text', ['hex', 'gzip'], v => `d=${gzipSync(`ref ${v} ok`).toString('hex')}`],
   ['percent-encoded gzip bytes in a form field', ['percent', 'gzip'], v => `data=${[...gzipSync(`ref ${v} ok`)].map(b => `%${b.toString(16).padStart(2, '0')}`).join('')}&x=1`],
@@ -766,7 +766,7 @@ test('layered: past the byte budget the verdict is inconclusive, never pass', t 
     ['corpus-unreadable', 'corpus-compressed', 'corpus-binary', 'corpus-too-deep', 'corpus-too-large'], 'the order reported');
 });
 
-// A regular expression over one run of more than about 5 MiB throws a RangeError in V8; the run scan does not. Round 3:
+// A regular expression over one run of more than about 5 MiB throws a RangeError in V8; the run scan does not.
 // 5 MiB of random bytes is an opaque part (an attachment the module cannot read), so it is never pass. The clock is
 // held: on a loaded machine the time budget can run out before the value beside the run is reached.
 test('layered: one base64 run of 7 MiB is read without throwing, and its random bytes are opaque', t => {
@@ -779,7 +779,7 @@ test('layered: one base64 run of 7 MiB is read without throwing, and its random 
 
 // Bytes under base64 that are not text and carry no structure, up to CANARY_DECODE_LIMITS.opaqueBytes in a layer (a
 // signature, a random id, a hash, a nonce), are examined as bytes and pass, and so do runs that start like a zlib
-// stream but do not inflate. More opaque bytes in one layer (an image, an attachment) are corpus-binary-layer (round 3).
+// stream but do not inflate. More opaque bytes in one layer (an image, an attachment) are corpus-binary-layer.
 test('layered: honest short bytes under base64 pass; a larger opaque part is inconclusive', () => {
   const zlibLike = seeded(48, 11);
   zlibLike[0] = 0x78; zlibLike[1] = 0x9c;
@@ -811,9 +811,9 @@ test('layered: honest short bytes under base64 pass; a larger opaque part is inc
   }
 });
 
-// --- Round 3: a pass needs every part of the corpus examined (coverage). ---
+// --- A pass needs every part of the corpus examined (coverage). ---
 
-// M6: a provider API raw message with an 8-bit part in a legacy charset, beside a base64 attachment that holds the value.
+// A provider API raw message with an 8-bit part in a legacy charset, beside a base64 attachment that holds the value.
 // A charset a label names and TextDecoder knows is read; an unknown label (UTF-7) is corpus-charset-unknown.
 const LEGACY = Object.freeze([
   ['windows-1251', 'cff0e8e2e5f22c20e2e0f820e7e0eae0e720'], ['koi8-r', 'f0d2c9d7c5d42c20d7c1db20dac1cbc1da20'],
@@ -824,7 +824,7 @@ const legacyMail = (charset, hex, bytes, attachment) => Buffer.concat([
   Buffer.from(hex.repeat(Math.ceil(bytes / (hex.length / 2))), 'hex').subarray(0, bytes),
   Buffer.from(`\r\n--b1\r\nContent-Type: text/plain\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64(attachment)}\r\n~~~ Order desk\r\n--b1--\r\n`)]);
 
-test('coverage: 8-bit mail in a legacy charset is read in the charset its label names; an unknown charset is never pass (M6)', () => {
+test('coverage: 8-bit mail in a legacy charset is read in the charset its label names; an unknown charset is never pass', () => {
   for (const [charset, hex] of LEGACY) for (const bytes of [1200, 400, 40]) PLANTED.forEach((value, v) => {
     const where = `${charset}, ${bytes} bytes, value ${v}`;
     const raw = attachment => JSON.stringify({ raw: legacyMail(charset, hex, bytes, attachment).toString('base64url') });
@@ -843,7 +843,7 @@ test('coverage: 8-bit mail in a legacy charset is read in the charset its label 
   assert.deepEqual(judge([unlabelled(1000)], PLAIN, { complete: true }), { outcome: 'inconclusive', reason: 'corpus-binary-layer' });
 });
 
-// The five value kinds of the round 2 and 3 reviews, drawn with drawCanaryValue from a seeded generator: a test
+// Five value kinds, drawn with drawCanaryValue from a seeded generator: a test
 // marker, 20 random letters and digits, 32 hex, a UUID and 24 base64 characters.
 const seededDraws = seed => {
   let state = seed >>> 0;
@@ -857,9 +857,9 @@ const seededDraws = seed => {
 };
 const PROSE = 'Your order is ready and waiting at the desk, and the invoice follows by mail today. Thanks again for ordering with us.';
 
-// M7: an outer base64 layer wrapped at 76 inside a raw JSON body (Python's base64.encodebytes, then json.dumps) loses
+// An outer base64 layer wrapped at 76 inside a raw JSON body (Python's base64.encodebytes, then json.dumps) loses
 // no line. The value slides through 120 positions of the inner text, for each of five values: 600 placements a shape.
-test('coverage: a wrapped outer base64 in a raw JSON body is joined at every placement (M7)', () => {
+test('coverage: a wrapped outer base64 in a raw JSON body is joined at every placement', () => {
   const wrapAt = (text, widths, separator) => { const lines = []; for (let i = 0, k = 0; i < text.length; k++) { const w = widths[Math.min(k, widths.length - 1)]; lines.push(text.slice(i, i + w)); i += w; } return lines.join(separator); };
   const forms = [
     ['\\n escapes in a JSON body', text => JSON.stringify({ key: `${wrapAt(b64(text), [76], '\n')}\n` })],
@@ -881,7 +881,6 @@ test('coverage: a wrapped outer base64 in a raw JSON body is joined at every pla
   }
 });
 
-// L5 to L9 of round 3.
 test('coverage: a stream cut short and followed by other bytes gives what it holds', () => {
   const field = stream => `{"z":"${[...stream].map(b => `%${b.toString(16).padStart(2, '0')}`).join('')}","n":1}`;
   for (const value of PLANTED) {
@@ -914,7 +913,7 @@ test('coverage: a long base32 run is decoded as base32', () => {
 });
 
 // The clock is held, so the decoding that goes on is not cut short by the time budget on a loaded machine.
-test('coverage: one stream over its cap adds its reason and decoding goes on (L6)', t => {
+test('coverage: one stream over its cap adds its reason and decoding goes on', t => {
   moduleClock(t).hold();
   const over = `p=${gzipSync(Buffer.alloc(CANARY_DECODE_LIMITS.decodedBytes + 1024)).toString('base64')}`;
   assert.deepEqual(judge([over], MARKER, { complete: true }), { outcome: 'inconclusive', reason: 'corpus-too-large' });
@@ -922,7 +921,7 @@ test('coverage: one stream over its cap adds its reason and decoding goes on (L6
   assert.deepEqual(judge([`${over} t=${b64(b64(`ref ${MARKER} ok`))}`], MARKER, { complete: true }), { outcome: 'fail', channel: 'encoded', encoding: 'base64', layers: ['base64', 'base64'] }, 'in one text');
 });
 
-test('coverage: a Basic token of several MiB is read without throwing (L7)', () => {
+test('coverage: a Basic token of several MiB is read without throwing', () => {
   const noise = seeded(Math.ceil(6 * 1024 * 1024 * 3 / 4), 21);
   assert.doesNotThrow(() => canaryVerdict([`Authorization: Basic ${noise.toString('base64')}`], MARKER, { complete: true }));
   assert.doesNotThrow(() => matchEncoded([`Authorization: Basic ${noise.toString('base64')}`], MARKER));
@@ -930,7 +929,7 @@ test('coverage: a Basic token of several MiB is read without throwing (L7)', () 
   assert.deepEqual(judge([`Authorization: Basic ${leaked}`], MARKER, { complete: true }), { outcome: 'fail', channel: 'encoded', encoding: 'basic-auth' });
 });
 
-test('coverage: zlib and gzip at every level inflate (L9)', () => {
+test('coverage: zlib and gzip at every level inflate', () => {
   for (const level of [1, 2, 3, 4, 5, 6, 7, 8, 9]) PLANTED.forEach((value, v) => {
     assert.deepEqual(judge([`{"z":"${deflateSync(body(value), { level }).toString('base64')}"}`], value, { complete: true }), { outcome: 'fail', channel: 'encoded', encoding: 'base64', layers: ['base64', 'zlib'] }, `zlib level ${level}, value ${v}`);
     assert.deepEqual(judge([`{"z":"${deflateSync(body(DECOY_OF.get(value)), { level }).toString('base64')}"}`], value, { complete: true }), { outcome: 'pass' }, `zlib level ${level}, decoy ${v}`);
@@ -940,11 +939,11 @@ test('coverage: zlib and gzip at every level inflate (L9)', () => {
 
 test('coverage: escapes are undone in any order up to viewRounds rounds; a view that still changes is too deep', () => {
   const pctN = (text, n) => { for (let i = 0; i < n; i++) text = pct(text); return text; };
-  assert.deepEqual(judge([`next=${pctN(MARKER, 5)}`], MARKER, { complete: true }), { outcome: 'fail', channel: 'encoded', encoding: 'percent', layers: ['percent', 'percent-double'] }, 'five rounds of percent (a known limit in round 2)');
+  assert.deepEqual(judge([`next=${pctN(MARKER, 5)}`], MARKER, { complete: true }), { outcome: 'fail', channel: 'encoded', encoding: 'percent', layers: ['percent', 'percent-double'] }, 'five rounds of percent (once a known limit)');
   assert.deepEqual(judge([`next=${pctN(DECOY_OF.get(MARKER), 4)}`], MARKER, { complete: true }), { outcome: 'pass' });
   assert.deepEqual(judge([`next=${pctN(DECOY_OF.get(MARKER), 5)}`], MARKER, { complete: true }), { outcome: 'inconclusive', reason: 'corpus-too-deep' });
   const jsonN = (value, n) => { let text = `{"note":"${uEsc(value)}"}`; for (let i = 1; i < n; i++) text = JSON.stringify({ x: text }); return text; };
-  assert.equal(judge([jsonN(MARKER, 4)], MARKER, { complete: true }).outcome, 'fail', 'JSON escapes four levels deep (a known limit in round 2)');
+  assert.equal(judge([jsonN(MARKER, 4)], MARKER, { complete: true }).outcome, 'fail', 'JSON escapes four levels deep (once a known limit)');
   assert.deepEqual(judge([jsonN(DECOY_OF.get(MARKER), 4)], MARKER, { complete: true }), { outcome: 'pass' });
   assert.deepEqual(judge([jsonN(DECOY_OF.get(MARKER), 5)], MARKER, { complete: true }), { outcome: 'inconclusive', reason: 'corpus-too-deep' });
   // Escapes in a JSON string of quoted-printable (the soft breaks written as \r\n escapes): JSON first, then QP.
@@ -985,9 +984,9 @@ test('coverage: an internal error, and more decodings than the budget, are incon
   assert.deepEqual(judge([`x=${MARKER}`, `t=${b64(b64(`ref ${DECOY} ok`))}`], MARKER, { complete: true }), { outcome: 'fail', channel: 'verbatim' }, 'a hit past the clock still fails');
 });
 
-// M8: 16 MiB of distinct gzip streams, each inflating to just under 8 MiB of zeros, took 54 s in round 3. Every inflated
+// 16 MiB of distinct gzip streams, each inflating to just under 8 MiB of zeros, once took 54 s. Every inflated
 // byte now counts against inflatedBytes and the decoded text against decodedBytes, so the verdict is quick and never pass.
-test('coverage: 16 MiB of small decompression bombs is inconclusive within the time budget (M8)', t => {
+test('coverage: 16 MiB of small decompression bombs is inconclusive within the time budget', t => {
   const stream = gzipSync(Buffer.alloc(8 * 1024 * 1024 - 64)), parts = [];
   for (let i = 0, size = 0; size < 16 * 1024 * 1024; i++) {
     const distinct = Buffer.from(stream);

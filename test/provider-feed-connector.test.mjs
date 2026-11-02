@@ -1,4 +1,4 @@
-// Provider feed (G2) end to end: an app whose vendor SDK sends mail straight to its provider (a loopback stub here),
+// Provider feed end to end: an app whose vendor SDK sends mail straight to its provider (a loopback stub here),
 // observed only through the provider's own signed feed. The connector runs the witness, settlement decides what the
 // records cannot place, and the run validator binds the sealed windows. Every request goes to 127.0.0.1.
 import test from 'node:test';
@@ -45,27 +45,27 @@ async function mailApp(t, stub, { lateMs = 650, holdMs = 0, other = null, job = 
       return send(200, { ok: true });
     }
     if (url.pathname === '/refused') { stub.reject([VIP]); return send(200, { ok: true }); }
-    // Later outcomes: delivered at once, then a delayed bounce lateMs after (the LD-7 succeed-then-fail shape).
+    // Later outcomes: delivered at once, then a delayed bounce lateMs after (succeed, then fail).
     if (url.pathname === '/notify-delivered-then-bounced') { const id = JSON.parse(stub.accept([VIP]).body).messageId; stub.outcome(id, 'succeeded'); setTimeout(() => stub.outcome(id, 'failed'), lateMs); return send(200, { ok: true }); }
     // An entry signed with a key that is not the stub's: the feed faults.
     if (url.pathname === '/forge') { stub.accept([VIP], { key: generateKeyPairSync('ed25519').privateKey }); return send(200, { ok: true }); }
     if (url.pathname === '/notify-other') { for (let i = 0; i < 3; i++) other.accept([VIP]); return send(200, { ok: true }); }
-    // A background job that keeps mailing for jobMs after the request (the G8 shape), one email every 150 ms.
+    // A background job that keeps mailing for jobMs after the request, one email every 150 ms.
     if (url.pathname === '/mail-job') { const until = Date.now() + Number(url.searchParams.get('ms')); const tick = () => { if (Date.now() < until) { stub.accept([`job@${EXT}`]); setTimeout(tick, 150); } }; tick(); return send(200, { ok: true }); }
     // The same job, ended by the test instead of a clock started here: it mails until job.until, which the test sets from the run-end
-    // drain's start (P17b).
+    // drain's start.
     if (url.pathname === '/mail-job-until') { const tick = () => { if (Date.now() < job.until) { stub.accept([`job@${EXT}`]); setTimeout(tick, 150); } }; tick(); return send(200, { ok: true }); }
-    // Feed v2: the case's own email plus a background job's ticket update to the same customer, each through its template.
+    // Templates: the case's own email plus a background job's ticket update to the same customer, each through its template.
     const mail = template => stub.accept([VIP], template === undefined ? {} : { fields: { template } });
     if (url.pathname === '/cancel') { mail('tmpl-order-cancelled'); mail('tmpl-ticket-update'); return send(200, { ok: true }); }
     if (url.pathname === '/cancel-twice') { mail('tmpl-order-cancelled'); mail('tmpl-ticket-update'); mail('tmpl-order-cancelled'); return send(200, { ok: true }); }
     if (url.pathname === '/ticket') { mail('tmpl-ticket-update'); return send(200, { ok: true }); }
     if (url.pathname === '/untemplated') { mail(); return send(200, { ok: true }); }
     if (url.pathname === '/variant-twice') { mail('tmpl-order-cancelled'); mail('TMPL-ORDER-CANCELLED'); return send(200, { ok: true }); }
-    // Feed v2, Part B: the case's email now, and a background ticket update (or the same template) after the witness request.
+    // Late entries: the case's email now, and a background ticket update (or the same template) after the witness request.
     if (url.pathname === '/cancel-late-ticket') { mail('tmpl-order-cancelled'); setTimeout(() => mail('tmpl-ticket-update'), lateMs); return send(200, { ok: true }); }
     if (url.pathname === '/cancel-late-same') { mail('tmpl-order-cancelled'); setTimeout(() => mail('tmpl-order-cancelled'), lateMs); return send(200, { ok: true }); }
-    // Feed v2, Part C (the R62-009 shape): the case's email to VIP now, and a background ticket update to another customer late.
+    // The lift: the case's email to VIP now, and a background ticket update to another customer late.
     if (url.pathname === '/cancel-late-other') { mail('tmpl-order-cancelled'); setTimeout(() => stub.accept([AISHA], { fields: { template: 'tmpl-ticket-update' } }), lateMs); return send(200, { ok: true }); }
     return send(404, {});
   });
@@ -77,13 +77,13 @@ const exists = { kind: 'effect.exists', select: { source: 'provider-feed', opera
 const none = { kind: 'effect.none', select: { source: 'provider-feed', operation: 'send', name: EXT, resource: VIP } };
 const check = (id, path, effects, severity = 'high') => ({ id, title: id, category: 'mail', severity, actorId: 'ops', method: 'POST', path, body: {}, evidenceRequirement: 'response',
   assertions: [{ kind: 'status.equals', expected: 200 }], effects });
-// The feed is the signed provider stub, declared as one (FIX-06): an undeclared key source never supports a pass.
+// The feed is the signed provider stub, declared as one (keySource "stub"): an undeclared key source never supports a pass.
 const profileOf = (origin, stub, checks, feedExtra = {}) => ({ id: 'mail', name: 'Mail', applicationId: 'mail', origin, buildLabel: 'b1', contextId: 'synthetic-mail',
   actors: { ops: { principalId: 'ops', credentialEnv: 'SCOPEHAVEN_TARGET_OPS', identityValue: 'ops' } }, requiredControlIds: ['WHOAMI'],
   observers: [{ id: 'mail', type: 'provider-feed', feedId: stub.feedId, feed: { endpoint: { port: stub.port, path: stub.path } }, publicKey: stub.publicKey,
     domains: [{ domain: EXT, addresses: [VIP] }], routing: 'provider', witness: { actorId: 'ops', method: 'GET', path: '/ping', domain: WITNESS }, witnessWaitMs: 2000, quietMs: 300, pollMs: 25, settleMs: 250, keySource: 'stub', ...feedExtra }],
   checks: [{ id: 'WHOAMI', title: 'Who am I', category: 'identity', severity: 'control', actorId: 'ops', method: 'GET', path: '/me', evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 200 }, { kind: 'json.equals', pointer: '/user', expected: 'ops' }] }, ...checks] });
-// required: further required controls (an allowed-use control with a positive effect guards an unpinned absence, FIX-07).
+// required: further required controls (an allowed-use control with a positive effect guards an unpinned absence).
 async function run(t, checks, app, feedExtra, required = []) {
   const stub = await startStub(t);
   const p = profileOf(await mailApp(t, stub, app), stub, checks, feedExtra);
@@ -121,7 +121,7 @@ test('allowed: a send through the provider passes effect.exists, a clean check p
   assert.equal(witnessCloseMs(p.observers, p.actors), TIMING_REQUEST_MS + 2000 + 10 * 300 + 3 * PROVIDER_FEED_REQUEST_MS);
 });
 
-test('P5: a send the records cannot place never passes either check it could belong to (boundary checks)', async t => {
+test('a send the records cannot place never passes either check it could belong to (boundary checks)', async t => {
   // A's send is stamped after A's witness request (and before the witness mail): A is partial (missing), and B's own
   // send of the same selector also fits A's, so settlement withholds B's pass (effect-ambiguous-attribution).
   const late = await run(t, [check('A', '/late-notify', [exists]), check('B', '/notify', [exists])]);
@@ -136,8 +136,8 @@ test('P5: a send the records cannot place never passes either check it could bel
   assert.equal(effectRow(into.run, 'B').settlement, 'effect-ambiguous-attribution');
 });
 
-// Feed v2, template binding end to end: the G2 replay's collision (a background ticket update to the customer in the case's
-// own window) no longer decides a template-bound clause, and the run record carries labels only.
+// Template binding end to end: a background ticket update to the customer in the case's
+// own window no longer decides a template-bound clause, and the run record carries labels only.
 const TEMPLATES = Object.freeze({ order_cancelled: 'tmpl-order-cancelled', ticket_update: 'tmpl-ticket-update', refund_confirmation: 'd-0c1f43daeeaef504760851f727007e0b' });
 const mailTo = template => ({ source: 'provider-feed', operation: 'send', name: EXT, resource: VIP, fields: [{ pointer: '/template', equals: template }] });
 const countOne = { kind: 'effect.count', expected: 1, select: mailTo('order_cancelled') };
@@ -146,7 +146,7 @@ const assertionOf = (r, id, i, kind) => rowOf(r, id).assertions.find(a => a.name
 // A stored run is JSON: forge on a JSON copy, so no two records share an object.
 const reseal = (run, id, mutate) => { const forged = JSON.parse(JSON.stringify(run)), fx = forged.results.find(x => x.id === id); mutate(forged, fx); fx.evidenceDigest = digest({ evidence: fx.trace[0].data, effects: fx.trace[1].data, assertions: fx.assertions }); return forged; };
 
-test('feed v2: a template-bound count decides beside other-template mail to the same customer, settles past it, and the validator binds the labels', async t => {
+test('feed templates: a template-bound count decides beside other-template mail to the same customer, settles past it, and the validator binds the labels', async t => {
   const { p, run: r } = await run(t, [check('CANCEL', '/cancel', [countOne]), check('TICKET', '/ticket', [{ kind: 'effect.exists', select: mailTo('ticket_update') }])], undefined, { templates: TEMPLATES });
   // The later ticket update reads "no" under order_cancelled, so settlement does not withhold CANCEL's count.
   assert.deepEqual([rowOf(r, 'CANCEL').status, rowOf(r, 'TICKET').status], ['pass', 'pass'], JSON.stringify([assertionOf(r, 'CANCEL', 1, 'effect.count'), assertionOf(r, 'TICKET', 1, 'effect.exists')]));
@@ -167,28 +167,28 @@ test('feed v2: a template-bound count decides beside other-template mail to the 
   refused((() => { const f = structuredClone(r); f.observers[0].capture = { [EXT]: ['/amount'] }; return f; })());
 });
 
-test('feed v2: mail with no template after a template-bound pass withholds it (settlement); effect.only allows the background mail only by its template', async t => {
+test('feed templates: mail with no template after a template-bound pass withholds it (settlement); effect.only allows the background mail only by its template', async t => {
   const late = await run(t, [check('CANCEL', '/cancel', [countOne]), check('LATER', '/untemplated', [exists])], undefined, { templates: TEMPLATES });
   // The later mail reads unknown under order_cancelled: it may be this check's late email.
   assert.equal(rowOf(late.run, 'CANCEL').status, 'inconclusive');
   assert.equal(assertionOf(late.run, 'CANCEL', 1, 'effect.count').settlement, 'effect-outside-window');
   validateHttpRunEvidence(late.run);
   // effect.only: the case's own email is expected once and the ticket update is allowed by its template; a second case email is beyond count.
-  // SENDS, a required allowed-use control with a positive effect, guards the effect.only clauses, which pin nothing (FIX-07).
+  // SENDS, a required allowed-use control with a positive effect, guards the effect.only clauses, which pin nothing.
   const o = await run(t, [check('SENDS', '/notify', [exists], 'control'), check('TWICE', '/cancel-twice', [only]), check('ONCE', '/cancel', [only])], undefined, { templates: TEMPLATES }, ['SENDS']);
   assert.deepEqual([rowOf(o.run, 'TWICE').status, rowOf(o.run, 'ONCE').status], ['fail', 'pass'], JSON.stringify([assertionOf(o.run, 'TWICE', 1, 'effect.only'), assertionOf(o.run, 'ONCE', 1, 'effect.only')]));
   assert.match(assertionOf(o.run, 'TWICE', 1, 'effect.only').actual ?? JSON.stringify(assertionOf(o.run, 'TWICE', 1, 'effect.only')), /beyond-count/);
   validateHttpRunEvidence(o.run);
 });
 
-test('feed v2: a template-pinned expect keeps a recipient-only allow from absorbing an unknown-template send, end to end', async t => {
+test('feed templates: a template-pinned expect keeps a recipient-only allow from absorbing an unknown-template send, end to end', async t => {
   const recipientOnly = { kind: 'effect.only', expect: [{ select: mailTo('order_cancelled'), count: 1 }], allow: [{ source: 'provider-feed', operation: 'send', name: EXT, resource: VIP }] };
   const o = await run(t, [check('KNOWN', '/cancel-twice', [recipientOnly]), check('VARIANT', '/variant-twice', [recipientOnly])], undefined, { templates: TEMPLATES });
   assert.deepEqual([rowOf(o.run, 'KNOWN').status, rowOf(o.run, 'VARIANT').status], ['fail', 'inconclusive'], JSON.stringify([assertionOf(o.run, 'KNOWN', 1, 'effect.only'), assertionOf(o.run, 'VARIANT', 1, 'effect.only')]));
   validateHttpRunEvidence(o.run);
 });
 
-test('feed v2: when the profile loads, a template pin on a feed domain must name one of that feed\'s labels', async t => {
+test('feed templates: when the profile loads, a template pin on a feed domain must name one of that feed\'s labels', async t => {
   const stub = await startStub(t);
   const load = (effects, feedExtra = { templates: TEMPLATES }, claims) => () => validateTargetFile({ schemaVersion: 1, targets: [profileOf('http://127.0.0.1:4400', stub, [{ ...check('C', '/cancel', effects), ...(claims ? { claims } : {}) }], feedExtra)] });
   const pinned = (op, value, extra = {}) => ({ source: 'provider-feed', operation: 'send', name: EXT, resource: VIP, fields: [{ pointer: '/template', [op]: value }], ...extra });
@@ -208,11 +208,11 @@ test('feed v2: when the profile loads, a template pin on a feed domain must name
   refused(load([], { templates: TEMPLATES }, [{ trigger: { field: { pointer: '/status', success: ['cancelled'], refusal: ['refused'] } }, select: pinned('equals', 'order_cancel') }]), /order_cancel/);
 });
 
-// Feed v2, Part B end to end (the G2 replay's R62-017 shape): a background ticket update to the customer arrives after the witness
+// Late entries end to end: a background ticket update to the customer arrives after the witness
 // request. It is a scoped entry with its own signed template, outside the case's template-bound clause; the run-end feed drain (or
 // a later window of the feed) follows it, and the validator binds the entry and the drain.
 const LATE_CODE = 'provider-feed-entry-after-witness-request';
-test('feed v2 B: a late other-template email to the customer leaves a template-bound count decided, followed by the drain or a later window', async t => {
+test('feed late entries: a late other-template email to the customer leaves a template-bound count decided, followed by the drain or a later window', async t => {
   const { run: r } = await run(t, [check('CANCEL', '/cancel-late-ticket', [countOne])], undefined, { templates: TEMPLATES });
   assert.equal(rowOf(r, 'CANCEL').status, 'pass', JSON.stringify(assertionOf(r, 'CANCEL', 1, 'effect.count')));
   const own = rowOf(r, 'CANCEL').trace[1].data.windows[0];
@@ -244,8 +244,8 @@ test('feed v2 B: a late other-template email to the customer leaves a template-b
   validateHttpRunEvidence(two.run);
 });
 
-test('feed v2 B: a quiescent feed drain whose final mark then fails is recorded as following nothing, so the run the connector makes validates', { timeout: 60000 }, async t => {
-  // Review finding (fv2b MINOR 2): the drain ends quiescent, then the signed head cannot be fetched at the final mark (a 404).
+test('feed late entries: a quiescent feed drain whose final mark then fails is recorded as following nothing, so the run the connector makes validates', { timeout: 60000 }, async t => {
+  // The drain ends quiescent, then the signed head cannot be fetched at the final mark (a 404).
   const stub = await startStub(t);
   const p = profileOf(await mailApp(t, stub), stub, [check('SENDS', '/notify', [exists], 'control')]);
   validateTargetFile({ schemaVersion: 1, targets: [p] });
@@ -261,16 +261,16 @@ test('feed v2 B: a quiescent feed drain whose final mark then fails is recorded 
   validateHttpRunEvidence(r);
 });
 
-// Feed v2, Part C end to end (the G2 v6 replay's R62-009 shape): the case expects its own order_cancelled email to VIP; a background
+// The lift end to end: the case expects its own order_cancelled email to VIP; a background
 // ticket update to another customer lands after the witness request, the window's only late entry. Its own signed template matches
 // the template-pinned allow, so under provider-feed/4 the effect.only clause is covered. A stored provider-feed/3 run of the same shape
 // keeps the semantics it was judged with: it validates and reads missing.
-test('feed v2 C7 and C8: a lone late background email lifts by its own template under provider-feed/4; a provider-feed/3 run keeps reading missing', { timeout: 120000 }, async t => {
+test('feed lift: a lone late background email lifts by its own template under provider-feed/4; a provider-feed/3 run keeps reading missing', { timeout: 120000 }, async t => {
   const onlyOwn = { kind: 'effect.only', expect: [{ select: mailTo('order_cancelled'), count: 1 }], allow: [{ source: 'provider-feed', operation: 'send', name: EXT, resource: AISHA, fields: [{ pointer: '/template', in: ['ticket_update'] }] }] };
   const shape = { templates: TEMPLATES, domains: [{ domain: EXT, addresses: [VIP, AISHA] }] };
   const runOf = async (settlement, observerFactory) => {
     const stub = await startStub(t);
-    // SENDS, a required allowed-use control with a positive effect, guards CASE's effect.only, which pins nothing (FIX-07).
+    // SENDS, a required allowed-use control with a positive effect, guards CASE's effect.only, which pins nothing.
     const base = profileOf(await mailApp(t, stub), stub, [check('SENDS', '/notify', [exists], 'control'), check('CASE', '/cancel-late-other', [onlyOwn])], shape);
     const p = { ...base, requiredControlIds: [...base.requiredControlIds, 'SENDS'], ...(settlement ? { settlement } : {}) };
     validateTargetFile({ schemaVersion: 1, targets: [p] });
@@ -284,12 +284,12 @@ test('feed v2 C7 and C8: a lone late background email lifts by its own template 
   assert.equal(rowOf(lifted, 'CASE').status, 'pass', JSON.stringify(only(lifted)));
   assert.equal(lifted.observers[0].collector.label, 'provider-feed/8');
   validateHttpRunEvidence(lifted);
-  // Without the judge declaration the 2026-10-10 rule still withholds the pass on the later committed send (unchanged).
+  // Without the judge declaration the run-level settlement rule still withholds the pass on the later committed send (unchanged).
   const plain = await runOf(null);
   assert.equal(rowOf(plain, 'CASE').status, 'inconclusive');
   assert.equal(only(plain).settlement, 'effect-outside-window');
   validateHttpRunEvidence(plain);
-  // C8: a feed that does not take the lift (as a provider-feed/3 build) is recorded under provider-feed/3 by the connector itself, from
+  // A feed that does not take the lift (as a provider-feed/3 build) is recorded under provider-feed/3 by the connector itself, from
   // the same flag it judged with: the run validates and reads missing. The lifted /4 verdict under a /3 label is refused.
   const asV3 = (configs, opts) => buildObservers(configs, opts).map(o => { if (o.source === 'provider-feed') o.templateLift = false; return o; });
   const v3 = await runOf(judge, asV3);
@@ -300,11 +300,11 @@ test('feed v2 C7 and C8: a lone late background email lifts by its own template 
   assert.throws(() => validateHttpRunEvidence(relabelled), error => error.code === 'invalid-run-evidence' && error.detail === 'effect-verdict');
 });
 
-// Later outcomes (PROVIDER-LATER-OUTCOME design with ADDENDUM-R1; PR-1 sealed the provider's later words in the settlement record, and
-// under provider-feed/6, PR-2, the stage reads them): the run validator binds them to sealed sends and recomputes what they decide.
+// Later outcomes (provider-feed/5 seals the provider's later words in the settlement record, and
+// under provider-feed/6 the later-outcome stage reads them): the run validator binds them to sealed sends and recomputes what they decide.
 const laterExtra = waitMs => ({ outcomes: { waitMs } });
 
-test('later end to end: a bounce the provider posts after the check is sealed, withholds the control that expected it, and the validator binds it (P10)', { timeout: 60000 }, async t => {
+test('later end to end: a bounce the provider posts after the check is sealed, withholds the control that expected it, and the validator binds it', { timeout: 60000 }, async t => {
   const { run: r } = await run(t, [check('SENDS', '/notify-later', [exists], 'control'), check('CLEAN', '/noop', [none])], { lateMs: 400 }, laterExtra(2500));
   // The control's expected email bounced: withheld and tagged (the stage never fails a control). CLEAN's absence still passes: its pairing
   // twin matched an accepted send, which shows the selector selects, whatever the provider did with it later.
@@ -332,7 +332,7 @@ test('later end to end: a bounce the provider posts after the check is sealed, w
   assert.throws(() => validateHttpRunEvidence(edited(x => { x.settlement.later[0].records[0].outcome = 'succeeded'; })), error => error.code === 'invalid-run-evidence' && error.detail === 'effect-verdict');
 });
 
-test('later P17a, no upgrade: with waitMs 0 and no outcome entries, every verdict and window reads as without outcomes', { timeout: 60000 }, async t => {
+test('later, no upgrade: with waitMs 0 and no outcome entries, every verdict and window reads as without outcomes', { timeout: 60000 }, async t => {
   const checks = [check('SENDS', '/notify', [exists], 'control'), check('CLEAN', '/noop', [none])];
   const plain = (await run(t, checks)).run, declared = (await run(t, checks, {}, laterExtra(0))).run;
   const verdicts = r => r.results.map(x => [x.id, x.status, x.assertions.map(a => [a.name, a.status, a.custody ?? null, a.settlement ?? null, a.pairing ?? null])]);
@@ -346,7 +346,7 @@ test('later P17a, no upgrade: with waitMs 0 and no outcome entries, every verdic
   validateHttpRunEvidence(declared);
 });
 
-test('later P17b: the later wait never widens a drain: a job mailing past the feed drain cap leaves the drain not quiescent within its own cap', { timeout: 120000 }, async t => {
+test('later: the later wait never widens a drain: a job mailing past the feed drain cap leaves the drain not quiescent within its own cap', { timeout: 120000 }, async t => {
   // The feed drain's cap is 10 x quietMs + 2 x 2000 = 7000 ms. The job mails from JOB's request until 1000 ms past the drain's cap, timed
   // from the moment the drain starts (seen through the observer factory), not from the request: however long the check window takes
   // on a loaded host, the job outlasts the drain's own cap, and it stops well within a 4000 ms later wait.
@@ -372,7 +372,7 @@ test('later P17b: the later wait never widens a drain: a job mailing past the fe
   validateHttpRunEvidence(declared);
 });
 
-test('later P21 and the label fallback: only records of sends the run sealed are kept, and a feed that cannot read outcomes is recorded provider-feed/4', { timeout: 60000 }, async t => {
+test('later records and the label fallback: only records of sends the run sealed are kept, and a feed that cannot read outcomes is recorded provider-feed/4', { timeout: 60000 }, async t => {
   // An observer whose records also name a send no sealed window holds (as for a send past an event cap): the connector drops that
   // record, so the run it makes validates.
   const stub = await startStub(t);
@@ -398,7 +398,7 @@ test('later P21 and the label fallback: only records of sends the run sealed are
   validateHttpRunEvidence(old);
 });
 
-test('later P19 (review MAJOR 1): the later wait comes after every window, so a send during it is in no window and binds no record', { timeout: 60000 }, async t => {
+test('later: the later wait comes after every window, so a send during it is in no window and binds no record', { timeout: 60000 }, async t => {
   // SENDS mails VIP (delivered at once); 5 s later the app mails another customer, while the 8 s later wait runs after the final mark.
   const { run: r } = await run(t, [check('SENDS', '/notify-then-mail', [exists], 'control')], { lateMs: 5000 }, laterExtra(8000));
   const sealed = [...r.results.filter(x => x.trace.length === 2).flatMap(x => x.trace[1].data.windows), ...r.settlement.gaps.flatMap(g => g.windows)];
@@ -410,7 +410,7 @@ test('later P19 (review MAJOR 1): the later wait comes after every window, so a 
   validateHttpRunEvidence(r);
 });
 
-test('later P10b: the validator binds a record only to a committed send of its own feed', { timeout: 90000 }, async t => {
+test('later: the validator binds a record only to a committed send of its own feed', { timeout: 90000 }, async t => {
   const stub = await startStub(t), other = await startStub(t, { feedId: 'other-mail' });
   const p = profileOf(await mailApp(t, stub, { other }), stub, [check('SENDS', '/notify', [exists], 'control'), check('REFUSED', '/refused', [none]), check('OTHER', '/notify-other', [{ kind: 'effect.exists', select: { source: 'provider-feed', operation: 'send', name: EXT } }])], laterExtra(500));
   p.observers.push({ id: 'other', type: 'provider-feed', feedId: other.feedId, feed: { endpoint: { port: other.port, path: other.path } }, publicKey: other.publicKey, domains: [{ domain: EXT, addresses: [VIP] }], pollMs: 25, quietMs: 300, settleMs: 250 });
@@ -441,7 +441,7 @@ test('later, a faulted feed is never clear: the connector writes clear false, an
   for (const label of ['provider-feed/1', 'provider-feed/2']) { const y = structuredClone(r); y.observers[0].collector.label = label; assert.throws(() => validateHttpRunEvidence(y), error => error.code === 'invalid-run-evidence', label); }
 });
 
-test('later stage over a real stub (LD-7): a boundary check whose expected email the provider later bounces fails; delivered, it passes at the success strength', { timeout: 120000 }, async t => {
+test('later stage over a real stub: a boundary check whose expected email the provider later bounces fails; delivered, it passes at the success strength', { timeout: 120000 }, async t => {
   const bounced = await run(t, [check('CASE', '/notify-later', [exists])], { lateMs: 400 }, laterExtra(2000));
   assert.deepEqual([rowOf(bounced.run, 'CASE').status, effectRow(bounced.run, 'CASE').later], ['fail', 'effect-later-failed'], JSON.stringify(effectRow(bounced.run, 'CASE')));
   validateHttpRunEvidence(bounced.run);

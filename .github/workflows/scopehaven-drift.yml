@@ -1,6 +1,6 @@
 name: Scopehaven drift (scheduled)
 
-# CMP-SCHEDULE-01: re-run the regression gate on a built-in synthetic target on a schedule and
+# Re-run the regression gate on a built-in synthetic target on a schedule and
 # write a job summary with drift against the last successful run, kept in the Actions cache.
 # No external target, no secrets, no notifications: the job summary is the only output.
 # workflow_dispatch can plant a regression: demo-vulnerable against a cached demo-repaired run.

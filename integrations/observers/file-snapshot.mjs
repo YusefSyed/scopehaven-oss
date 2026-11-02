@@ -1,4 +1,4 @@
-// File snapshot, report-only (L8 fix 5 v1; Yusef's Nov 3 approval, item 26: "report-only for v1").
+// File snapshot, report-only in this version.
 // Lists the files an application writes under declared roots at two points of a run and reports what was added, changed or
 // removed between them. It is not an observer of the effect rules: it makes no window, no effect event and no verdict, so a
 // declared `files` channel still reads not observed (docs/KNOWN-LIMITS.md) and every row reads as it did without it. The

@@ -193,12 +193,12 @@ Keep the evaluation runner, and add a verdict from the application's own records
   - The matrix binds the source's sha256 and, for a live run, the service's `configDigest` and the journal's digest.
   - It is signed with `integrations/attest` (producer version `3.0.0`) and carries the signer's key fingerprint. The signed bytes have one canonical form: keys sorted at every level, one-space indent. The bytes signed are the bytes checked, after a JSON round trip.
   - `verifySecondOpinion({ content, envelope, publicKey, expectedKeyFingerprint })` recomputes every count from the rows, requires the producer version and the canonical bytes, and requires the expected key fingerprint. A matrix whose counts contradict its rows, one in another byte form, or one re-signed with another key does not verify.
-  - **Take the expected fingerprint from here, not from the folder the matrix came in.** A fingerprint computed from the key handed over with the matrix pins nothing. The round-5 receipts are signed by `49334ce919575c3c863bb5b7af661178b153eb73c3d38a3b33b51e89891712ff`.
+  - **Take the expected fingerprint from here, not from the folder the matrix came in.** A fingerprint computed from the key handed over with the matrix pins nothing. The validation receipts are signed by `49334ce919575c3c863bb5b7af661178b153eb73c3d38a3b33b51e89891712ff`.
   - A live matrix also counts `unclaimed`: the windows no row took a verdict from, and the commits in them or in any gap (no row ever takes a gap). An overlapped window is never judged, so a delete inside it does not show in `unclaimed.commits`.
   - The matrix schema is `scopehaven-second-opinion/3`.
 - **No source text.** The matrix keeps none.
 
-**Validation** (recorded on a private build; not reproducible from this repository)**.** The round-5 receipt is kept outside this repository. It supersedes the round-1 to round-4 figures. Each live run records the tree commit and `SERVICE_BUILD` it ran (`BUILD.json`).
+**Validation** (recorded on a private build; not reproducible from this repository)**.** The validation receipt is kept outside this repository. It supersedes earlier figures. Each live run records the tree commit and `SERVICE_BUILD` it ran (`BUILD.json`).
 - **Live run, independent custody.** Pinned Promptfoo 0.123.1 ran offline (5 tests) against the records desk, with `--max-concurrency 1`, `--no-cache` and both hooks. The run had:
   - the desk behind the hold gate (each call recorded with its window);
   - the desk's outbound HTTP through an egress recorder, with its witness;

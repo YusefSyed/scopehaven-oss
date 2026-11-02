@@ -1,4 +1,4 @@
-// H1 step 3: a remote target over direct HTTPS (targetContext "operator-remote"). It runs only under an authorization
+// A remote target over direct HTTPS (targetContext "operator-remote"). It runs only under an authorization
 // record naming its exact origin; its host is resolved once and pinned, checked again before each request, and refused
 // when an answer changes or holds an address that is not public and not named in the record; the certificate is
 // verified; no redirect is followed. No real network: an injected resolver maps test host names to 127.0.0.1, where a
@@ -61,7 +61,7 @@ const scripted = answers => { let n = 0; const fn = async () => answers[Math.min
 // A record naming the remote origin (and, when given, the non-public addresses it may resolve to).
 const libraryRecord = (origin, addresses = [], edit) => { const r = { schema: AUTHORIZATION_SCHEMA, id: 'remote-library', target: { id: 'remote-notes', applicationId: 'notes-app' }, origins: [origin],
   ...(addresses.length ? { addresses } : {}), identities: ['member-1'], validFrom: ago(1), validUntil: ago(-30), signer: { name: 'A. Example', role: 'Owner' }, signedAt: ago(1) }; edit?.(r); return checksumAuthorization(r); };
-// What every entry point passes the connector for a remote target (PR455-REVIEW m1): the record's grant (authorizedRemote) and
+// What every entry point passes the connector for a remote target: the record's grant (authorizedRemote) and
 // window check, with the test resolver and CA spread beside the grant.
 const granted = (origin, { addresses = [], resolve, ca, beforeRequest, record = libraryRecord(origin, addresses) } = {}) => ({ beforeRequest: beforeRequest ?? windowGuard(record).check,
   remote: { ...authorizedRemote(record), ...(resolve ? { resolve } : {}), ...(ca ? { ca } : {}) } });
@@ -89,7 +89,7 @@ test('address classes: only a public address is dialled without the record namin
     // IPv4 carried in IPv6, in hex as well as dotted notation: mapped, translated and compatible forms; local-use NAT64; site-local.
     ['::ffff:7f00:1', 'loopback'], ['0:0:0:0:0:ffff:a9fe:a9fe', 'metadata'], ['::ffff:0:7f00:1', 'loopback'], ['::ffff:0:10.0.0.1', 'private'], ['::127.0.0.1', 'loopback'],
     ['::a00:1', 'private'], ['::ffff:808:808', 'public'], ['64:ff9b:1::a00:1', 'reserved'], ['64:ff9b::808:808', 'reserved'], ['fec0::1', 'private'], ['FE80::1%en0'.split('%')[0], 'link-local'],
-    // PR455-REVIEW n3: IPv6 documentation (RFC 9637), SRv6 SIDs and the deprecated 6to4 relay anycast.
+    // IPv6 documentation (RFC 9637), SRv6 SIDs and the deprecated 6to4 relay anycast.
     ['3fff::1', 'documentation'], ['3fff:fff::1', 'documentation'], ['3fff:1000::1', 'public'], ['5f00::1', 'reserved'], ['192.88.99.1', 'reserved'], ['192.88.100.1', 'public']])
     assert.equal(addressClass(address), cls, address);
 });
@@ -155,7 +155,7 @@ test('an authorized remote run: TLS verified for the host, every request to the 
   const gate = summarizeGate({ candidate: run, expectedSuite });
   assert.deepEqual([gate.exitCode, gate.reasons, gate.current.targetContext], [1, ['remote-pass-unpaired'], 'operator-remote'], 'ADMIN-SETTINGS has no same-route control');
   assert.match(renderReport(run), /Not clean on the remote target:<\/strong> ADMIN-SETTINGS/);
-  // PR453-REVIEW m1 carried to remote targets: the comparison and SARIF read the unpaired pass as the gate does.
+  // On a remote target too, the comparison and SARIF read the unpaired pass as the gate does.
   const compared = compareRuns(run, run), admin = compared.rows.find(r => r.id === 'ADMIN-SETTINGS');
   assert.deepEqual([admin.transition, admin.transitionReason], ['unverified', 'candidate-remote-pass-unpaired']);
   assert.ok(compared.reasons.some(r => r.includes('remote-pass-unpaired: ADMIN-SETTINGS') && r.includes('a gateway in front of the target')), JSON.stringify(compared.reasons));
@@ -235,7 +235,7 @@ test('the gate and the dashboard report a remote refusal by its code, with nothi
   assert.equal(app.connections(), 0);
 });
 
-// H1 step 3 on the reviewed #451: the authorization window applies to a remote target's requests as to loopback ones. The
+// The authorization window applies to a remote target's requests as to loopback ones. The
 // remote app holds every response until hold(at) says and records when each TCP connection arrived; with hold set just past
 // the record's validUntil, the window ends while the run waits on the remote target. A request the check let through left
 // before validUntil and arrives within milliseconds; one sent after the held response would arrive 300 ms or more after it.
@@ -276,7 +276,7 @@ const oneRequestRemote = origin => ({ ...remoteProfile(origin), id: 'remote-one'
   checks: remoteProfile(origin).checks.filter(c => c.id === 'READ-NOTES') });
 const savedRunCount = out => existsSync(join(out, 'runs')) ? readdirSync(join(out, 'runs')).filter(f => f.endsWith('.json')).length : 0;
 
-test('H1 step 3 on the reviewed #451: assess holds a remote target to the record\'s window: no request after validUntil, and a run whose window ends is not saved', async t => {
+test('assess holds a remote target to the record\'s window: no request after validUntil, and a run whose window ends is not saved', async t => {
   const app = await slowRemoteApp(t), origin = `https://127.0.0.1:${app.port}`, { caFile } = tls(t), dir = scratch(t);
   const profiles = join(dir, 'profiles.json');
   writeFileSync(profiles, JSON.stringify({ schemaVersion: 1, targets: [remoteProfile(origin), oneRequestRemote(origin)] }));
@@ -304,7 +304,7 @@ test('H1 step 3 on the reviewed #451: assess holds a remote target to the record
   assert.equal(savedRunCount(outOne), 0, 'no run was saved');
 });
 
-test('H1 step 3 on the reviewed #451: the dashboard run path and runAuthorized hold a remote target to the window: no request and no DNS lookup after validUntil, nothing saved', async t => {
+test('the dashboard run path and runAuthorized hold a remote target to the window: no request and no DNS lookup after validUntil, nothing saved', async t => {
   const app = await slowRemoteApp(t), origin = `https://${HOST}:${app.port}`, { ca } = tls(t), dir = scratch(t);
   // The injected resolver answers 127.0.0.1, a loopback address the record names (addresses), and records when it was asked.
   const lookups = [], resolve = async () => { lookups.push(Date.now()); return ['127.0.0.1']; };
@@ -342,14 +342,14 @@ test('H1 step 3 on the reviewed #451: the dashboard run path and runAuthorized h
   allBefore(lookups.slice(lookupsBefore), r.until, 'a DNS lookup');
 });
 
-test('H1 step 3 on the reviewed #451: the connector makes the window check before a remote host is resolved: a check that refuses stops the run with no lookup and no connection', async t => {
+test('the connector makes the window check before a remote host is resolved: a check that refuses stops the run with no lookup and no connection', async t => {
   const app = await remoteApp(t), { ca } = tls(t), resolve = scripted([['127.0.0.1']]);
   const ended = () => { throw Object.assign(new Error('the window ended'), { code: WINDOW_ENDED }); };
   await assert.rejects(runHttpAssessment(remoteProfile(`https://${HOST}:${app.port}`), { env, ...granted(`https://${HOST}:${app.port}`, { addresses: ['127.0.0.1'], resolve, ca, beforeRequest: ended }) }), error => error.code === WINDOW_ENDED);
   assert.deepEqual([resolve.calls(), app.connections()], [0, 0]);
 });
 
-test('PR455-REVIEW M1: a slow DNS check that runs past validUntil sends nothing: the window is checked again after it, immediately before the connection', async t => {
+test('a slow DNS check that runs past validUntil sends nothing: the window is checked again after it, immediately before the connection', async t => {
   const app = await remoteApp(t), { ca } = tls(t), origin = `https://${HOST}:${app.port}`;
   // The record's window on an injected clock, which passes validUntil while the third lookup (the DNS check before the
   // second request) is still pending; that lookup then takes 150 ms more, as a slow system resolver can.
@@ -371,7 +371,7 @@ test('PR455-REVIEW M1: a slow DNS check that runs past validUntil sends nothing:
   assert.ok(outcome.run || outcome.error);
 });
 
-test('PR455-REVIEW M1 with a header key (PR456-REVIEW): after a slow DNS check that runs past validUntil, no request carrying X-Api-Key is sent', async t => {
+test('with a header key: after a slow DNS check that runs past validUntil, no request carrying X-Api-Key is sent', async t => {
   // The remote app answers the X-Api-Key actor and records each request that carried the key.
   const keyed = [], byKey = handler => (req, res, json) => { if (req.headers['x-api-key'] !== TOKEN) return json(401, {}); keyed.push(req.url); return handler(json); };
   const app = await remoteApp(t, { routes: { '/me': byKey(json => json(200, { user: 'member-1' })), '/notes': byKey(json => json(200, { notes: [] })), '/admin/settings': byKey(json => json(403, {})) } });
@@ -392,7 +392,7 @@ test('PR455-REVIEW M1 with a header key (PR456-REVIEW): after a slow DNS check t
   assert.ok(guard.ended());
 });
 
-test('PR455-REVIEW n2: no proxy and no shared agent: with NODE_USE_ENV_PROXY=1 and HTTPS_PROXY set, the run reaches the target directly while a control request in the same process goes to the proxy', async t => {
+test('no proxy and no shared agent: with NODE_USE_ENV_PROXY=1 and HTTPS_PROXY set, the run reaches the target directly while a control request in the same process goes to the proxy', async t => {
   const app = await remoteApp(t), { caFile } = tls(t), origin = `https://${HOST}:${app.port}`;
   // A counting proxy that records the CONNECT line of each connection and tunnels nothing.
   const { createServer: createTcpServer } = await import('node:net');
@@ -423,13 +423,13 @@ test('PR455-REVIEW n2: no proxy and no shared agent: with NODE_USE_ENV_PROXY=1 a
   assert.ok(connects.some(line => line.startsWith('CONNECT control.remote.test:')), `the proxy setting was live: the control request reached it (${JSON.stringify(connects)})`);
 });
 
-test('PR455-REVIEW m1: the library entry refuses a remote target without a grant from a record naming its origin, and a window check, before any lookup', async t => {
+test('the library entry refuses a remote target without a grant from a record naming its origin, and a window check, before any lookup', async t => {
   const app = await remoteApp(t), { ca } = tls(t), origin = `https://${HOST}:${app.port}`, resolve = scripted([['127.0.0.1']]);
   const missing = error => error?.name === 'AuthorizationError' && error.code === 'authorization-missing';
   const record = libraryRecord(origin, ['127.0.0.1']), check = windowGuard(record).check;
   for (const [name, options] of [
     ['no remote option and no window check', {}],
-    ['addresses with no record (the review\'s probe R1)', { remote: { allowedAddresses: ['127.0.0.1'], resolve, ca } }],
+    ['addresses with no record', { remote: { allowedAddresses: ['127.0.0.1'], resolve, ca } }],
     ['a window check, but addresses with no record', { beforeRequest: check, remote: { allowedAddresses: ['127.0.0.1'], resolve, ca } }],
     ['a grant, but no window check', { remote: { ...authorizedRemote(record), resolve, ca } }],
     ['a grant from a record for another origin', { beforeRequest: check, remote: { ...authorizedRemote(libraryRecord(`https://prod.remote.test:${app.port}`, ['127.0.0.1'])), resolve, ca } }],
@@ -447,7 +447,7 @@ test('PR455-REVIEW m1: the library entry refuses a remote target without a grant
   assert.equal(run.counts.pass, 3);
 });
 
-// PR455 round 2 N3: a target whose TLS handshake the test holds. A TCP listener accepts each connection, calls onAccept,
+// A target whose TLS handshake the test holds. A TCP listener accepts each connection, calls onAccept,
 // and keeps the socket paused for holdMs() before it hands it to a TLS server. That server counts every request byte it
 // decrypts (none can arrive before its handshake ends) and answers 200.
 async function heldHandshakeApp(t, { holdMs, onAccept = () => {} }) {
@@ -472,7 +472,7 @@ async function heldHandshakeApp(t, { holdMs, onAccept = () => {} }) {
   return { port: listener.address().port, accepted: () => accepted, requestBytes: () => requestBytes };
 }
 
-test('PR455 round 2 N3: a connection opened before validUntil whose TLS handshake ends after it writes no request: the socket is closed, no byte of the request arrives, and the run is refused', async t => {
+test('a connection opened before validUntil whose TLS handshake ends after it writes no request: the socket is closed, no byte of the request arrives, and the run is refused', async t => {
   // 1. The connector, on an injected clock. The window ends when the target accepts the connection, while its handshake is held.
   let clock = 0, endOnAccept = false;
   const app = await heldHandshakeApp(t, { holdMs: () => 300, onAccept: () => { if (endOnAccept) clock = until; } });
@@ -509,7 +509,7 @@ test('PR455 round 2 N3: a connection opened before validUntil whose TLS handshak
   assert.equal(live.requestBytes(), 0, 'no request byte arrived after the window ended');
 });
 
-test('PR455 round 2 N2: the remote transport is not exported: no caller can dial a remote pin without the grant and window checks', async () => {
+test('the remote transport is not exported: no caller can dial a remote pin without the grant and window checks', async () => {
   const connector = await import('../src/http-connector.mjs');
   assert.equal('observeRemote' in connector, false);
   assert.deepEqual(Object.keys(connector).filter(name => /remote/i.test(name)), []);

@@ -1,4 +1,4 @@
-// Readiness edge E3: attribution through returned ids (src/id-closure.mjs) and its one use in background attribution
+// Attribution through returned ids (src/id-closure.mjs) and its one use in background attribution
 // (src/http-attribution.mjs). A returned id says which object a send concerns, never which request caused it, so a tie only
 // shows a withheld effect.exists pass is the check's own: it never decides a fail, never excuses a send tied to another
 // check (the IDOR counter-property), and never touches an absence clause.
@@ -90,7 +90,7 @@ test('the one use: a matched background-possible send tied to this check\'s own 
   assert.equal(findingsOf([[ownCheck(), [charge(), send(HOOKS, 'applied', [], { references: [C] })]]])[0][1], 'background-unattributed');
   // A seed must fit one of the check's own selectors: a PAY send the check does not select seeds nothing.
   assert.equal(findingsOf([[[clause('effect.exists', 'pass')], [charge(), notifyA()]]])[0][0], 'background-unattributed');
-  // Fails, absence clauses and effect.count are exactly gap 5's, even with a tie to this check.
+  // Fails, absence clauses and effect.count are exactly background attribution's, even with a tie to this check.
   assert.equal(findingsOf([[ownCheck(clause('effect.none', 'fail')), [charge(), notifyA()]]])[0][1], 'background-unattributed');
   assert.equal(findingsOf([[ownCheck(clause('effect.count', 'pass', sel(HOOKS), { expected: 1, matched: 1 })), [charge(), notifyA()]]])[0][1], 'background-unattributed');
 });
@@ -106,7 +106,7 @@ test('B1: an earlier check\'s late send in a later check\'s window seeds nothing
   const Jrefund = [clause('effect.exists', 'pass', sel(PAY, { resource: 'POST /v1/refunds' }))];
   assert.equal(findingsOf([[Jrefund, []], [ownCheck(), [charge(0), notifyA()]]])[1][1], 'background-unattributed');
   assert.equal(findingsOf([[Jrefund, []], [ownCheck(), [charge(1), notifyA()]]])[1][1], null, 'with K\'s own token the charge is K\'s seed');
-  // Without correlation tokens nothing seeds: E3 decides nothing.
+  // Without correlation tokens nothing seeds: returned ids decide nothing.
   tokensFor = new Map();
   assert.equal(findingsOf([[ownCheck(), [charge(), notifyA()]]])[0][1], 'background-unattributed');
   tokensFor = undefined;
@@ -157,7 +157,7 @@ test('mutation guards: one per property', () => {
   assert.deepEqual([viaRef, viaC].map(owners([[s]], [[], [viaRef, viaC]])), [0, null]);
 });
 
-test('differential compat against 4e7001d: without a tie, attribution findings are exactly gap 5\'s', async () => {
+test('differential compat against the frozen build: without a tie, attribution findings are exactly background attribution\'s', async () => {
   const frozen = await import(fileURLToPath(new URL('./fixtures/http-attribution-4e7001d.mjs', import.meta.url)));
   let state = 7;
   const rand = n => { state = (state * 1103515245 + 12345) % 2147483648; return (state >>> 16) % n; };

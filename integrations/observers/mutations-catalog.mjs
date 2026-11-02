@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Mutation sweep for the catalog fingerprint (N13): its reader, rule, exclusions and record (./catalog.mjs), and its use in
+// Mutation sweep for the catalog fingerprint: its reader, rule, exclusions and record (./catalog.mjs), and its use in
 // pg-snapshot, pg-wal and the SQLite observers. One mutation per property; each must make a test fail. A survivor is a
 // test gap.
 //   node integrations/observers/mutations-catalog.mjs [--out FILE] [--only ID,ID...]
@@ -48,7 +48,7 @@ export const MUTATIONS = [
   m('L9', 'a relation\'s row-level security flag is in its definition', C, [['pg_catalog.json_build_array(r.relkind, r.relpersistence, r.relrowsecurity, r.relforcerowsecurity,', 'pg_catalog.json_build_array(r.relkind, r.relpersistence, r.relforcerowsecurity,']], { live: true }),
   m('P3', 'more versioned rows than the limit have no fingerprint', C, [['if (versions.length > CATALOG_LIMITS.versions || ', 'if (']]),
   m('X5', 'a platform table entry stays in on Postgres (its grants, policies and triggers)', C, [["tables: Object.freeze(engine === 'sqlite' ? kept.filter(e => e.table !== null).map(e => `${e.schema}.${e.table}`).sort() : [])", 'tables: Object.freeze(kept.filter(e => e.table !== null).map(e => `${e.schema}.${e.table}`).sort())']]),
-  // The catalog's own session and the bracket (review round 1, H1).
+  // The catalog's own session and the bracket.
   m('B1', 'a mark\'s two catalog reads that differ make it unstable', C, [['stable: catalogReasons(first, first, second).length === 0', 'stable: true']]),
   m('B2', 'an unstable mark or baseline reads schema-drift', C, [['  if (baseline.stable === false || before.stable === false || after.stable === false) return [SCHEMA_DRIFT];\n', '']]),
   m('B3', 'an error on the catalog\'s session reads as no fingerprint, never as a failed mark', C, [['      } catch { return UNREADABLE; }', '      } catch (error) { throw error; }']]),
@@ -56,7 +56,7 @@ export const MUTATIONS = [
   m('B5', 'the catalog\'s session pins identifier quoting', C, [["'SET quote_all_identifiers = off', ", '']]),
   m('B6', 'the catalog\'s session turns JIT off', C, [[", 'SET jit = off']);", ']);']]),
   m('W6', 'pg-wal: its own policy read prints nothing, so it takes no lock on what a policy names', W, [['po.polroles::text, po.polqual::text, po.polwithcheck::text, po.xmin::text)', 'po.polroles::text, pg_catalog.pg_get_expr(po.polqual, po.polrelid), pg_catalog.pg_get_expr(po.polwithcheck, po.polrelid), po.xmin::text)']], { live: true }),
-  // What the Postgres read covers, round 2 (live).
+  // More of what the Postgres read covers (live).
   m('L6', 'a relation\'s kind token is its oid, not its row version (a rewrite is not a change)', C, [['        r.oid::pg_catalog.text FROM rel r', '        r.xmin::pg_catalog.text FROM rel r']], { live: true }),
   m('L10', 'the relations\' versions are read with their row versions', C, [['SELECT r.oid::pg_catalog.text AS id, r.xmin::pg_catalog.text AS xmin', 'SELECT r.oid::pg_catalog.text AS id, r.oid::pg_catalog.text AS xmin']], { live: true }),
   m('T1', 'a partition\'s trigger whose enabled state differs from its parent\'s is kept', C, [['FROM trg g WHERE g.tgparentid <> 0 AND g.tgenabled IS DISTINCT FROM g.parentenabled', 'FROM trg g WHERE false']], { live: true }),
@@ -105,8 +105,8 @@ export const MUTATIONS = [
     ['if (taken.ok && taken.catalog.ok) { latest = taken.catalog; drifted ||= Boolean(baseline?.ok) && taken.catalog.sha256 !== baseline.sha256; }', 'if (taken.ok && taken.catalog.ok) { latest = taken.catalog; }']]),
   m('Q9', 'sqlite audit table: the catalog reasons make the window partial', Q, [["return { events, coverage: reasons.length ? 'partial' : 'complete', reason: reasons.length ? reasons.join(',') : null };", "return { events, coverage: truncated ? 'partial' : 'complete', reason: truncated ? 'audit-row-limit' : null };"]]),
   m('Q10', 'sqlite audit table: the baseline is start()\'s own reading', Q, [['    async start() { baseline = (await maxId()).catalog; },', '    async start() { await maxId(); },']]),
-  // Two runs' records (VR1).
-  m('K1', 'runs from before N13 (no records) read as before', C, [["if (!listed(before) && !listed(after)) return { state: 'not-recorded', flags: [], duringRun: [] };", "if (!listed(before) && !listed(after)) return notComparable('none');"]]),
+  // Two runs' records.
+  m('K1', 'runs from before the catalog fingerprint (no records) read as before', C, [["if (!listed(before) && !listed(after)) return { state: 'not-recorded', flags: [], duringRun: [] };", "if (!listed(before) && !listed(after)) return notComparable('none');"]]),
   m('K2', 'one run alone recorded is not comparable', C, [["if (!listed(before) || !listed(after)) return notComparable('one-run-only');", "if (!listed(before) || !listed(after)) return { state: 'unchanged', flags: [], duringRun: during };"]]),
   m('K3', 'another set of observers is not comparable', C, [["if (!sameIds || new Set(ids(before)).size !== before.length || ", 'if (']]),
   m('K4', 'other exclusions are not comparable', C, [["if (digest(a.excluded ?? null) !== digest(b.excluded ?? null)) return notComparable('exclusions-differ');", '']]),

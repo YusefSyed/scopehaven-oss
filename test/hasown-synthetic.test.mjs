@@ -1,11 +1,11 @@
-// NC12, the Object.hasOwn coercion sweep (D-01's shape, #502), on the synthetic side. Object.hasOwn coerces its key, so a fixture
+// The Object.hasOwn coercion sweep, on the synthetic side. Object.hasOwn coerces its key, so a fixture
 // version that is an array or an object naming a known family read as that family in src/runner.mjs syntheticFamily, and an
-// in-process run sharing that one value with every attempt manifest passed the manifests' === checks too. #504 (9ccf7cad) required
-// a string there; 4042cdfb (#510) reverted it, and this change restores it. src/contract-synthetic.mjs:74 (unknownIdentity) and :679
+// in-process run sharing that one value with every attempt manifest passed the manifests' === checks too. An earlier change required
+// a string there and a later one reverted it; this change restores it. src/contract-synthetic.mjs:74 (unknownIdentity) and :679
 // (LEGACY_CONTROLS) are reached only through projectSyntheticInternal's compareRuns(run, run), so the restored check guards them as
 // well; the restoration moves neither the synthetic nor the contract evaluator. (contract-synthetic.mjs:311, attempt.actor, is another
-// coercion, fixed by NC12's contract re-pin, #540, which does move the contract evaluator.) A run recorded at main 0de64259 by main's
-// own runner, before the restoration, still validates, compares, projects and renders as main did.
+// coercion, fixed by the contract evaluator's re-pin, which does move the contract evaluator.) A run recorded by the earlier build's
+// own runner, before the restoration, still validates, compares, projects and renders as that build did.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -31,10 +31,10 @@ test('a fixture version that is not a string, shared with every attempt manifest
     const comparison = compareRuns(shaped, shaped);
     assert.equal(comparison.compatible, false, String(value));
     assert.ok(comparison.reasons.includes(FAMILY), JSON.stringify(comparison.reasons));
-    // Main graded the array form under other rules than the string's (not the /4+ reset pins: 23 fail, 18 pass, 3 conflicting).
+    // The earlier build graded the array form under other rules than the string's (not the /4+ reset pins: 23 fail, 18 pass, 3 conflicting).
     assert.deepEqual(contractView(shaped), { contractVersion: contractView(run).contractVersion, supported: false, origin: 'synthetic-local-http', reason: 'invalid-family' });
   }
-  // The shape a stored file can hold: every row inconclusive with no attempt, so no manifest === runs at all. Main compared this run
+  // The shape a stored file can hold: every row inconclusive with no attempt, so no manifest === runs at all. The earlier build compared this run
   // with itself and projected it (44 conflicting, the array in its view identity); the string control still does both.
   const stored = version => {
     const shaped = JSON.parse(JSON.stringify(run)); shaped.fixtureVersion = version;
@@ -49,7 +49,7 @@ test('a fixture version that is not a string, shared with every attempt manifest
   assert.equal(contractView(array).reason, 'invalid-family');
 });
 
-test('a synthetic run recorded and sealed at main 0de64259 validates, compares, projects and renders at the head as at main', async () => {
+test('a synthetic run recorded and sealed before the sweep validates, compares, projects and renders at the head as it did then', async () => {
   const { recordedAt, run } = recorded;
   assert.equal(recordedAt, '0de64259');
   assert.equal(run.evaluatorHash, recorded.evaluatorHash);
@@ -60,8 +60,8 @@ test('a synthetic run recorded and sealed at main 0de64259 validates, compares, 
   assert.equal(comparison.compatible, true);
   assert.deepEqual(comparison.summary, recorded.comparedWithRepaired);
   const view = contractView(run);
-  // #540 moved the contract evaluator (08166764 -> 51c7d84e), so this view's hash and the viewDigest over it are no longer main's;
-  // test/hasown-contract.test.mjs compares the rest of this run's view with main's.
+  // The contract re-pin moved the contract evaluator (08166764 -> 51c7d84e), so this view's hash and the viewDigest over it are no
+  // longer the recorded ones; test/hasown-contract.test.mjs compares the rest of this run's view with the recorded projection.
   assert.notEqual(CONTRACT_EVALUATOR_HASH, recorded.contractEvaluatorHash);
   assert.equal(view.pins.grader.contractEvaluatorHash, CONTRACT_EVALUATOR_HASH);
   assert.deepEqual(view.verdictCounts, recorded.verdictCounts);

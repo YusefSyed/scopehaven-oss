@@ -1,4 +1,4 @@
-// SURPASS-PASSK-01: a pass^k column per check, with exact fractions.
+// A pass^k column per check, with exact fractions.
 // Pure: no I/O, clock, randomness or dependencies. For each check with `passed`
 // successes in `trials` trials, pass^k = C(passed, k) / C(trials, k) (tau-bench),
 // computed as a float by stats.passHatK and as a reduced BigInt fraction. A trial

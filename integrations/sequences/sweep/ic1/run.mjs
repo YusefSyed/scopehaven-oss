@@ -2,7 +2,7 @@
 // here supports no comparison with any rival; that needs a fresh sealed round). One sweep per case with zero
 // hand-written strategy, then a score against the answer key.
 //   node run.mjs --root DIR --set round|practice --out DIR [--concurrency N] [--cases ID,ID] [--timing-seed HEX]
-// DIR is the differentiation lane's a review record outside this repository folder (a checkout or a git archive
+// DIR is the folder that holds ic1/ (a checkout or a git archive
 // of it); it is only read. Each case's spec is built from the public case alone (its id, staff member and message)
 // and DeskLane's public deployment description (APP-IC1.md): the backend serves the model at /v1/chat/completions,
 // tools at /tool/<name> and deliveries at /deliver/<job> (the model is the one passive path); the tool service refuses

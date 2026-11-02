@@ -1,4 +1,4 @@
-// Grant versus use (roadmap v2 item 7, its packaging half; lane B6): for each actor, what it was granted, what the run
+// Grant versus use: for each actor, what it was granted, what the run
 // records show it actually used across a set of runs, and the excess (granted and never used in those runs), plus what
 // it used that it was never granted. Presentation only, like the coverage report: it never feeds a verdict, a count,
 // compareRuns, a gate outcome or any identity hash, and it reads src/ without changing it.
@@ -210,7 +210,7 @@ function assemble({ reach, principals, aliases, places, operationUses, runFacts,
   const reachEntries = [...reach.entries.values()];
   for (const p of places) for (const w of p.windows) {
     if (!authoritative(w)) continue;
-    // A scoped window (coverage v2) is partial only because of its entries, each a send it could not place (late, in flight, an
+    // A scoped window is partial only because of its entries, each a send it could not place (late, in flight, an
     // ambiguous path, a sibling host): only an entry that send could be may be missing from it, unless nothing later followed
     // its late entries, when it is read window-wide as src reads it. Any other partial or failed window could be missing
     // anything it sees.
@@ -395,7 +395,7 @@ export function grantUseReport({ target, runs = [], inventory = null, contract =
     for (const b of run.settlement?.barriers ?? []) places.push({ run: id, record: 'barrier-window', id: `after ${b.after}`, own: false, candidates: [byId.get(b.after).actorId], windows: sealed(b.windows, 'barrier'), order: position(b.after) + 0.25, failing: [], wide: new Set() });
     // A run that declares observers and has no settlement record observed only its effect rows: any other sent row ran unobserved.
     if (configs.length && !run.settlement) for (const r of results) if (sentRow(r) && r.trace?.[1]?.type !== 'effect-observation') runFacts.push({ run: id, reason: 'check-unobserved', at: r.id, actors: [byId.get(r.id).actorId] });
-    // A recorder that did not drain at the run's end may have missed late sends (coverage v2 Part D).
+    // A recorder that did not drain at the run's end may have missed late sends.
     for (const d of run.settlement?.drains ?? []) if (!(d.quiescent === true && d.markClear === true && d.closedAfterCollect === false)) {
       const w = rowWindows.flat().find(x => x.instanceId === d.instanceId);
       runFacts.push({ run: id, reason: 'collector-not-drained', observer: d.instanceId, sees: w ? [...reach.entries.values()].filter(e => seesEntry(w, e)).map(e => e.key) : [], actors: [...actedHere] });

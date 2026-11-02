@@ -1,4 +1,4 @@
-// Declared channels (N11) and the catalog identity (N13) on one run: both are recorded, both survive the store, and the
+// Declared channels and the catalog identity on one run: both are recorded, both survive the store, and the
 // exported suite binds both, so a later reorder of the shared validator's suite checks cannot drop either binding.
 // Owned synthetic data only: in-memory observers with an injected transport; no network, no model, no database server.
 import test from 'node:test';

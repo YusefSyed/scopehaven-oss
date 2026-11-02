@@ -26,7 +26,7 @@ const ABSENCE_UNPROVEN = { 'sqlite-snapshot': ['B-NO-A-REFUND', 'AST-B-NO-A-REFU
 // Custody (src/custody.mjs): an audit log is a record the app writes, so a refund prohibition whose
 // absence only the app's own audit decides reads inconclusive (subject-writable-custody), never pass.
 const CUSTODY_HELD = { 'sqlite-audit': ['B-NO-A-REFUND', 'AST-B-NO-A-REFUND'], 'http-audit': ['B-NO-A-REFUND', 'AST-B-NO-A-REFUND'] };
-// Settlement (core batch v2, src/http-settlement.mjs): the egress example's host-wide clause (effect 1, no payment call
+// Settlement (src/http-settlement.mjs): the egress example's host-wide clause (effect 1, no payment call
 // at all) cannot be settled, because the same-action twins after each prohibition make payment calls that fit it, so
 // either could be the prohibition's late effect. That clause reads inconclusive (effect-outside-window, custody still
 // independent); the per-order clause (effect 2) passes. Correlation is by selector, not by request.

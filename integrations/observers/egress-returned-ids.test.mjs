@@ -1,4 +1,4 @@
-// Readiness edge E3 end to end over real loopback HTTP: forward-proof/2 binds the reply body, a destination that declares
+// Returned ids end to end over real loopback HTTP: forward-proof/2 binds the reply body, a destination that declares
 // ids records the salted digests of a /2-proven reply's minted and referenced ids (a minted value the request carried is an
 // echo and is dropped), and background attribution uses them in one place: a withheld effect.exists pass stands when its
 // matched send refers to an object the check's own send had created. forward-proof/1 is unchanged (pinned vector).
@@ -85,7 +85,7 @@ test('a /2-proven reply records salted id digests; echoed, /1, tampered, unprove
   const up = await upstreamDouble(t);
   const o = await sink(t, [{ host: PAY, paths: ['/v1'], forward: forwardOf(up) }, { host: HOOKS, forward: forwardOf(up, { proofVersion: undefined, ids: undefined }) }]);
   assert.deepEqual(o.scope.forward[PAY], { upstreamPort: up, applied: [200, 201, 204], rejected: [], proof: true, proofVersion: 2, ids: { minted: ['/id'], references: ['/object'] } });
-  assert.deepEqual(o.scope.forward[HOOKS], { upstreamPort: up, applied: [200, 201, 204], rejected: [], proof: true }, 'a /1 destination keeps exactly its E1 entry');
+  assert.deepEqual(o.scope.forward[HOOKS], { upstreamPort: up, applied: [200, 201, 204], rejected: [], proof: true }, 'a /1 destination keeps exactly its forward-proof/1 entry');
   const w = await windowOf(o, async () => {
     for (const path of ['charges', 'v1', 'tamper', 'short', 'secret']) await send(o.port, `http://${PAY}/v1/${path}`);
     await send(o.port, `http://${HOOKS}/hooks?v1`);
@@ -107,7 +107,7 @@ test('a /2-proven reply records salted id digests; echoed, /1, tampered, unprove
   assert.deepEqual([tamper.proven, tamper.minted], [false, undefined], 'a proof over another body is no proof');
   assert.deepEqual([short.proven, short.minted], [true, undefined], 'ch_1 is too short and a number is never an id');
   assert.deepEqual([secret.proven, secret.minted], [true, undefined], 'a card-number-shaped value is refused by the body-field reader');
-  assert.deepEqual([hooks.proven, hooks.outcome, Object.hasOwn(hooks, 'minted'), Object.hasOwn(hooks, 'references')], [true, 'applied', false, false], 'a /1 destination: an E1 record');
+  assert.deepEqual([hooks.proven, hooks.outcome, Object.hasOwn(hooks, 'minted'), Object.hasOwn(hooks, 'references')], [true, 'applied', false, false], 'a /1 destination: a forward-proof/1 record');
   // The same id from two sends of one recorder has one digest; validation of the declaration.
   const v2 = ids => ({ upstream: 'http://127.0.0.1:47002', proofEnv: PROOF_ENV, proofVersion: 2, ids });
   for (const forward of [{ upstream: 'http://127.0.0.1:47002', proofEnv: PROOF_ENV, ids: { minted: ['/id'] } }, { upstream: 'http://127.0.0.1:47002', proofVersion: 2 },
@@ -169,7 +169,7 @@ test('connector run: a send tied to the check\'s own object releases its effect.
   }, x => x.lostBind);
   // OWN creates a charge (its own selected, non-background PAY send seeds closure(OWN)) and notifies about it: the
   // notification is background-possible but refers to OWN's charge, so its effect.exists pass stands. QUIET sends nothing,
-  // and its effect.exists fail stays gap 5's (inconclusive). IDOR's request makes the app notify about OWN's charge: the
+  // and its effect.exists fail stays background attribution's (inconclusive). IDOR's request makes the app notify about OWN's charge: the
   // send is tied to OWN, and it never passes or decides IDOR's effect.none (pinned).
   const checks = [check('OWN', '/charge', [charged, hooksSent]), check('QUIET', '/quiet', [hooksSent]), check('IDOR', '/notify-other', [noHooks])];
   const { p, run: r } = await run(checks);
@@ -182,7 +182,7 @@ test('connector run: a send tied to the check\'s own object releases its effect.
   assert.deepEqual(r.observers[0].forward[PAY], { upstreamPort: up, applied: [200, 201, 204], rejected: [], proof: true, proofVersion: 2, ids: { minted: ['/id'], references: [] } });
   const suite = createRegistry({ profiles: [p], env }).exportSuite(p.id);
   validateHttpRunEvidence(r, { expectedSuite: suite });
-  // Without ids, gap 5 alone holds OWN at inconclusive: the difference is E3's. Without correlation nothing seeds either.
+  // Without ids, background attribution alone holds OWN at inconclusive: the difference is the returned ids'. Without correlation nothing seeds either.
   const { run: plain } = await run(checks, false);
   assert.deepEqual(['OWN', 'QUIET', 'IDOR'].map(id => row(plain, id).status), ['inconclusive', 'inconclusive', 'inconclusive']);
   const { run: uncorrelated } = await run(checks, true, false);

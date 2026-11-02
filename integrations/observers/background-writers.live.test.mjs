@@ -1,4 +1,4 @@
-// Background writers (N12) against a real PostgreSQL with wal_level = logical: pg-snapshot's attribution of in-flight
+// Background writers against a real PostgreSQL with wal_level = logical: pg-snapshot's attribution of in-flight
 // writers by their real locks, the end barrier with a worker that finishes while the mark waits (pg-snapshot and pg-wal),
 // and the run lease between two runs. Skipped unless SCOPEHAVEN_PG_LIVE names a disposable test database as
 // "user:password@127.0.0.1:port/database" for a superuser (the test creates a second database, schemas and roles, and

@@ -376,7 +376,7 @@ test('M2: a nested read template with a parent parameter is accepted and filled 
   assert.equal(path('twin-before'), '/api/workspaces/ws-a/threads/t-a1');
 });
 
-test('N1 (case E2): an enforcing app whose anon role lacks the write grant (401, row untouched) never reads FAIL', async () => {
+test('an enforcing app whose anon role lacks the write grant (401, row untouched) never reads FAIL', async () => {
   const dir = join(here, 'fixtures', 'supabase-migrations');
   const files = await Promise.all((await readdir(dir)).sort().map(async id => ({ id, content: await readFile(join(dir, id)), kind: 'sql' })));
   const matrix = importRls(files, { application: 'tickets', roles: ['anon', 'authenticated'] });

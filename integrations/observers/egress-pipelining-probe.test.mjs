@@ -1,6 +1,6 @@
-// Coverage v2 PR-1 acceptance probe (review record, not in this repository): bytes
-// pipelined in the same write behind a close are still recorded; bytes written after the server closed a connection are lost
-// unseen. So a window with any server-made close in its range is never scoped (egress-scope-ineligible).
+// Scoped-coverage acceptance probe: bytes pipelined in the same write behind a close are still recorded; bytes written
+// after the server closed a connection are lost unseen. So a window with any server-made close in its range is never
+// scoped (egress-scope-ineligible).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
@@ -45,7 +45,7 @@ test('probe: pipelined bytes behind a Connection: close or an over-limit destroy
   const control = await witnessed({ idle: false });
   assert.deepEqual(control.scoped?.map(e => [e.name, e.codes]), [[OTHER, ['egress-request-after-witness-request']]], `no server close: scoped (${control.reason})`);
   // A close the client asked for (the witness request above carried Connection: close) is never logged.
-  // Review of PR-1: a pooled connection answered before the window's start mark, then closed by the idle timer inside the
+  // A pooled connection answered before the window's start mark, then closed by the idle timer inside the
   // window before any record arrives in it, still counts (closes are counted by mark position, not by the records around them).
   const pooled = raw(o.port, req(PAY, '/v1/ok'), { gapMs: 8000, second: '' });
   await new Promise(r => setTimeout(r, 300));

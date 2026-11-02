@@ -1,7 +1,6 @@
-// Node/Python agreement on round-2 review probes (a record outside this repository
-// 2026-10-05/w1-ledger-r2-review-probes/r2probe.mjs, R00-R10 and Q01-Q21), kept as a test: every
-// probe must get the same verdict, reason and exit code from both verifiers, and the probes the review
-// gave an outcome for must get that outcome.
+// Node/Python agreement on edge probes (R00-R10 and Q01-Q21), kept as a test: every
+// probe must get the same verdict, reason and exit code from both verifiers, and the probes with a
+// stated outcome must get that outcome.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, writeFile, chmod } from 'node:fs/promises';
@@ -119,7 +118,7 @@ await both('R03b entry 0 index changed AND entry 2 has a 5000-digit integer (raw
 await both('R03c checkpoint 0 signature tampered AND checkpoint 2 nested 600 deep', base(SB, { checkpoints: text(SP.map((l, i) => i === 0 ? l.replace(/"sig":"(.)/, (m, c) => `"sig":"${c === 'A' ? 'B' : 'A'}`) : i === 2 ? nested(600) : l)) }), { expect: 'same reason' });
 await both('R03d ledger.json nested 600 deep', base(SB, { metadata: Buffer.from(`${nested(600)}\n`) }), { expect: 'same reason' });
 
-// ---- Run-file verdict binding (M2) ----
+// ---- Run-file verdict binding ----
 {
   // (a) Writer path: a run export with a field nested 2000 deep, signed by attest and appended by the writer.
   const deep = runWith(exported[0], { raw: `"deep":${nested(2000)}` });
@@ -227,12 +226,12 @@ await proofBoth('Q21 consistency: proof from a 5000-digit integer', 'consistency
 }
 
 const row = label => log.find(r => r.label === label) ?? proofs.find(r => r.label === label);
-test('every round-2 review probe gets the same outcome from Node and Python', { skip: !PY && 'no Python 3 at a fixed path' }, () => {
+test('every R and Q probe gets the same outcome from Node and Python', { skip: !PY && 'no Python 3 at a fixed path' }, () => {
   for (const r of [...log, ...proofs]) assert.ok(r.agree, `${r.label}: node ${JSON.stringify(r.node)} python ${JSON.stringify(r.python)}`);
   assert.ok(log.length >= 30 && proofs.length >= 20);
 });
 
-test('round-2 review probes with a stated outcome get it', { skip: !PY && 'no Python 3 at a fixed path' }, () => {
+test('R and Q probes with a stated outcome get it', { skip: !PY && 'no Python 3 at a fixed path' }, () => {
   const verdict = label => row(label).node[0];
   for (const label of ['R00 baseline', 'R00b baseline with all run files', 'R04 writer-appended runs (deep field / 5000-digit field), no run files', 'R06 run files: duplicates and an unrelated file',
     'R09 evidence-key holder: old run re-exported under a new run id and appended', 'Q01 inclusion valid', 'Q19 consistency: proof from 2.0 to 4e0']) assert.equal(verdict(label), 'verified', label);

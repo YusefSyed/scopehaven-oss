@@ -1,4 +1,4 @@
-// Background attribution (readiness gap 5, W4 part 1; src/http-attribution.mjs): pure rules over synthetic windows. No I/O,
+// Background attribution (src/http-attribution.mjs): pure rules over synthetic windows. No I/O,
 // no model, no provider. Each allowed behaviour sits beside the forbidden or fail-closed behaviour next to it. Clauses are
 // decided with the control role so custody keeps their verdicts; roles are tested through applyAttribution.
 import test from 'node:test';
@@ -37,13 +37,13 @@ function layout(clauses, spec = () => null, obs = ['aud'], { second = [FILLER] }
 const find = ({ rows, gaps, barriers }, background = [SYNC]) => attributionFindings(rows, gaps, barriers, { background });
 const at = (position, o, make) => (p, x) => p === position && x === o ? [[make()]] : null;
 
-test('Gap 5 none pass: a worker effect on another row leaves an actor-pinned absence standing at every position; on the same row it is unattributed in the own window and every later one, never before it', () => {
+test('none pass: a worker effect on another row leaves an actor-pinned absence standing at every position; on the same row it is unattributed in the own window and every later one, never before it', () => {
   for (const p of POSITIONS) {
     const other = layout([NONE_B], at(p, 'aud', () => ev('aud', { actor: 'svc-sync', operation: 'delete', name: 'docs', resource: 'doc-C' })));
     assert.equal(other.rows[0].effects[0].verdict, 'pass', p);
     assert.equal(find(other)[0][0], null, `${p}: another row`);
     const same = layout([NONE_B], at(p, 'aud', () => ev('aud', { actor: 'svc-sync', operation: 'delete', name: 'docs', resource: 'doc-B' })));
-    assert.equal(same.rows[0].effects[0].verdict, 'pass', `${p}: the actor pin alone passes it (FO-3)`);
+    assert.equal(same.rows[0].effects[0].verdict, 'pass', `${p}: the actor pin alone passes it`);
     assert.equal(find(same)[0][0], p === 'before' ? null : 'background-unattributed', `${p}: the same row`);
   }
   // A worker effect with no row (the observer cannot name rows) never proves it was another row.
@@ -60,7 +60,7 @@ test('Gap 5 none pass: a worker effect on another row leaves an actor-pinned abs
   assert.equal(find(otherRow)[0][0], null, 'content pins still exclude');
 });
 
-test('Gap 5 none pass: an observer that could record the worker\'s effect must decide absence in the own window and every later one (background-unobserved), gated by overlap', () => {
+test('none pass: an observer that could record the worker\'s effect must decide absence in the own window and every later one (background-unobserved), gated by overlap', () => {
   const obs = ['aud', 'snap'];
   const clean = layout([NONE_B], () => null, obs);
   assert.equal(clean.rows[0].effects[0].verdict, 'pass');
@@ -79,7 +79,7 @@ test('Gap 5 none pass: an observer that could record the worker\'s effect must d
   assert.equal(find(before)[0][0], null);
 });
 
-test('Gap 5 none fail: a fail resting only on background effects is unattributed; one resting on any other committed effect stands', () => {
+test('none fail: a fail resting only on background effects is unattributed; one resting on any other committed effect stands', () => {
   const NONE_ANY = { kind: 'effect.none', select: { operation: 'delete', name: 'docs' } };
   const mixed = layout([NONE_ANY], (p, o) => p === 'own' && o === 'aud' ? [[ev('aud', { actor: 'alice', operation: 'delete', name: 'docs', resource: 'doc-A' }), ev('aud', { actor: 'svc-sync', operation: 'delete', name: 'docs', resource: 'doc-C' })]] : null);
   assert.equal(mixed.rows[0].effects[0].verdict, 'fail');
@@ -97,14 +97,14 @@ test('Gap 5 none fail: a fail resting only on background effects is unattributed
   assert.equal(find(bob)[0][0], null);
 });
 
-test('Gap 5 exists pass: a pass resting only on background (or earlier-explained) effects is unattributed; any other matched effect keeps it, across observers', () => {
+test('exists pass: a pass resting only on background (or earlier-explained) effects is unattributed; any other matched effect keeps it, across observers', () => {
   const EXISTS = { kind: 'effect.exists', select: { operation: 'delete', name: 'docs' } };
   const mixed = layout([EXISTS], (p, o) => p === 'own' && o === 'aud' ? [[ev('aud', { actor: 'alice', operation: 'delete', name: 'docs', resource: 'doc-A' }), ev('aud', { actor: 'svc-sync', operation: 'delete', name: 'docs', resource: 'doc-C' })]] : null);
   assert.equal(mixed.rows[0].effects[0].verdict, 'pass');
   assert.equal(find(mixed)[0][0], null);
   const only = layout([EXISTS], at('own', 'aud', () => ev('aud', { actor: 'svc-sync', operation: 'delete', name: 'docs', resource: 'doc-C' })));
   assert.equal(only.rows[0].effects[0].verdict, 'pass');
-  assert.equal(find(only)[0][0], 'background-unattributed', 'FO-1');
+  assert.equal(find(only)[0][0], 'background-unattributed', 'a pass resting only on a background effect');
   // One worker insert recorded twice: by the audit table (its principal) and the snapshot (no actor). Both copies are
   // background; with the audit copy by alice the snapshot copy alone is not all the pass rests on.
   const INS = [{ id: 'sync-ins', select: { actor: 'svc-sync', operation: 'insert', name: 'orders' } }];
@@ -116,7 +116,7 @@ test('Gap 5 exists pass: a pass resting only on background (or earlier-explained
   assert.equal(find(copies('alice'), INS)[0][0], null);
 });
 
-test('Gap 5 exists pass: an effect an earlier check\'s selector explains plus a background effect is unattributed; a later check\'s selector explains nothing; the first fitting row decides', () => {
+test('exists pass: an effect an earlier check\'s selector explains plus a background effect is unattributed; a later check\'s selector explains nothing; the first fitting row decides', () => {
   const INS = [{ id: 'sync-ins', select: { actor: 'svc-sync', operation: 'insert', name: 'orders' } }];
   const EX = { kind: 'effect.exists', select: { operation: 'insert', name: 'orders' } };
   const O9 = { kind: 'effect.none', select: { operation: 'insert', name: 'orders', resource: 'o-9' } };
@@ -137,13 +137,13 @@ test('Gap 5 exists pass: an effect an earlier check\'s selector explains plus a 
   assert.equal(unnamed, 'background-unattributed');
 });
 
-test('Gap 5 exists fail: a background effect that could be the expected one (own or later window, any vocabulary) is unattributed; another name leaves the fail standing; a blind seer is unobserved', () => {
+test('exists fail: a background effect that could be the expected one (own or later window, any vocabulary) is unattributed; another name leaves the fail standing; a blind seer is unobserved', () => {
   const WORKER = [{ id: 'worker', select: { actor: 'svc-worker' } }];
   const EX = { kind: 'effect.exists', select: { actor: 'alice', operation: 'insert', name: 'export' } };
   for (const p of ['own', 'barrier', 'later', 'tail']) {
     const behalf = layout([EX], at(p, 'aud', () => ev('aud', { actor: 'svc-worker', operation: 'insert', name: 'export', resource: 'x-1' })));
     assert.equal(behalf.rows[0].effects[0].verdict, 'fail', p);
-    assert.equal(find(behalf, WORKER)[0][0], 'background-unattributed', `${p} (FO-7)`);
+    assert.equal(find(behalf, WORKER)[0][0], 'background-unattributed', `${p}`);
     const other = layout([EX], at(p, 'aud', () => ev('aud', { actor: 'svc-worker', operation: 'insert', name: 'report', resource: 'x-1' })));
     assert.equal(find(other, WORKER)[0][0], null, `${p}: another name`);
   }
@@ -158,7 +158,7 @@ test('Gap 5 exists fail: a background effect that could be the expected one (own
   assert.equal(find(seer('complete'), WORKER)[0][0], null);
 });
 
-test('Gap 5 count: substitution, a late double application and an interval that holds n are unattributed; a clean count and a fail outside the interval stand', () => {
+test('count: substitution, a late double application and an interval that holds n are unattributed; a clean count and a fail outside the interval stand', () => {
   const SRC = [{ id: 'sync', select: { actor: 'svc-sync', operation: 'insert', name: 'orders' } }, { id: 'retry', select: { actor: 'svc-retry', operation: 'insert', name: 'orders' } }];
   const COUNT = n => ({ kind: 'effect.count', select: { source: 'sql-audit-table', operation: 'insert', name: 'orders' }, expected: n });
   const ins = (actor, o = 'aud', name = 'orders') => ev(o, { actor, operation: 'insert', name, resource: `r-${seq + 1}` });
@@ -166,10 +166,10 @@ test('Gap 5 count: substitution, a late double application and an interval that 
   const clean = run(1, () => [ins('alice')]);
   assert.equal(clean.rows[0].effects[0].verdict, 'pass');
   assert.equal(find(clean, SRC)[0][0], null);
-  assert.equal(find(run(1, () => [ins('svc-sync')]), SRC)[0][0], 'background-unattributed', 'substitution (FO-2)');
+  assert.equal(find(run(1, () => [ins('svc-sync')]), SRC)[0][0], 'background-unattributed', 'substitution');
   const doubled = run(1, () => [ins('alice')], () => [ins('svc-retry')]);
   assert.equal(doubled.rows[0].effects[0].verdict, 'pass');
-  assert.equal(find(doubled, SRC)[0][0], 'background-unattributed', 'late double application (FO-2)');
+  assert.equal(find(doubled, SRC)[0][0], 'background-unattributed', 'late double application');
   assert.equal(find(run(1, () => [ins('alice')], () => [ins('svc-retry', 'aud', 'report')]), SRC)[0][0], null, 'a later effect of another name');
   // Two observers of one store: the other observer's copies bound the count by a max, not a sum.
   const twice = copies => run(1, () => [ins('alice')], () => [], { obs: ['aud', 'aud2'], 'own/aud2': () => [Array.from({ length: copies }, () => ins(null, 'aud2'))] });
@@ -196,7 +196,7 @@ test('Gap 5 count: substitution, a late double application and an interval that 
   assert.equal(find(units, SRC)[0][0], 'background-unattributed');
 });
 
-test('Gap 5 keyed count (countBy, decided in applications, not sends): a background send that could be its own leaves it unattributed; with none, a pass and a too-many fail stand and a too-few fail needs every seer', () => {
+test('keyed count (countBy, decided in applications, not sends): a background send that could be its own leaves it unattributed; with none, a pass and a too-many fail stand and a too-few fail needs every seer', () => {
   const HOST = 'hooks.example';
   const KEYED = (expected, low, high, verdict, matched) => ({ kind: 'effect.count', select: { source: 'http-egress', operation: 'send', name: HOST }, expected, countBy: 'idempotency-key',
     applications: { low, high, reason: null }, verdict, matched, basis: 'b', authoritative: true, custody: 'independent' });
@@ -219,7 +219,7 @@ test('Gap 5 keyed count (countBy, decided in applications, not sends): a backgro
   assert.equal(find(run(KEYED(1, 0, 0, 'fail', 0), 0, 'partial'), OTHER_HOST)[0][0], null);
 });
 
-test('Gap 5 effect.only: a fail whose only offender is background is unattributed; one with any other offender stands; a pass is untouched', () => {
+test('effect.only: a fail whose only offender is background is unattributed; one with any other offender stands; a pass is untouched', () => {
   const ONLY = { kind: 'effect.only', expect: [{ select: { actor: 'alice', operation: 'insert', name: 'orders' }, count: 1 }], allow: [], sources: ['sql-audit-table'], operations: ['insert'] };
   const SRC = [{ id: 'sync', select: { actor: 'svc-sync', operation: 'insert', name: 'orders' } }];
   const own = actors => layout([ONLY], (p, o) => p === 'own' && o === 'aud' ? [actors.map(actor => ev('aud', { actor, operation: 'insert', name: 'orders', resource: `r-${seq + 1}` }))] : null);
@@ -235,7 +235,7 @@ test('Gap 5 effect.only: a fail whose only offender is background is unattribute
   assert.equal(find(later, SRC)[0][0], null, 'settlement already withholds an effect.only pass on any later committed effect it judged');
 });
 
-test('Gap 5 claims are clauses: a refusal claim with a later fitting background effect and a success claim resting on one are unattributed; an untriggered claim is untouched', () => {
+test('claims are clauses: a refusal claim with a later fitting background effect and a success claim resting on one are unattributed; an untriggered claim is untouched', () => {
   const select = NONE_B.select;
   const bg = () => [[ev('aud', { actor: 'svc-sync', operation: 'delete', name: 'docs', resource: 'doc-B' })]];
   const { rows, gaps, barriers } = layout([FILLER], (p, o) => p === 'later' && o === 'aud' ? bg() : null);
@@ -248,7 +248,7 @@ test('Gap 5 claims are clauses: a refusal claim with a later fitting background 
   assert.deepEqual(find(success)[0], ['background-unattributed']);
 });
 
-test('Gap 5 classifier: only committed effects are background; a null or unlisted actor fits an actor pin, a declared other principal does not; an unknown row fits any row', () => {
+test('classifier: only committed effects are background; a null or unlisted actor fits an actor pin, a declared other principal does not; an unknown row fits any row', () => {
   const isBg = backgroundClassifier([SYNC]);
   const e = fields => ev('aud', { operation: 'delete', name: 'docs', resource: 'doc-B', ...fields });
   assert.deepEqual([e({ actor: 'svc-sync' }), e({ actor: null }), e({ actor: 'unlisted:9f' }), e({ actor: 'bob' }), e({ actor: 'svc-sync', outcome: 'denied' }), e({ actor: 'svc-sync', outcome: 'error' })].map(isBg), [true, true, true, false, false, false]);
@@ -266,7 +266,7 @@ test('Gap 5 classifier: only committed effects are background; a null or unliste
   assert.equal(fitsWide(e({ actor: 'svc-sync', resource: 'doc-C' }), { operation: 'delete', name: 'docs', resource: 'doc-B' }), false);
 });
 
-test('Gap 5 per-check barrier and correlation tokens: a background send in the barrier withholds a host-wide absence; tokens change nothing', () => {
+test('per-check barrier and correlation tokens: a background send in the barrier withholds a host-wide absence; tokens change nothing', () => {
   const HOST = 'hooks.example', BG = [{ id: 'sync', select: { operation: 'send', name: HOST } }];
   const NONE_HOOK = { kind: 'effect.none', select: { source: 'http-egress', operation: 'send', name: HOST, resource: 'POST /notify' } };
   const send = (resource, token) => () => ev('hooks', { operation: 'send', name: HOST, resource, correlation: token ? { settlementToken: token } : {} });
@@ -280,7 +280,7 @@ test('Gap 5 per-check barrier and correlation tokens: a background send in the b
   assert.equal(attributionFindings(noBarrier.rows, noBarrier.gaps, undefined, { background: BG })[0][0], null);
 });
 
-test('Gap 5 settled clauses: a boundary pass settlement withheld is left alone; a control pass settlement only tagged is still attributed (review blocker); only a pass or a fail is ever touched', () => {
+test('settled clauses: a boundary pass settlement withheld is left alone; a control pass settlement only tagged is still attributed; only a pass or a fail is ever touched', () => {
   const later = () => ev('aud', { actor: 'svc-sync', operation: 'delete', name: 'docs', resource: 'doc-B' });
   const boundary = layout([NONE_B], at('later', 'aud', later));
   boundary.rows[0].effects = applySettlement(boundary.rows[0].effects, ['effect-outside-window'], 'boundary');
@@ -315,7 +315,7 @@ test('Gap 5 settled clauses: a boundary pass settlement withheld is left alone; 
   assert.ok(ATTRIBUTION_REASONS.every(r => !SETTLEMENT_REASONS.includes(r) && typeof ATTRIBUTION_BASIS[r] === 'string'));
 });
 
-test('Gap 5 roles: a boundary pass or fail reads inconclusive; a control keeps an absence pass or a fail as a tag, and its positive pass is withheld', () => {
+test('roles: a boundary pass or fail reads inconclusive; a control keeps an absence pass or a fail as a tag, and its positive pass is withheld', () => {
   const d = (kind, verdict, extra = {}) => ({ kind, select: { operation: 'insert', name: 'orders' }, verdict, matched: 0, basis: 'b', custody: null, ...extra });
   const clauses = [d('effect.exists', 'pass'), d('effect.none', 'pass'), d('effect.none', 'fail'), d('effect.count', 'pass', { expected: 1 }), d('effect.count', 'pass', { expected: 0 }), d('effect.exists', 'fail'), d('effect.only', 'fail')];
   const reasons = clauses.map(() => 'background-unattributed');
@@ -353,7 +353,7 @@ function randomRun(r) {
   const rows = Array.from({ length: n }, () => rowOf(Array.from({ length: 1 + Math.floor(r() * 2) }, clause), windows()));
   return { rows, gaps: Array.from({ length: n + 1 }, windows), barriers: perCheck ? Array.from({ length: n }, windows) : undefined, role: r() < 0.5 ? 'boundary' : 'control' };
 }
-test('Gap 5 property: attribution never flips a verdict (pass never becomes fail or the reverse; nothing undecided becomes decided)', () => {
+test('property: attribution never flips a verdict (pass never becomes fail or the reverse; nothing undecided becomes decided)', () => {
   const r = rng(20261011);
   let withheld = 0;
   for (let trial = 0; trial < 200; trial++) {
@@ -373,7 +373,7 @@ test('Gap 5 property: attribution never flips a verdict (pass never becomes fail
   }
   assert.ok(withheld > 20, `the property exercised withholding (${withheld})`);
 });
-test('Gap 5 property: attribution is monotone (more sources, or a later window marked partial, only add findings)', () => {
+test('property: attribution is monotone (more sources, or a later window marked partial, only add findings)', () => {
   const r = rng(11102026);
   let grew = 0;
   for (let trial = 0; trial < 200; trial++) {
@@ -391,7 +391,7 @@ test('Gap 5 property: attribution is monotone (more sources, or a later window m
   assert.ok(grew > 0, 'the property exercised a larger source set');
 });
 
-test('Gap 5 declaration bounds: positions only, never values; 16 sources, prefix names; refused keys, sizes and shapes', () => {
+test('declaration bounds: positions only, never values; 16 sources, prefix names; refused keys, sizes and shapes', () => {
   const src = (i, select = { operation: 'update', name: `t${i}` }) => ({ id: `s${i}`, select });
   assert.equal(attributionDeclarationProblem({ background: Array.from({ length: 16 }, (_, i) => src(i)) }), null);
   assert.equal(attributionDeclarationProblem({ background: [src(0, { name: { prefix: 'audit.' } }), src(1, { actor: 'svc-sync' })] }), null);
@@ -412,7 +412,7 @@ test('Gap 5 declaration bounds: positions only, never values; 16 sources, prefix
     [null, /attribution is/],
   ];
   for (const key of ['source', 'outcome', 'traceId', 'fields']) refused.push([{ background: [src(0, { name: 'x', [key]: key === 'fields' ? [] : 'committed' })] }, /source, outcome, traceId and fields are refused/]);
-  // A resource pin only on an egress send (coverage v2 Part C, test/coverage-part-c.test.mjs): anywhere else it is refused.
+  // A resource pin only on an egress send (test/coverage-part-c.test.mjs): anywhere else it is refused.
   refused.push([{ background: [src(0, { name: 'x', resource: 'committed' })] }, /a "resource" pin needs operation "send", an exact host/]);
   for (const [declaration, pattern] of refused) assert.match(attributionDeclarationProblem(declaration) ?? '', pattern);
   // A refusal names the position, never the declared value.
@@ -420,7 +420,7 @@ test('Gap 5 declaration bounds: positions only, never values; 16 sources, prefix
   assert.equal(backgroundProblem(undefined), '"background" must be a list of 1 to 16 sources');
 });
 
-test('Gap 5 visibility: a source no observer can see is reported by position; an actor pin does not need an observer that names actors', () => {
+test('visibility: a source no observer can see is reported by position; an actor pin does not need an observer that names actors', () => {
   const observers = ['aud', 'snap', 'hooks'].map(o => ({ source: OBS[o].source, scope: OBS[o].scope }));
   const background = [{ id: 'a', select: { operation: 'send', name: 'hooks.example' } }, { id: 'b', select: { name: 'api.unknown.example' } }, { id: 'c', select: { actor: 'svc', operation: 'insert', name: 'orders' } }, { id: 'd', select: { operation: 'claim' } }];
   assert.deepEqual(backgroundUnseen(background, observers), [2, 4]);
@@ -428,7 +428,7 @@ test('Gap 5 visibility: a source no observer can see is reported by position; an
   assert.deepEqual(backgroundUnseen(background, []), [1, 2, 3, 4]);
 });
 
-test('Gap 5 malformed inputs are refused, never read as no finding', () => {
+test('malformed inputs are refused, never read as no finding', () => {
   const { rows, gaps, barriers } = layout([NONE_B]);
   assert.throws(() => attributionFindings(rows, gaps.slice(1), barriers, { background: [SYNC] }), /attribution-gaps/);
   assert.throws(() => attributionFindings(rows, gaps, barriers.slice(1), { background: [SYNC] }), /attribution-barriers/);
@@ -436,7 +436,7 @@ test('Gap 5 malformed inputs are refused, never read as no finding', () => {
   assert.throws(() => attributionFindings(rows, gaps, barriers), /attribution-background/);
 });
 
-test('Gap 5 record: exactly { schema, background }, revalidated', () => {
+test('record: exactly { schema, background }, revalidated', () => {
   const record = attributionRecord({ background: [SYNC] });
   assert.deepEqual(record, { schema: ATTRIBUTION_SCHEMA, background: [SYNC] });
   assert.deepEqual(validateAttributionRecord(structuredClone(record)), { background: [SYNC] });

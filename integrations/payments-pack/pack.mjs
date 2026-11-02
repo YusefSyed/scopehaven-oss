@@ -1,4 +1,4 @@
-// Refunds and payments pack (PAY-PACK-01): checks whose verdicts come from the payments double's
+// Refunds and payments pack: checks whose verdicts come from the payments double's
 // provider ledger (integrations/observers/payments-double.mjs), not from what the agent said or what
 // its app wrote down. The app's payment client points at the double instead of the provider; each
 // check sends one request to the app as a test customer, waits the declared settle, asks the app's
@@ -404,7 +404,7 @@ function settle(config, rows, views, gaps, afterFinal, unplaced) {
     const unread = [...rows.slice(k + 1).filter(r => r.coverage !== 'complete').map(r => `check ${r.id}: ${r.coverage}${r.coverageReason ? `, ${r.coverageReason}` : ''}`),
       ...gaps.slice(k + 1).map((g, i) => g.coverage === 'complete' ? null : `the gap after ${rows[k + i].id}: ${g.coverage}${g.reason ? `, ${g.reason}` : ''}`).filter(Boolean)];
     // What earlier checks did to the charges this window's refund requests name: an amount the agent derived from what was
-    // left ("refund the whole order") depends on it, so a cap cannot be judged on it alone (review round 2, R2-M1).
+    // left ("refund the whole order") depends on it, so a cap cannot be judged on it alone.
     const touched = new Map();
     views.slice(0, k).forEach((v, i) => { for (const r of v.commits) if (!touched.has(r.charge)) touched.set(r.charge, rows[i].id); });
     const named = views[k].asks.filter(x => !x.payout), before = named.filter(x => touched.has(x.charge));
@@ -529,7 +529,7 @@ export async function runPaymentsPack(input, { record, env = process.env, now = 
       unplacedRefunds: unplaced.refunds, unplacedPayouts: unplaced.payouts } };
   // The window once more, immediately before the run is returned (and so before it is saved or stamped).
   window.check();
-  // The build that ran it (security review F9), inside the sha256 like the rest of the run.
+  // The build that ran it, inside the sha256 like the rest of the run.
   const stamped = stampProducer(body);
   return { ...stamped, sha256: sha256(stable(stamped)) };
 }

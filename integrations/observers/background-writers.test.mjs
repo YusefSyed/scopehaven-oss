@@ -1,4 +1,4 @@
-// Background writers (N12): the per-platform ignore lists and their one reader, the end barrier and the shared-database rule,
+// Background writers: the per-platform ignore lists and their one reader, the end barrier and the shared-database rule,
 // in pg-snapshot (against a scripted session: no server) and sqlite-snapshot (real database files in a spaced temp folder).
 // pg-wal's own rules are in pg-wal.test.mjs; both Postgres observers against a real server are in
 // background-writers.live.test.mjs.
@@ -253,7 +253,7 @@ test('sqlite-snapshot with an ignore list: an unlisted table that changed holds 
   const unlisted = await sqliteWindow(o, () => db.exec("INSERT INTO audit (what) VALUES ('refund sent')"));
   assert.deepEqual([unlisted.coverage, unlisted.reason, unlisted.background.unlisted], ['partial', 'unlisted-table-changed', ['audit']]);
   const created = await sqliteWindow(o, () => db.exec('CREATE TABLE outbox (id INTEGER)'));
-  // A table created during the run is also a schema change against the run's baseline (N13, ./catalog.mjs).
+  // A table created during the run is also a schema change against the run's baseline (./catalog.mjs).
   assert.deepEqual([created.reason, created.background.unlisted], ['schema-drift,unlisted-table-changed', ['outbox']], 'a table that appeared');
   // A run that starts after those tables exist has them in its baseline.
   db.exec('INSERT INTO outbox VALUES (9007199254740993)');

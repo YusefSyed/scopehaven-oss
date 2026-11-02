@@ -211,7 +211,7 @@ export function renderSarif(run, { standardsMap = defaultStandardsMap } = {}) {
   const results = run.results.map((row, index) => {
     const reading = withheld.find(r => r.id === row.id);
     // A status is looked up only as a string: Object.hasOwn coerces its key, so ["pass"] would read PASS here while the channel and
-    // unpaired-route rules above, which compare strictly, skip it (D-01's shape, #502).
+    // unpaired-route rules above, which compare strictly, skip it.
     const recognized = typeof row.status === 'string' && Object.hasOwn(OUTCOMES, row.status);
     const outcome = reading ? CHANNEL_WITHHELD : unpaired.includes(row.id) ? unpairedOutcome : recognized ? OUTCOMES[row.status] : UNRECOGNIZED;
     const severity = text(row.severity, 'unspecified');
@@ -274,7 +274,7 @@ export function renderSarif(run, { standardsMap = defaultStandardsMap } = {}) {
       unlisted: channels.unlisted.map(entry => ({ ...entry, rows: [...entry.rows] })), withheld: channels.withheld.map(r => ({ id: r.id, reasons: [...r.reasons] })), rule: channels.rule } : { declared: false, reason: channels.reason, note: channels.note } } : {}),
     // Typed claims and the residual (src/residual.mjs): what each verdict rests on, and what the run did not show.
     claimTypes: { counts: claimCounts(claims), rule: CLAIM_RULE }, residual: residualOf(run),
-    // A confined launch (FIX-01 option 2): what was allowed and refused; never a verdict input.
+    // A confined launch: what was allowed and refused; never a verdict input.
     ...(confinementOf(run) ? { confinement: (({ tier, mechanism, covers, profileDigest, sinks, allow, selfTest, origin, denials, limits }) => ({ tier, mechanism, covers, profileDigest, sinks, allow, selfTest, origin, kernelDenials: denials.collected ? denials.count : null, limits }))(confinementOf(run)) } : {}),
     humanNotes: NOTES_SCOPE, locationScope: LOCATION_SCOPE,
     outcomeMapping: { fail: 'kind fail; level from check severity', pass: 'kind pass; level none', inconclusive: 'kind open; level none', error: 'kind open; level none; tool execution notification', not_applicable: 'kind notApplicable; level none',

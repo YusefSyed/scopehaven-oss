@@ -178,7 +178,7 @@ test('a rate at or above 1 or below 0, more than 50 trials and a run with no con
 test('a conversation run stamped with an earlier evaluator identity never compares with a current one', async t => {
   const { run } = await storefront(t);
   const { run: current } = await run();
-  // 69ea63ca: main before the zero-trial rule; 9e0f984f: that rule as first pushed (#418), before the range rules.
+  // 69ea63ca: the evaluator before the zero-trial rule; 9e0f984f: with that rule, before the range rules.
   for (const evaluatorHash of ['69ea63ca846548ba79ce7d7804935b054c900ce2334cbdf1a366e9bf3ffb1085', '9e0f984f0b866d4a8f63b017dec6c4f6e89a002298bb709f7638d7bc39c06673']) {
     for (const [a, b] of [[{ ...current, evaluatorHash }, current], [current, { ...current, evaluatorHash }]]) {
       const comparison = compareRuns(a, b);
@@ -245,7 +245,7 @@ test('CLI: --save --gate stores and gates a run; a drilled baseline then restore
   const { env, drill, spec } = await storefront(t);
   const dir = await mkdtemp(join(tmpdir(), 'scopehaven-conv-cli-')); t.after(() => rm(dir, { recursive: true, force: true }));
   const specFile = join(dir, 'spec.json'); await writeFile(specFile, JSON.stringify(spec), { mode: 0o600 });
-  // CMP-ROE-01: the record covering the spec (test/authorization.test.mjs pins the refusals).
+  // The authorization record covering the spec (test/authorization.test.mjs pins the refusals).
   const authorization = conversationAuthorizationArgs(join(dir, 'authorization.json'), spec);
   let out = ''; const stdout = { write: s => { out += s; } };
   await drill('crossCustomer', true);

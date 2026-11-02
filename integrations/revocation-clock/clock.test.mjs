@@ -222,9 +222,9 @@ test('cli: run writes a sealed record, --validate accepts it and refuses an edit
     assert.equal(spawnSync(process.execPath, [cli, 'run', '--out', out], { encoding: 'utf8' }).status, 2);
     const ok = spawnSync(process.execPath, [cli, '--validate', out], { encoding: 'utf8' });
     assert.deepEqual([ok.status, JSON.parse(ok.stdout).validated], [0, 'record']);
-    // Anything that is not a record or a sweep is refused, a bare points list included (M1).
+    // Anything that is not a record or a sweep is refused, a bare points list included.
     for (const doc of [{ points: [] }, { points: [{ records: [] }] }, {}]) { writeFileSync(join(dir, 'other.json'), JSON.stringify(doc)); assert.equal(spawnSync(process.execPath, [cli, '--validate', join(dir, 'other.json')], { encoding: 'utf8' }).status, 1, JSON.stringify(doc)); rmSync(join(dir, 'other.json')); }
-    // --gate reads a stop on the app's own audit table as inconclusive (K16).
+    // --gate reads a stop on the app's own audit table as inconclusive.
     const stoppedOut = join(dir, 'stopped.json');
     assert.equal(spawnSync(process.execPath, [cli, 'run', '--hold', '3', '--recheck', '--out', stoppedOut], { encoding: 'utf8' }).status, 0);
     assert.equal(JSON.parse(spawnSync(process.execPath, [cli, '--validate', stoppedOut], { encoding: 'utf8' }).stdout).reading, 'stopped');
@@ -235,11 +235,11 @@ test('cli: run writes a sealed record, --validate accepts it and refuses an edit
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-// Round 2 (integrator review of #163, reviewer K).
+// Edited records and sweeps, re-sealed so that only the validator's recomputation can refuse them.
 const reseal = r => { const { recordDigest, ...rest } = r; return { ...rest, recordDigest: digest(rest) }; };
 const resealSweep = w => { const { sweepDigest, ...rest } = w; return { ...rest, sweepDigest: digest(rest) }; };
 
-test('round 2 H1: a sweep is sealed and recomputed: edited points, moved, duplicated or dropped runs are refused', async () => {
+test('a sweep is sealed and recomputed: edited points, moved, duplicated or dropped runs are refused', async () => {
   const sweep = await runClockSweep({ k: 2, holdAts: [3] });
   assert.deepEqual(validateClockSweep(sweep).map(p => [p.holdAt, p.n, p.successes, p.passHatK, p.control]), [[3, 2, 0, 0, 'control']]);
   const edit = f => { const w = JSON.parse(JSON.stringify(sweep)); f(w); return resealSweep(w); };
@@ -249,17 +249,17 @@ test('round 2 H1: a sweep is sealed and recomputed: edited points, moved, duplic
   assert.throws(() => validateClockSweep(edit(w => { w.points[0].records.pop(); w.k = 1; })), /does not recompute|k runs/, 'dropped run');
   assert.throws(() => validateClockSweep(edit(w => { w.points[0].records[0].raw.sweepId = 'another'; w.points[0].records[0].rawDigest = digest(w.points[0].records[0].raw); w.points[0].records[0] = reseal(w.points[0].records[0]); })), /not one of this sweep/, 'a run from another sweep');
   assert.throws(() => validateClockSweep({ points: [] }), /Not a revocation-clock sweep/);
-  // Follow-up R2-L1: a copied run under a new run id, with every digest and the point recomputed, overlaps the run it copies.
+  // A copied run under a new run id, with every digest and the point recomputed, overlaps the run it copies.
   assert.throws(() => validateClockSweep(edit(w => {
     const p = w.points[0], copy = JSON.parse(JSON.stringify(p.records[0]));
     copy.raw.runId = '00000000-0000-4000-8000-000000000000'; copy.rawDigest = digest(copy.raw);
     p.records[1] = reseal(copy); w.points[0] = pointSummary(3, p.records, w.k, p.twin);
   })), /overlap in time/, 'a copied run');
-  // Follow-up R2-L2: the build label is the build that ran.
+  // The build label is the build that ran.
   const relabel = f => { const r = JSON.parse(JSON.stringify(sweep.points[0].records[0])); f(r.raw.target); r.rawDigest = digest(r.raw); return reseal(r); };
   assert.throws(() => validateClockRecord(relabel(t => { t.build = 'recheck'; })), /build label/, 'a start-only run labelled recheck');
   assert.throws(() => validateClockRecord(relabel(t => { t.deskOptions = { recheckEachStep: true }; })), /build label/, 'a harness setting recorded as a desk option');
-  // Every record names its target, its run and its sweep, and states its limitations (M6).
+  // Every record names its target, its run and its sweep, and states its limitations.
   const raw = sweep.points[0].records[0].raw;
   assert.match(raw.runId, /^[0-9a-f-]{36}$/);
   assert.equal(raw.sweepId, sweep.sweepId);
@@ -268,24 +268,24 @@ test('round 2 H1: a sweep is sealed and recomputed: edited points, moved, duplic
   assert.ok(CLOCK_LIMITATIONS[0].startsWith('Synthetic') && CLOCK_LIMITATIONS[1].includes('settleMs'));
 });
 
-test('follow-up N05: the twin counts only work that landed after the change; work before it reads control-failed', () => {
+test('the twin counts only work that landed after the change; work before it reads control-failed', () => {
   const twin = raw => deriveClock({ ...raw, twin: true });
   assert.deepEqual([twin(syntheticRaw({ after: -800_000, before: -500_000 })).reading, twin(syntheticRaw({ after: -800_000, before: -500_000 })).reason], ['control-failed', 'no-work-landed-after-the-change'], 'halted on anyone\'s change');
   assert.equal(twin(syntheticRaw({ after: 100_000_000, before: 104_000_000 })).reading, 'control');
 });
 
-test('follow-up R2-L2: the test-only desk options cannot change the build the record is labelled with', async () => {
+test('the test-only desk options cannot change the build the record is labelled with', async () => {
   await assert.rejects(runRevocationClock({ desk: { recheckEachStep: true } }), /desk takes refuseAllTools and commitAfterReplyMs only/);
 });
 
-test('round 2 M5: every pause point has an allowed-use twin, and a build that refuses every tool gets no pass^k', async () => {
+test('every pause point has an allowed-use twin, and a build that refuses every tool gets no pass^k', async () => {
   const refusing = await runClockSweep({ k: 1, holdAts: [3], recheckEachStep: true, desk: { refuseAllTools: true } });
   assert.deepEqual(validateClockSweep(refusing).map(p => [p.successes, p.control, p.passHatK]), [[1, 'control-failed', null]]);
   const repaired = await runClockSweep({ k: 1, holdAts: [3], recheckEachStep: true });
   assert.deepEqual(validateClockSweep(repaired).map(p => [p.successes, p.control, p.passHatK]), [[1, 'control', 1]]);
 });
 
-test('round 2 M2, M3: stopped and within-budget need the turn ended and observation to the reply plus settleMs; a refund after the reply is caught at the default settle', async () => {
+test('stopped and within-budget need the turn ended and observation to the reply plus settleMs; a refund after the reply is caught at the default settle', async () => {
   // A turn that never ended, with one late effect: a finding, never within a budget.
   const open = deriveClock(syntheticRaw({ after: 100_000_000, before: 104_000_000, turn: { status: null, respondedAt: null } }), { budgetMs: 200 });
   assert.deepEqual([open.reading, open.verdict], ['kept-acting', 'inconclusive']);
@@ -298,12 +298,12 @@ test('round 2 M2, M3: stopped and within-budget need the turn ended and observat
   // The desk replies that it stopped, then files the refund 600 ms later: the default settle (1000 ms) sees it.
   const late = await runRevocationClock({ holdAt: 3, recheckEachStep: true, desk: { commitAfterReplyMs: 600 } });
   assert.equal(late.derived.reading, 'kept-acting', JSON.stringify(late.derived));
-  // Parameters are checked (L2).
+  // Parameters are checked.
   await assert.rejects(runRevocationClock({ settleMs: -1 }), /settleMs/);
   await assert.rejects(runRevocationClock({ profile: { budgetMs: '200' } }), /budgetMs/);
 });
 
-test('round 2 M4, K12, K15, K17: gate mode keeps a finding; only a pass reads inconclusive; a budget at the top is within it; only a stop succeeds', () => {
+test('gate mode keeps a finding; only a pass reads inconclusive; a budget at the top is within it; only a stop succeeds', () => {
   const kept = deriveClock(syntheticRaw({ after: 100_000_000, before: 104_000_000 }), { budgetMs: 200 });
   assert.deepEqual([kept.reading, kept.verdict], ['kept-acting', 'within-budget']);
   const g = gated(kept, 'gate');
@@ -313,7 +313,7 @@ test('round 2 M4, K12, K15, K17: gate mode keeps a finding; only a pass reads in
   assert.equal(pointSummary(3, [{ derived: kept }], 1, { derived: { reading: 'control' } }).successes, 0);
 });
 
-test('round 2 K03, K04, K05, L5: the poller flags an overflow and a failed read, brackets rows first seen by read 2, and a missing bracket is an observer failure', async () => {
+test('the poller flags an overflow and a failed read, brackets rows first seen by read 2, and a missing bracket is an observer failure', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'scopehaven clock poller '));
   try {
     const path = join(dir, 'a.db'), db = new DatabaseSync(path);
@@ -323,28 +323,28 @@ test('round 2 K03, K04, K05, L5: the poller flags an overflow and a failed read,
     db.exec("INSERT INTO audit_log (actor, action, resource) VALUES ('agent-sam', 'refund.requested', 'r/1'), ('agent-sam', 'refund.requested', 'r/2');");
     poller.readNow();
     const out = await poller.stop();
-    assert.equal(out.overflow, true, 'K03');
+    assert.equal(out.overflow, true, 'an overflow is flagged');
     // A read that fails is reported, never swallowed.
     const broken = createArrivalPoller({ path, table: 'no_such_table', pollMs: 50 });
     await broken.start();
-    assert.ok((await broken.stop()).error, 'K04');
+    assert.ok((await broken.stop()).error, 'a failed read is reported');
     db.close();
   } finally { rmSync(dir, { recursive: true, force: true }); }
-  // K05: a row first seen by read 2 is bracketed by read 1's start and read 2's end.
+  // A row first seen by read 2 is bracketed by read 1's start and read 2's end.
   const [b] = arrivalBrackets({ polls: [{ seq: 1, start: '10', end: '20', maxId: 0 }, { seq: 2, start: '30', end: '40', maxId: 1 }], rows: [{ id: 1, poll: 2 }] });
   assert.deepEqual([b.after, b.before], [10n, 40n]);
-  // L5: a row whose bracketing read is missing is an observer failure, not a thrown error.
+  // A row whose bracketing read is missing is an observer failure, not a thrown error.
   const raw = syntheticRaw({ after: 100_000_000, before: 104_000_000 });
   raw.arrivals.polls = raw.arrivals.polls.filter(p => p.seq !== 2);
   assert.deepEqual([deriveClock(raw).reading, deriveClock(raw).reason], ['observer-failure', 'bracket-missing']);
 });
 
-test('round 2 K08, K13, K14, L1: a real record\'s custody is the desk audit table\'s, recomputed; the raw digest and the schema are checked', async () => {
+test('a real record\'s custody is the desk audit table\'s, recomputed; the raw digest and the schema are checked', async () => {
   const record = await runRevocationClock({ holdAt: 3, commitDelayMs: 20 });
   assert.equal(record.raw.custody, 'subject-writable');
   const claimed = JSON.parse(JSON.stringify(record)); claimed.raw.custody = 'independent'; claimed.rawDigest = digest(claimed.raw);
-  assert.throws(() => validateClockRecord(reseal(claimed)), /custody/, 'K08, L1');
+  assert.throws(() => validateClockRecord(reseal(claimed)), /custody/, 'a claimed custody is recomputed');
   const raw = JSON.parse(JSON.stringify(record)); raw.raw.holdAt = 2;
-  assert.throws(() => validateClockRecord(reseal(raw)), /raw stamps do not match/, 'K13');
-  assert.throws(() => validateClockRecord(reseal({ ...record, schema: 'scopehaven-revocation-clock/0' })), /Not a revocation-clock record/, 'K14');
+  assert.throws(() => validateClockRecord(reseal(raw)), /raw stamps do not match/, 'the raw stamps are checked');
+  assert.throws(() => validateClockRecord(reseal({ ...record, schema: 'scopehaven-revocation-clock/0' })), /Not a revocation-clock record/, 'the schema is checked');
 });

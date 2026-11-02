@@ -1,4 +1,4 @@
-// Later outcomes, PR-1 (PROVIDER-LATER-OUTCOME design with ADDENDUM-R1; collector provider-feed/5): the profile declaration, the run
+// Later outcomes (collector provider-feed/5): the profile declaration, the run
 // record's feed, the settlement record's later list and its binding, and the limitation sentence. Pure: no socket, no file read
 // beyond module loading. The observer and the connector are tested over a loopback stub in integrations/observers/provider-feed.test.mjs
 // and test/provider-feed-connector.test.mjs.

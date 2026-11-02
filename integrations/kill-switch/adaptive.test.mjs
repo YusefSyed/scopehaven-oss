@@ -1,6 +1,5 @@
 // ADAPTIVE-01. Owned synthetic agent desk on loopback with a scripted model stand-in; no model,
-// provider or customer system, and no target option. Design brief:
-// a review record outside this repository
+// provider or customer system, and no target option.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -15,7 +14,7 @@ import { TAMPER_SCRIPT, runControlTamper, REFUSED_STATUS } from './control-tampe
 const SMALL = Object.freeze({ ...BOUNDS, maxRuns: 2, maxAttempts: 64 });
 const rowsOf = runs => runs.flatMap(r => r.rows.map(row => `${row.id}:${row.status}`));
 // Edit a record AND fix its seal, which is what a tamperer who read the format would do. The
-// seal (low 1) stops a careless edit; the sentDigest comparison (the Medium) is what still
+// seal stops a careless edit; the sentDigest comparison is what still
 // catches a replay that sends something different from a record that is internally consistent.
 // Resealing is therefore not a workaround here - it is the only way to test the digest at all.
 const reseal = record => { const { recordDigest, ...body } = record; return { ...body, recordDigest: digest(body) }; };
@@ -159,7 +158,7 @@ test('the record seals an attempted map that nothing reads, and the summary lead
   assert.equal(typeof record.recordDigest, 'string');
   assert(record.limitations.some(l => /never read by a row or by the gate/.test(l)));
   assert(record.limitations.some(l => /clean run is NOT evidence of security/.test(l)));
-  // And it says what its own seal cannot show (round-3 review, low 2): the seal is unkeyed, so a
+  // And it says what its own seal cannot show: the seal is unkeyed, so a
   // consistently edited and resealed log verifies and replays identical against itself.
   assert(record.limitations.some(l => /seal shows only that the record is internally consistent, not where it came from/.test(l)),
     'the record must say what its seal cannot show');
@@ -189,8 +188,8 @@ test('the verdicts are the existing rows’, with the custody they already carry
   assert.deepEqual(replayed[0].rows.map(r => r.id).sort(), [...ids].sort(), 'the replay reports the same rows, no more');
 });
 
-test('r2: a replay that sends a different order is caught, not reported identical', async () => {
-  // Medium 1 of the #253 review. `replayAdaptive` returned `plan: recorded.plan` - the record's
+test('a replay that sends a different order is caught, not reported identical', async () => {
+  // `replayAdaptive` once returned `plan: recorded.plan` - the record's
   // OWN object - so compareReplay's sequence check compared the log with itself and could never
   // differ. A replay sending the reversed order read `sequenceIdentical: true`, and two replay
   // mutants survived the sweep. The comparison is now over a digest each side takes of the
@@ -205,7 +204,7 @@ test('r2: a replay that sends a different order is caught, not reported identica
   assert.equal(same.finding, null);
   // The digests are equal because both sides built the same script, not because one was copied.
   assert.deepEqual(honest.map(r => r.sentDigest), record.runs.map(r => r.sentDigest));
-  // Round 4 (review of round 3): each side digests the holdAt the check says it RAN, so the
+  // Each side digests the holdAt the check says it RAN, so the
   // record's digest has to be of the pause point its plan logs. Rebuilt here from the logged plan
   // alone, a run that paused somewhere other than its log says is visible without a replay.
   const callOf = new Map(DECLARED_CALLS.map(d => [d.surfaceId, d.call]));
@@ -218,8 +217,8 @@ test('r2: a replay that sends a different order is caught, not reported identica
     const logged = digest({ holdAt: r.plan.holdAt, script });
     assert.equal(r.sentDigest, logged, `run ${r.runIndex}: the digest must be of the pause point the record logs`);
     // beforePause drives the attempted map and the summary's "never attempted against a live
-    // control", and nothing pinned it: a mutant shifting it by one step passed every test (lead
-    // review of #253 round 4, note 1). It must name exactly the calls the check releases before
+    // control", and nothing pinned it: a mutant shifting it by one step passed every test.
+    // It must name exactly the calls the check releases before
     // the pause, the steps before holdAt, which is the slice control-tamper's permittedRows takes.
     const released = script.slice(0, r.plan.holdAt - 1).flatMap(step => step.toolCalls ?? []).map(call => idOf.get(call));
     assert.deepEqual(r.plan.beforePause, released, `run ${r.runIndex}: beforePause must be the calls released before the pause`);
@@ -244,9 +243,9 @@ test('r2: a replay that sends a different order is caught, not reported identica
   assert(differs.sequenceDifferences.length >= 1, JSON.stringify(differs.sequenceDifferences));
   assert(differs.finding !== null, 'and that is a finding');
 
-  // Round 3 (review of round 2): the PAUSE POINT is inside the digest too. Digesting the
+  // The PAUSE POINT is inside the digest too. Digesting the
   // script alone meant a replay that sent the same calls and paused somewhere else read
-  // identical - the same shape of hole as round 2's, one field along.
+  // identical - the same shape of hole as the order above, one field along.
   const movedPause = reseal({ ...record, runs: record.runs.map(r => ({ ...r, plan: { ...r.plan, holdAt: r.plan.holdAt === 1 ? 2 : 1 } })) });
   assert.equal(verifyRecordSeal(movedPause), null, 'internally consistent, so only the digest can catch it');
   const elsewhere = await replayAdaptive(movedPause);
@@ -261,7 +260,7 @@ test('r2: a replay that sends a different order is caught, not reported identica
   assert.equal(compareReplay(record, [...honest, { ...honest[0], runIndex: 99 }]).sequenceIdentical, false);
 });
 
-test('r2: the record seal is checked, not merely computed', async () => {
+test('the record seal is checked, not merely computed', async () => {
   // recordDigest was recomputable but nothing read it, which is a seal in name only.
   const record = await runAdaptive({ seed: 4, bounds: { ...BOUNDS, maxRuns: 1, maxAttempts: 12 } });
   const { recordDigest, ...body } = record;
@@ -272,8 +271,8 @@ test('r2: the record seal is checked, not merely computed', async () => {
   assert.notEqual(digest({ ...body, seed: body.seed + 1 }), recordDigest);
 });
 
-test('r2: the adaptation reads statuses and its own log, and nothing of the subject’s', async () => {
-  // Low 1. The reviewer's mutant steered on `run.report.audit.length` and survived, because
+test('the adaptation reads statuses and its own log, and nothing of the subject’s', async () => {
+  // A mutant that steered on `run.report.audit.length` survived, because
   // nothing pinned WHICH signals the search may read. `silentRefusal` is the probe that settles
   // it: every attempt is still refused with the same status, and the desk records none of them,
   // so the audit differs while the statuses do not. A search reading the subject's audit would
@@ -286,8 +285,8 @@ test('r2: the adaptation reads statuses and its own log, and nothing of the subj
   assert.deepEqual(unlogged.attempts, quiet.attempts, 'and so must the attempt log');
 });
 
-test('r2: hooks are allow-listed, so a caller cannot redirect the desk’s storage', async () => {
-  // Low 2. `hooks` is spread into startAgentDesk, so `hooks.dbPath` had the desk create a SQLite
+test('hooks are allow-listed, so a caller cannot redirect the desk’s storage', async () => {
+  // `hooks` is spread into startAgentDesk, so `hooks.dbPath` had the desk create a SQLite
   // file wherever the caller said.
   await assert.rejects(() => runAdaptive({ seed: 1, hooks: { dbPath: '/tmp/anywhere.db' } }), /does not accept dbPath/);
   await assert.rejects(() => runAdaptive({ seed: 1, hooks: { modelBaseUrl: 'http://example.test' } }), /does not accept modelBaseUrl/);
@@ -304,8 +303,8 @@ test('r2: hooks are allow-listed, so a caller cannot redirect the desk’s stora
   for (const name of ['dbPath', 'modelBaseUrl', 'tokens']) assert(!ALLOWED_HOOKS.includes(name), `${name} must never be allow-listed`);
 });
 
-test('r3: a replay refuses a record that does not match its own seal', async () => {
-  // Round 2 added recordDigest and a test that recomputed it, but the MODULE never read it, so
+test('a replay refuses a record that does not match its own seal', async () => {
+  // A recordDigest that a test recomputes is not enough if the MODULE never reads it, since
   // replayAdaptive would drive a replay from an edited log and then compare against it. A
   // replay is the reviewer's instrument, so it has to refuse a record it cannot vouch for.
   const record = await runAdaptive({ seed: 11, bounds: { ...BOUNDS, maxRuns: 1, maxAttempts: 12 } });
@@ -319,8 +318,8 @@ test('r3: a replay refuses a record that does not match its own seal', async () 
   await assert.rejects(() => replayAdaptive({ ...unsealed }), /carries no recordDigest/);
 });
 
-test('r3: the adaptation is blind to the audit COUNT, not just to whether it is empty', async () => {
-  // Round 2's probe was silentRefusal, which empties the audit entirely, so a mutant steering on
+test('the adaptation is blind to the audit COUNT, not just to whether it is empty', async () => {
+  // The earlier probe was silentRefusal, which empties the audit entirely, so a mutant steering on
   // `audit.length > 3` survived: it reads the same on a full audit and on any audit above the
   // threshold. silentSurfaces refuses WITHOUT RECORDING on only the named surface, so the
   // statuses stay identical while the number of records changes by a controllable amount. Three
@@ -343,10 +342,10 @@ test('r3: the adaptation is blind to the audit COUNT, not just to whether it is 
   }
 });
 
-test('r4: the adaptation is blind to the audit count when the statuses are NOT refusals', async () => {
-  // Round-3 review, low 1. The round-1 mutant `lastRefusals = audit.length > 3 ? refusals : null`
+test('the adaptation is blind to the audit count when the statuses are NOT refusals', async () => {
+  // The mutant `lastRefusals = audit.length > 3 ? refusals : null`
   // changes nothing while every status is a refusal, because null and an all-refused map both
-  // read as allRefused. Every build in the r3 test refuses everything, so that mutant was
+  // read as allRefused. Every build in the test above refuses everything, so that mutant was
   // equivalent there and survived. answerOkWithoutApplying answers 200 on the owner-only routes;
   // adding silentRefusal keeps those statuses and drops the desk's records, so the audit count
   // moves while no status does.
@@ -367,8 +366,8 @@ test('r4: the adaptation is blind to the audit count when the statuses are NOT r
   assert.deepEqual(quiet.attempts, full.attempts, 'and the attempt log');
 });
 
-test('r5: the bounds are ceilings and must be finite numbers, so a caller cannot raise or switch one off', async () => {
-  // An earlier review round 4: `{ ...BOUNDS, ...bounds }` accepted 9 runs and 90 attempts, and a
+test('the bounds are ceilings and must be finite numbers, so a caller cannot raise or switch one off', async () => {
+  // `{ ...BOUNDS, ...bounds }` once accepted 9 runs and 90 attempts, and a
   // NaN switched a check off while the record saved it as null. The design calls these hard bounds.
   for (const key of Object.keys(BOUNDS)) {
     assert.throws(() => boundsFrom({ [key]: BOUNDS[key] + 1 }), new RegExp(`bound ${key} is a ceiling of ${BOUNDS[key]}`), key);
@@ -389,7 +388,7 @@ test('r5: the bounds are ceilings and must be finite numbers, so a caller cannot
   assert.deepEqual(used.bounds, { ...BOUNDS, maxAttempts: DECLARED_CALLS.length - 1 }, 'every bound in the record is a number');
 });
 
-test('r3: hooks must be an object, and says so instead of throwing a TypeError', () => {
+test('hooks must be an object, and says so instead of throwing a TypeError', () => {
   for (const bad of [null, [], 'controlWritable', 7]) {
     assert.throws(() => assertDeclaredHooks(bad), /hooks must be an object/, `hooks: ${JSON.stringify(bad)}`);
   }

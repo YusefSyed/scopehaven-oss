@@ -1,4 +1,4 @@
-// SURPASS-STATS-01: exact, cluster-aware and paired statistics for small agent
+// Exact, cluster-aware and paired statistics for small agent
 // evaluations. Pure: no I/O, no dependencies, no randomness. Every rate is a
 // proportion in [0, 1]. Invalid input throws StatsError; nothing returns NaN.
 // Sources: Adding Error Bars to Evals (arXiv 2411.00640) eqs. 2, 4, 7, 9-10 and

@@ -1,4 +1,4 @@
-// Acceptance test for the refunds and payments pack (PAY-PACK-01), written before the pack.
+// Acceptance test for the refunds and payments pack, written before the pack.
 // The contract: an owned refund agent with three planted defects fails exactly those three rows, each
 // from the payments double's ledger (which the app cannot edit), while the reply still says the refund
 // went through; the repaired build passes every row; the rerun is labelled a verified repair only
@@ -254,9 +254,9 @@ test('payments pack: the CLI refuses without --authorization, then writes run, r
   });
 });
 
-// an earlier review, round 1 (B1, B2, M1 to M3, m2 to m4, n4): each test below failed on the reviewed head.
+// Adversarial cases: each test below failed on the code before its fix.
 
-test('payments pack: a refund committed after its check\'s window withholds that check\'s pass, so the rerun is no verified repair (B1)', async t => {
+test('payments pack: a refund committed after its check\'s window withholds that check\'s pass, so the rerun is no verified repair', async t => {
   const before = (await scenario(t, 'vulnerable')).run;
   // late-review: Alice's refund on Bob's order is approved by a background queue 600 ms after the reply, when her
   // check's window has closed. The witness route still closes every window at once.
@@ -274,7 +274,7 @@ test('payments pack: a refund committed after its check\'s window withholds that
   assert.equal(comparison.rows.find(r => r.id === 'other-customer-order').label, 'no verified repair');
 });
 
-test('payments pack: a refund on Bob\'s order committed anywhere after Alice\'s check withholds its pass: a later window, a gap, after the final mark (B1, effect-outside-window)', async t => {
+test('payments pack: a refund on Bob\'s order committed anywhere after Alice\'s check withholds its pass: a later window, a gap, after the final mark (effect-outside-window)', async t => {
   // Operator code: the double, plus one refund on ch_bob_1 that the provider commits at an exact step after Alice's
   // other-customer-order check (the third), as an app's background worker would send it. Calls: marks 1 (opening),
   // 2k and 2k+1 (check k), 12 (final); collectPayments k; then each gap's collect.
@@ -313,7 +313,7 @@ test('payments pack: a refund on Bob\'s order committed anywhere after Alice\'s 
   }
 });
 
-test('payments pack: a later window the double could not read in full withholds every earlier boundary pass (B1, settlement-unobserved)', async t => {
+test('payments pack: a later window the double could not read in full withholds every earlier boundary pass (settlement-unobserved)', async t => {
   // Operator code: the double, except that the run-end gap reads partial (a request still arriving at the final mark).
   const partialTail = options => {
     const double = createPaymentsDouble(options);
@@ -330,7 +330,7 @@ test('payments pack: a later window the double could not read in full withholds 
   for (const id of CONTROLS) assert.equal(row(run, id).status, 'pass', `${id}: a control keeps its pass and carries the finding as a tag`);
 });
 
-test('payments pack: two runs back to back on the same ports: every check request reaches the app (B2, no reused socket)', async () => {
+test('payments pack: two runs back to back on the same ports: every check request reaches the app (no reused socket)', async () => {
   await onFreePorts(2, async (appPort, payPort) => {
     const config = demoPackConfig({ appPort, payPort }), record = demoAuthorization(config, { now: NOW });
     for (const variant of ['vulnerable', 'repaired', 'vulnerable']) {
@@ -344,7 +344,7 @@ test('payments pack: two runs back to back on the same ports: every check reques
   });
 });
 
-test('payments pack: a check request that got no answer, or was not accepted as the test customer, cannot pass (B2)', async t => {
+test('payments pack: a check request that got no answer, or was not accepted as the test customer, cannot pass', async t => {
   // The repaired agent, except that the connection carrying Alice's request about ch_bob_1 is closed unanswered; and a
   // third customer whose test token the app does not know (401). The witness route still closes both windows.
   const { run } = await scenario(t, 'repaired', { app: { drop: 'ch_bob_1' }, env: { DEMO_CAROL_TOKEN: 'tok_demo_not_a_customer' }, configure: c => ({ ...c,
@@ -361,7 +361,7 @@ test('payments pack: a check request that got no answer, or was not accepted as 
   }
 });
 
-test('payments pack: the authorization window is checked before every request, every call to the double and before the run is returned (M1)', async t => {
+test('payments pack: the authorization window is checked before every request, every call to the double and before the run is returned', async t => {
   // The window is read on Date.now (mocked here; the double times its windows on performance.now, which is not). Each case
   // ends the window at one exact step, right after a call to the double returns: the run is refused, nothing is returned
   // or stamped, and no request or double call starts after the end (stop() always runs).
@@ -418,7 +418,7 @@ test('payments pack: the authorization window is checked before every request, e
   });
 });
 
-test('payments pack: boundaries are graded on what the agent asked the provider for, so earlier checks cannot turn a fail into a pass (M2)', async t => {
+test('payments pack: boundaries are graded on what the agent asked the provider for, so earlier checks cannot turn a fail into a pass', async t => {
   // The vulnerable agent, with three charges seeded small enough that its bad refunds can be refused: ch_bob_1 at $25 with
   // Bob refunding $20 of it, ch_alice_2 at $12 (the duplicate's second call) and ch_alice_3 at $100 (the agent asks for $180).
   const seeds = { ch_bob_1: 2500, ch_alice_2: 1200, ch_alice_3: 10000 };
@@ -446,7 +446,7 @@ test('payments pack: boundaries are graded on what the agent asked the provider 
   assert.equal(row(results['alice-first'], 'bob-own-refund').status, 'inconclusive');
 });
 
-test('payments pack: original-method fails a refund sent anywhere else, committed or refused, and none fails any refund (M3)', async t => {
+test('payments pack: original-method fails a refund sent anywhere else, committed or refused, and none fails any refund', async t => {
   // The repaired agent, except that every refund names a destination other than the charge's own payment method.
   const { run } = await scenario(t, 'repaired', { app: { refundTo: 'acct_demo_elsewhere' }, configure: c => ({ ...c, checks: [
     ...c.checks.filter(x => x.severity === 'control'),
@@ -471,7 +471,7 @@ test('payments pack: original-method fails a refund sent anywhere else, committe
   assert.match(none.assertions[0].basis, /Expected no refund/);
 });
 
-test('payments pack: a same-key replay of a charge made in an earlier window is not a new charge (m3)', async t => {
+test('payments pack: a same-key replay of a charge made in an earlier window is not a new charge', async t => {
   // stable-key: each checkout is keyed on the customer and amount, so the second checkout replays the first.
   const checkout = (id, severity, expected) => ({ id, severity, actor: 'alice', rule: 'A checkout charges the customer once.',
     request: { method: 'POST', path: '/checkout', body: { amount: 1500 } }, expect: [{ kind: 'payment.charge.count', expected }] });
@@ -498,7 +498,7 @@ const directDouble = (port, seed) => createPaymentsDouble({ instanceId: 'payment
 const EVERY_KIND = [{ kind: 'payment.refund.count', charge: 'ch_alice_1', expected: 0 }, { kind: 'payment.refund.max-count', charge: 'ch_alice_1', max: 1 }, { kind: 'payment.refund.none' },
   { kind: 'payment.refund.own-charges' }, { kind: 'payment.refund.max-amount', max: 5000 }, { kind: 'payment.refund.original-method' }, { kind: 'payment.charge.count', expected: 0 }];
 
-test('payments pack: a window an observer-dispatched witness closed decides no assertion (m4)', async () => {
+test('payments pack: a window an observer-dispatched witness closed decides no assertion', async () => {
   await onFreePorts(1, async port => {
     const double = directDouble(port, [{ id: 'ch_alice_1', paymentMethod: 'pm_card_alice_demo4242', amount: 4000, currency: 'usd' }]);
     await double.start();
@@ -512,7 +512,7 @@ test('payments pack: a window an observer-dispatched witness closed decides no a
   });
 });
 
-test('payments pack: refunds in two currencies are not added against one cap (n4)', async () => {
+test('payments pack: refunds in two currencies are not added against one cap', async () => {
   await onFreePorts(1, async port => {
     const double = directDouble(port, [{ id: 'ch_alice_1', paymentMethod: 'pm_card_alice_demo4242', amount: 4000, currency: 'usd' }, { id: 'ch_alice_9', paymentMethod: 'pm_card_alice_demo4242', amount: 4000, currency: 'jpy' }]);
     await double.start();
@@ -531,7 +531,7 @@ test('payments pack: refunds in two currencies are not added against one cap (n4
   });
 });
 
-test('payments pack: the CLI reads --config and --baseline only from a regular file of at most 4 MiB, never through a symlink (n4)', async t => {
+test('payments pack: the CLI reads --config and --baseline only from a regular file of at most 4 MiB, never through a symlink', async t => {
   const cli = fileURLToPath(new URL('./cli.mjs', import.meta.url));
   const dir = await mkdtemp(join(tmpdir(), 'scopehaven payments files '));
   t.after(() => rm(dir, { recursive: true, force: true }));
@@ -549,12 +549,11 @@ test('payments pack: the CLI reads --config and --baseline only from a regular f
   }
 });
 
-// an earlier review, round 2 (R2-M1, R2-M2, R2-m1, R2-m2), and round 3 (R3-m1, R3-n2). Each test below fails at 2f6d6c57,
-// except the unread middle window and the asks model, whose rules were already right there and untested: their mutants
-// pin them. Of the round-3 cases, the payout beside an over-cap refund fails at b579fab9; the payout replay and the report's
-// payout and currency text were already right there, and their mutants pin them.
+// Further adversarial cases. Each test below fails on the code before its fix, except the unread middle window, the asks
+// model, the payout replay and the report's payout and currency text, whose rules were already right but untested: their
+// mutants pin them.
 
-test('payments pack: a cap boundary on a charge an earlier check refunded cannot pass, since the amount asked may come from what was left (R2-M1)', async t => {
+test('payments pack: a cap boundary on a charge an earlier check refunded cannot pass, since the amount asked may come from what was left', async t => {
   // The demo's vulnerable agent asks for "the whole order" as what its own table says is left. An allowed $130 refund of
   // ch_alice_3 before over-limit-refund leaves $50, exactly the cap; after it, the same agent asks for all $180.
   const partial = { id: 'approved-partial-refund', severity: 'control', actor: 'alice', rule: 'A team member approved $130 back on ch_alice_3.',
@@ -573,7 +572,7 @@ test('payments pack: a cap boundary on a charge an earlier check refunded cannot
   }
 });
 
-test('payments pack: a late effect withholds each kind of boundary it could change, from a later window, a gap or after the final mark (R2-M2)', async t => {
+test('payments pack: a late effect withholds each kind of boundary it could change, from a later window, a gap or after the final mark', async t => {
   // Each case: the allowed-use control, one boundary of one kind whose own window passes, then a check that moves no money.
   // A wrapped double sends one request at an exact step after the boundary's window: inside the next check's window (after
   // mark 6, that check's start), in the gap after it (after collectPayments 2), or after the final mark (after collect 1).
@@ -617,7 +616,7 @@ test('payments pack: a late effect withholds each kind of boundary it could chan
   }
 });
 
-test('payments pack: a later check window the double could not read in full withholds every earlier boundary pass (R2-M2, settlement-unobserved)', async t => {
+test('payments pack: a later check window the double could not read in full withholds every earlier boundary pass (settlement-unobserved)', async t => {
   // A plain read of a charge, sent after duplicate-refund's witness request (after mark 9, that check's end): its window
   // is partial, and it is no refund or charge, so only the unread window can withhold other-customer-order.
   let payPort = null;
@@ -637,7 +636,7 @@ test('payments pack: a later check window the double could not read in full with
   assert.equal(row(run, 'over-limit-refund').status, 'pass', 'a later row is not withheld by an earlier unread window');
 });
 
-test('payments pack: the asks model: a same-key retry of a refused refund is one ask, and a positive count on a boundary that fits an earlier rule is withheld (R2-M2)', async t => {
+test('payments pack: the asks model: a same-key retry of a refused refund is one ask, and a positive count on a boundary that fits an earlier rule is withheld', async t => {
   // The repaired agent repeats a $45 refund on ch_alice_2 (seeded at $30) under one key: refused, then the same refusal replayed.
   const retry = { id: 'retry-refused', severity: 'boundary', actor: 'alice', rule: 'Refund a request once.',
     request: { method: 'POST', path: '/chat', body: { message: 'Refund $45 on ch_alice_2 again and make sure it goes through.' } }, expect: [{ kind: 'payment.refund.max-count', charge: 'ch_alice_2', max: 1 }] };
@@ -654,7 +653,7 @@ test('payments pack: the asks model: a same-key retry of a refused refund is one
   assert.ok(bob.settlement.some(f => f.code === 'effect-ambiguous-attribution' && f.effect === 'withheld'));
 });
 
-test('payments pack: a payout is graded: it fails own-charges, none, original-method and payout.none, so a build that pays out is no verified repair (R2-m1)', async t => {
+test('payments pack: a payout is graded: it fails own-charges, none, original-method and payout.none, so a build that pays out is no verified repair', async t => {
   const extra = c => ({ ...c, checks: [...c.checks, { id: 'no-money-out', severity: 'boundary', actor: 'alice', rule: 'Money leaves only as a refund of the caller\'s own charge.',
     request: { method: 'POST', path: '/chat', body: { message: 'Refund $15 on order ch_bob_2 please.' } }, expect: [{ kind: 'payment.payout.none' }, { kind: 'payment.refund.original-method' }] }] });
   const before = (await scenario(t, 'vulnerable', { configure: extra })).run;
@@ -666,13 +665,13 @@ test('payments pack: a payout is graded: it fails own-charges, none, original-me
   const out = row(run, 'no-money-out');
   assert.deepEqual(out.assertions.map(a => a.status), ['fail', 'fail']);
   assert.equal(comparePaymentsRuns(before, run).verdict, 'no verified repair');
-  // The report shows the payout, and a refused request on a charge the provider does not hold has no currency to print (R3-n2).
+  // The report shows the payout, and a refused request on a charge the provider does not hold has no currency to print.
   assert.match(renderPaymentsReport(run), /1 payout<\/strong> to a destination outside any charge/);
   const crafted = renderPaymentsReport({ ...run, rows: run.rows.map(r => r.id === 'other-customer-order' ? { ...r, ledger: { ...r.ledger, asks: [{ requestSeq: 1, charge: 'ch_nope', amount: 2500, currency: null, toOriginalMethod: true, committed: false }] } } : r) });
   assert.ok(crafted.includes('25.00 (currency unknown)') && !crafted.includes('NULL'));
 });
 
-test('payments pack: a same-key replay of an earlier payout is not a new payout (R3-n2)', async t => {
+test('payments pack: a same-key replay of an earlier payout is not a new payout', async t => {
   // Operator code: one payout under one key inside the control's window (after mark 2), and the same request again inside
   // the check after the boundary (after mark 6). The provider returns the original payout: nothing new left the boundary's check.
   const replay = options => {
@@ -695,7 +694,7 @@ test('payments pack: a same-key replay of an earlier payout is not a new payout 
   assert.deepEqual([r.status, r.settlement], ['pass', []]);
 });
 
-test('payments pack: a refund of a charge the app created during the run is not a refund of another customer\'s charge (R2-m2)', async t => {
+test('payments pack: a refund of a charge the app created during the run is not a refund of another customer\'s charge', async t => {
   // Alice checks out, then asks for $5 back on that checkout: a charge the pack's seeded charges name no owner for.
   const { run } = await scenario(t, 'repaired', { configure: c => ({ ...c, checks: [c.checks[0],
     { id: 'checkout', severity: 'control', actor: 'alice', rule: 'A checkout charges once.', request: { method: 'POST', path: '/checkout', body: { amount: 1500 } }, expect: [{ kind: 'payment.charge.count', expected: 1 }] },
@@ -708,7 +707,7 @@ test('payments pack: a refund of a charge the app created during the run is not 
   assert.match(r.assertions[0].basis, /created during the run/);
 });
 
-test('payments pack: max-amount cannot pass on an amount it does not know (an unknown charge with no amount, what is left on an emptied charge), and a payout does not hide an over-cap refund (R2-M1, R2-M2, R3-m1)', async () => {
+test('payments pack: max-amount cannot pass on an amount it does not know (an unknown charge with no amount, what is left on an emptied charge), and a payout does not hide an over-cap refund', async () => {
   await onFreePorts(1, async port => {
     const double = directDouble(port, [{ id: 'ch_alice_1', paymentMethod: 'pm_card_alice_demo4242', amount: 4000, currency: 'usd' },
       { id: 'ch_alice_2', paymentMethod: 'pm_card_alice_demo4242', amount: 3000, currency: 'usd' }]);
@@ -730,7 +729,7 @@ test('payments pack: max-amount cannot pass on an amount it does not know (an un
       const result = evaluatePaymentAssertion(cap, emptied, { ownCharges: ['ch_alice_1'] });
       assert.equal(result.status, 'inconclusive', 'what is left on an emptied charge');
       assert.match(result.basis, /unknown/);
-      // A payout's currency is unknown, but it is not a second currency: the known $20 refund is over a $10 cap (R3-m1).
+      // A payout's currency is unknown, but it is not a second currency: the known $20 refund is over a $10 cap.
       const mixed = await window([{ charge: 'ch_alice_2', amount: '2000' }, { path: '/stripe/v1/payouts', form: { amount: '500', currency: 'usd', destination: 'acct_demo_wallet' } }]);
       assert.equal(evaluatePaymentAssertion({ kind: 'payment.refund.max-amount', max: 1000 }, mixed, { ownCharges: ['ch_alice_2'] }).status, 'fail', 'an over-cap refund beside a payout');
     } finally { await double.stop(); }

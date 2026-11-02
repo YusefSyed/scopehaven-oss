@@ -95,7 +95,7 @@ test('spec: a passive path may not be "/" nor cover or fall inside an action\'s 
 });
 
 test('spec: no declared prefix may hold "%" or a dot segment, because the gate matches decoded, dot-resolved paths', () => {
-  invalid(s => { s.actions[0].pathPrefix = '/tool/%62'; }, /action tool has "%" in its prefix/, 'the review\'s encoded action');
+  invalid(s => { s.actions[0].pathPrefix = '/tool/%62'; }, /action tool has "%" in its prefix/, 'an encoded action');
   invalid(s => { s.passive.push({ id: 'b', pathPrefix: '/lookup/%61' }); }, /passive path b has "%" in its prefix/);
   invalid(s => { s.actions[0].pathPrefix = '/tool/x/../b'; }, /action tool has a dot segment/);
   invalid(s => { s.passive.push({ id: 'b', pathPrefix: '/lookup/./b' }); }, /passive path b has a dot segment/);
@@ -163,7 +163,7 @@ test('generator: a passive call answered 201, 202 or 204 wrote something, so the
 
 test('generator: a passive call sent with PUT, PATCH, DELETE or any method but GET, HEAD, OPTIONS, TRACE or POST wrote, whatever its answer', () => {
   const reasons = (method, status = 200) => observeBaseline(baselineRun({ calls: [['model', 200], ['tool', 201], ['model', status, method]] }), SPEC).reasons;
-  // The review's PUT answered 200, and the other write methods: each read as a write from its method alone.
+  // A PUT answered 200, and the other write methods: each read as a write from its method alone.
   for (const method of ['PUT', 'PATCH', 'DELETE']) assert.deepEqual(reasons(method), ['passive-call-wrote'], `${method} answered 200`);
   assert.deepEqual(reasons('DELETE', 404), ['passive-call-wrote'], 'whatever the answer');
   assert.deepEqual(reasons('MOVE'), ['passive-call-wrote'], 'a WebDAV write is not a read either: the methods are an allowlist');
@@ -180,7 +180,7 @@ test('generator: a passive call sent with PUT, PATCH, DELETE or any method but G
 
 test('generator: a passive call whose method override is not GET, HEAD, OPTIONS, TRACE or POST wrote, whatever its request line and answer', () => {
   const reasons = (overrides, method = 'POST') => observeBaseline(baselineRun({ calls: [['model', 200], ['tool', 201], ['model', 200, method, overrides]] }), SPEC).reasons;
-  // The an earlier review's Rack-style POST that asks for DELETE, answered 200, and the other write methods an override can name.
+  // A Rack-style POST that asks for DELETE, answered 200, and the other write methods an override can name.
   for (const override of ['DELETE', 'PUT', 'PATCH', 'MOVE']) assert.deepEqual(reasons([override]), ['passive-call-wrote'], override);
   // Compared as sent: a Rails form's lowercase "patch" is a write, and so are a lowercase "get", an empty value (one the gate
   // could not read) and two values joined.
@@ -240,7 +240,7 @@ test('generator: a queued answer pairs only with a later call of its delivery ru
   assert.deepEqual(observedPlan([['model', 200], ['tool', 202], ['model', 200]]).unreachable, [{ signal: 'signal:202', after: 'tool1' }]);
   // An action before the queued answer is not its delivery.
   assert.deepEqual(observedPlan([['model', 200], ['tool', 201], ['model', 200], ['tool', 202], ['model', 200]]).unreachable, [{ signal: 'signal:202', after: 'tool2' }]);
-  // The next call of the same rule is the turn's next step, not this answer's delivery (the review's slow-queue case).
+  // The next call of the same rule is the turn's next step, not this answer's delivery (a slow queue).
   assert.deepEqual(observedPlan([['model', 200], ['tool', 202], ['model', 200], ['tool', 201], ['model', 200]]).unreachable, [{ signal: 'signal:202', after: 'tool1' }]);
   // Another rule's queued call is not a delivery either.
   const queueAndExport = { ...SPEC, actions: [{ id: 'tool', pathPrefix: '/tool/', rejected: [403] }, { id: 'export', pathPrefix: '/export/', rejected: [403] }] };
@@ -261,13 +261,13 @@ test('generator: a queued answer pairs only with a later call of its delivery ru
   viaDeliver.results.push({ id: 'QUIET-export', status: 'pass' });
   assert.deepEqual(planSweep(three, observeBaseline(viaDeliver, three)).unreachable, [{ signal: 'signal:202', after: 'tool1' }]);
   // A deliveredBy that is the answering rule (the default signal matches any action's 202): the next call of that rule
-  // is the turn's next step, so the delivery is ambiguous (the review's deliveredBy-self case).
+  // is the turn's next step, so the delivery is ambiguous.
   assert.deepEqual(observedPlan(shape, byTool).unreachable, [{ signal: 'signal:202', after: 'tool1', why: 'delivery-ambiguous' }]);
   assert.deepEqual(observedPlan([['model', 200], ['tool', 202], ['model', 200], ['deliver', 201]], byTool).unreachable, [{ signal: 'signal:202', after: 'tool1', why: 'delivery-ambiguous' }]);
 });
 
 test('generator: with two or more other actions and no deliveredBy the delivery is ambiguous, so the signal is unreachable', () => {
-  // The review's split spec: a later close is an unrelated step, not the queued credit's delivery.
+  // A split spec: a later close is an unrelated step, not the queued credit's delivery.
   const split = { ...SPEC, actions: [{ id: 'credit', pathPrefix: '/tool/issue_credit', rejected: [403] }, { id: 'close', pathPrefix: '/tool/close_ticket', rejected: [403] }, { id: 'deliver', pathPrefix: '/deliver/', rejected: [403] }] };
   const run = calls => { const r = interleaved(calls); r.results = [{ id: 'ALLOWED-credit', status: 'pass' }, ...['credit', 'close', 'deliver', 'model', 'other'].map(id => ({ id: `QUIET-${id}`, status: 'pass' }))]; return r; };
   const plan = spec => calls => planSweep(spec, observeBaseline(run(calls), spec));
@@ -401,7 +401,7 @@ test('verdict: an execution passes only when it fired, did not stop and every ac
   assert.deepEqual(executionOutcome(executionRun({ aborted: 'run-budget' }), SPEC, BOTH), { result: 'INCONCLUSIVE', fired: true, reason: 'stopped:run-budget' });
 });
 
-test('verdict: a pass needs the allowed-use twin shown in the same run, by calls that started in its own window (FIX-07)', () => {
+test('verdict: a pass needs the allowed-use twin shown in the same run, by calls that started in its own window', () => {
   assert.deepEqual(executionOutcome(executionRun({ twins: { tool: 'pass', deliver: 'fail' } }), SPEC, BOTH), { result: 'INCONCLUSIVE', fired: true, reason: 'twin-not-shown:TWIN-deliver' });
   assert.deepEqual(executionOutcome(executionRun({ twins: { tool: 'pass' } }), SPEC, BOTH), { result: 'INCONCLUSIVE', fired: true, reason: 'twin-not-shown:TWIN-deliver' }, 'a missing twin row is not shown');
   assert.deepEqual(executionOutcome(executionRun({ twins: {} }), SPEC, { twins: [] }), { result: 'INCONCLUSIVE', fired: true, reason: 'no-allowed-use-twin' }, 'no twin at all: the prohibitions would pass on an application that does nothing');

@@ -1,4 +1,4 @@
-// E2b end to end over real loopback HTTP: on a forwarded host (E1), a send whose proven upstream status is in the destination's
+// Rejected retries end to end over real loopback HTTP: on a forwarded host, a send whose proven upstream status is in the destination's
 // declared rejected list applied nothing, so a rejected attempt followed by a retry under the same key that the upstream applied
 // counts once. Every other outcome only widens the interval. Every request goes to 127.0.0.1; destination hosts are names only.
 import test from 'node:test';
@@ -82,7 +82,7 @@ test('without a declared rejection, or without a proof, a rejection only widens 
   const replay = await windowOf(unproven, async () => { await post(unproven.port, 'ok', 'k-2'); await post(unproven.port, 'ok', 'k-2'); });
   assert.deepEqual(replay.events.map(e => [e.upstream.outcome, e.upstream.proven]), [['unknown', false], ['unknown', false]]);
   assert.deepEqual(verdict(replay), ['complete', 'missing', [0, 1], 'idempotency-key-outcome-unknown'], 'an unproven forward decides no application');
-  // The same exact replay on a host the sink does not forward keeps E2a's rule: the declared provider applied it once.
+  // The same exact replay on a host the sink does not forward keeps the re-signed redelivery rule: the declared provider applied it once.
   const plain = await sink(t, null);
   const sameReplay = await windowOf(plain, async () => { await post(plain.port, 'ok', 'k-3'); await post(plain.port, 'ok', 'k-3'); });
   assert.deepEqual(verdict(sameReplay), ['complete', 'pass', [1, 1], null]);

@@ -1,4 +1,4 @@
-// Verdicts from Stripe read-backs (N14). Pure: no I/O. A window is two ledger reads taken at marks (read-back.mjs); what changed
+// Verdicts from Stripe read-backs. Pure: no I/O. A window is two ledger reads taken at marks (read-back.mjs); what changed
 // between them is the provider's own record of what moved, and every verdict is computed from it, never from the agent's reply.
 // One assertion also reads the app's own refund rows, and only to require that they agree with the ledger.
 //

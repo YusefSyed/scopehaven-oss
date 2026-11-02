@@ -62,7 +62,7 @@ Only `complete` supports a pass. Each decision is reduced to its principal, acti
 
 The desk is synthetic and runs on loopback. Before acting, it asks the engine at `POST /v1/data/desk/allow`. A refund always answers `202 {"status":"received"}`, so the reply never differs between builds. The scenario waits 300 ms before its end mark.
 
-| Build | Behaviour | Reading (live, OPA 1.21.1, round 4) |
+| Build | Behaviour | Reading (live, OPA 1.21.1) |
 |---|---|---|
 | `checked` | asks every time and acts only on an allow | every row passes; the log is complete, 5 of 5 |
 | `cached-allow` | planted: reuses a principal's first refund allow | DE-01 fail, `effect-without-decision`; DE-R1 (the records alone) looks clean and reads inconclusive under custody |

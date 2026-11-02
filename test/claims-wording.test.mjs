@@ -8,11 +8,11 @@ import { allowedUseLabel } from '../src/allowed-use.mjs';
 import { summarizeGate } from '../integrations/regression-gate/gate.mjs';
 import { createHttpLab, makeLabProfile } from '../examples/http-lab.mjs';
 
-// Product output wording from the claims register (v33, productOutputWording):
-// every allowed-use number carries C32's limits, a restoration count never says
+// Product output wording (productOutputWording):
+// every allowed-use number carries its stated limits, a restoration count never says
 // "fixed" outside the owned synthetic fixture and always travels with its scope
 // description (in the gate summary, evidenceScope), and the SARIF tool
-// description says nothing beyond C22.
+// description says nothing beyond its approved sentence.
 // Owned synthetic fixture and owned loopback lab only.
 const LIMITS = 'Counts only the declared allowed-use controls; inconclusive controls are not counted. It is not a security score.';
 const RESPONSE_SCOPE = 'Response comparison only; backend effects remain unverified.';
@@ -76,7 +76,7 @@ test('an observed-backend restoration prints its own scoped label', () => {
   assert.match(renderComparisonReport(observed), /<p>\d+ Response contracts restored; backend observed where marked\. · /);
 });
 
-test('the SARIF tool description is the approved C22 sentence', () => {
+test('the SARIF tool description is the approved sentence', () => {
   const driver = renderSarif(repaired).runs[0].tool.driver;
   assert.equal(driver.name, 'Scopehaven');
   assert.equal(driver.fullName, 'Scopehaven: local checks that an AI agent stays inside its permissions and that a fix keeps allowed work working');

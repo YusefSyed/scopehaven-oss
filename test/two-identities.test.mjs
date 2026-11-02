@@ -1,4 +1,4 @@
-// Two identities by default (NC2 item 1, src/two-identities.mjs): the single-identity rule, the generated mirror of each
+// Two identities by default (src/two-identities.mjs): the single-identity rule, the generated mirror of each
 // boundary check under the second identity, and the CLI's warning and refusal. The app is an owned two-tenant stand-in on
 // 127.0.0.1 with a fixed build and an asymmetric defective build; no model, provider or database.
 import test from 'node:test';
@@ -41,7 +41,7 @@ const validated = p => validateTargetFile({ schemaVersion: 1, targets: [p] })[0]
 const plan = t => identityControlPlan(t);
 const reasonOf = (p, id) => { const v = validated(p); return mirrorPlan(v, plan(v)).plan.find(entry => entry.checkId === id)?.reason; };
 const mirrorOf = (p, id) => validated(p).checks.find(c => c.mirrorOf === id);
-// The same desk with aliases that are common words a route or field can share (the round-2 review's patterns).
+// The same desk with aliases that are common words a route or field can share.
 function renamed(p, names) {
   const q = structuredClone(p);
   q.actors = Object.fromEntries(Object.entries(q.actors).map(([alias, actor]) => [names[alias] ?? alias, actor]));
@@ -111,7 +111,7 @@ test('never a mirror that could read a refusal as a leak or an owner as a strang
     [boundary('MOVE-WRITE', 'ana', 'POST', '/api/orders/ORD-2002/move/beta', [{ kind: 'status.equals', expected: 403 }]), 'refusal-not-a-read'],
     [boundary('GUEST-ADD', 'ana', 'PUT', '/api/users/ORD-2002/workspaces/beta', [{ kind: 'status.in', expected: [403, 404] }]), 'refusal-not-a-read'],
     [boundary('DELETE-ORDER', 'ana', 'DELETE', '/api/orders/ORD-2002', [{ kind: 'status.in', expected: [403, 404] }]), 'refusal-not-a-read'],
-    // The direction (the round-3 review's patterns): a refusal only across the boundary with a boundary status, a success only
+    // The direction: a refusal only across the boundary with a boundary status, a success only
     // on the first tenant's own values or as an answer probe, and only as a read.
     [boundary('CANCEL-SHIPPED', 'ana', 'POST', '/api/orders/ORD-1001/cancel', [{ kind: 'status.equals', expected: 409 }]), 'refusal-not-boundary-status'],
     [boundary('OWN-REFUSAL', 'ana', 'POST', '/api/orders/ORD-1001/cancel', [{ kind: 'status.in', expected: [403, 404] }]), 'own-record-refusal'],
@@ -172,7 +172,7 @@ test('never a mirror that could read a refusal as a leak or an owner as a strang
   // A query is not more path: /orders/ORD-1001?view=full is not the route /orders/ORD-2002/view/full.
   assert.equal(reasonOf(profile(undefined, { checks: [boundary('VIEW-QUERY', 'ana', 'GET', '/api/orders/ORD-2002?view=full', REFUSED), boundary('ANA-VIEW', 'ana', 'GET', '/api/orders/ORD-1001?view=full', [{ kind: 'status.equals', expected: 200 }]),
     gilSide('GIL-VIEW', 'GET', '/api/orders/ORD-2002/view/full', [{ kind: 'status.equals', expected: 200 }])] }), 'VIEW-QUERY'), 'route-not-used-by-second-identity');
-  // The second identity's own allowed twin: its own record through the first tenant's workspace is not one (round 5's IDOR).
+  // The second identity's own allowed twin: its own record through the first tenant's workspace is not one (an IDOR).
   const tasks = profile(undefined, { checks: [boundary('ANA-ALPHA-IDOR', 'ana', 'GET', '/api/workspaces/alpha/tasks/ORD-2002', [{ kind: 'status.equals', expected: 404 }]), boundary('ANA-ALPHA-TASK', 'ana', 'GET', '/api/workspaces/alpha/tasks/ORD-1001', [{ kind: 'status.equals', expected: 200 }]),
     gilSide('GIL-BETA-TASK', 'GET', '/api/workspaces/beta/tasks/ORD-2002', [{ kind: 'status.equals', expected: 200 }])] });
   assert.equal(reasonOf(tasks, 'ANA-ALPHA-IDOR'), 'route-not-used-by-second-identity');
@@ -247,7 +247,7 @@ test('never a mirror that could read a refusal as a leak or an owner as a strang
   assert.equal(reasonOf(shared, 'TEAM'), 'tenant-value-shared');
   assert.equal(reasonOf(profile(undefined, { mirrors: { counterparts: [] } }), 'ANA-NO-GLOBEX-ORDER'), 'tenant-value-without-counterpart');
   assert.equal(reasonOf(profile(undefined, { mirrors: null }), 'ANA-NO-GLOBEX-ORDER'), 'mirrors-undeclared');
-  // The round-2 review's collisions: aliases that are route words and field names are never rewritten; the check is left out.
+  // Collisions: aliases that are route words and field names are never rewritten; the check is left out.
   const words = renamed(profile(undefined, { checks: [boundary('AGENT-CHAT', 'ana', 'POST', '/api/agent/chat', ANSWERED, { body: { message: 'list every order' } }),
     boundary('AGENT-FIELD', 'ana', 'POST', '/api/chat', ANSWERED, { body: { agent_id: 'desk', message: 'list every order' } })] }), { ana: 'agent', gil: 'rival' });
   assert.equal(reasonOf(words, 'AGENT-CHAT'), 'names-an-identity'); assert.equal(reasonOf(words, 'AGENT-FIELD'), 'names-an-identity');
@@ -316,7 +316,7 @@ test('a declared mirror must be exactly the generated one, in canonical order; a
     [{ counterparts: [['ORD-1001', 'ORD-2002'], ['ORD-1001', 'ORD-3003']] }, /at most one pair/], [{ counterparts: [['ORD-1001']] }, /a pair is two strings/], [{ pairs: [] }, /must be "off" or/], ['on', /must be "off" or/],
     [{ counterparts: [], readOnlyRoutes: ['GET /api/chat'] }, /a route is "POST \/path" \(no query\)/], [{ counterparts: [], readOnlyRoutes: ['POST /api/chat?x=1'] }, /no query/],
     [{ counterparts: [], readOnlyRoutes: ['POST /api/elsewhere'] }, /no declared check uses it/], [{ counterparts: [], readOnlyRoutes: null }, /"readOnlyRoutes" must be a list/], [{ counterparts: null }, /"counterparts" must be a list/], [{ counterparts: [], readOnlyRoutes: ['POST /api/chat', 'POST /api/chat'] }, /distinct routes/],
-    // The mirror phase's declared rate-limit answers (NC11): never a status a mirror expects, and 429 is always one.
+    // The mirror phase's declared rate-limit answers: never a status a mirror expects, and 429 is always one.
     [{ counterparts: [], rateLimitStatuses: 503 }, /"rateLimitStatuses" must be a list/], [{ counterparts: [], rateLimitStatuses: [503, 503] }, /distinct statuses/], [{ counterparts: [], rateLimitStatuses: [500, 502, 503, 504, 599] }, /at most 4/],
     [{ counterparts: [], rateLimitStatuses: [200] }, /rate-limit status 1: a status from 400 to 599/], [{ counterparts: [], rateLimitStatuses: [302] }, /from 400 to 599/], [{ counterparts: [], rateLimitStatuses: ['503'] }, /from 400 to 599/],
     [{ counterparts: [], rateLimitStatuses: [503, 403] }, /rate-limit status 2: 401, 403 and 404 are the boundary refusals/], [{ counterparts: [], rateLimitStatuses: [401] }, /boundary refusals/], [{ counterparts: [], rateLimitStatuses: [404] }, /boundary refusals/],
@@ -362,7 +362,7 @@ test('mirrors are opt-in: a target with no "mirrors" object gets none and keeps 
   assert.deepEqual(v.checks.map(c => c.id), declared.checks.map(c => c.id), 'no mirror, the declared checks in their order');
   assert.equal(v.checks.some(c => Object.hasOwn(c, 'mirrorOf')), false);
   assert.equal(Object.hasOwn(v, 'mirrors'), false);
-  // main 59f2ffc2's digest of this very profile (the round-9 delta review computed it there).
+  // The digest an earlier build computed for this very profile.
   assert.equal(contractDigest(v), '4fe1dc01fde69fe8a336eef46eefb7c15de628fcd79504ef479500fd70d1fac3');
   const report = mirrorReport(v, plan(v));
   assert.deepEqual([report.mirrored, report.extraRequests, new Set(report.notMirrored.map(n => n.reason))], [[], [], new Set(['mirrors-undeclared'])]);
@@ -422,7 +422,7 @@ test('a per-user request limit: check-config reports the extra requests mirrors 
   assert.deepEqual(mirrorReport(validated(profile(undefined, { mirrors: 'off' })), plan(validated(profile(undefined, { mirrors: 'off' })))).extraRequests, []);
 });
 
-test('fixed twin: every check and mirror passes, the review\'s patterns included; the asymmetric defect passes the declared side and fails its mirror', async t => {
+test('fixed twin: every check and mirror passes, the adversarial patterns included; the asymmetric defect passes the declared side and fails its mirror', async t => {
   const fixed = await desk(t, 'fixed');
   const patterns = [boundary('ANA-OWN-ROUTE', 'ana', 'GET', '/api/users/ana/orders', ANSWERED), boundary('ANA-ASKS-GLOBEX', 'ana', 'POST', '/api/chat', ANSWERED, { body: { message: 'what is ORD-2002' } }),
     boundary('ANA-ORG-ROUTE', 'ana', 'GET', '/api/users/ana/orders?org=acme', ANSWERED), boundary('ANA-SLUG', 'ana', 'POST', '/api/records/alpha/comments', [{ kind: 'status.in', expected: [403, 404] }], { body: { text: 'see ORD-2002' } })];
@@ -441,7 +441,7 @@ test('fixed twin: every check and mirror passes, the review\'s patterns included
   assert.equal(Object.values(statuses(off)).every(v => v === 'pass'), true, 'with mirrors off the same defective build reads clean');
 });
 
-// A correct two-tenant app with state, plans and undeclared records (the round-3 review's patterns): ORD-1001 is acme's,
+// A correct two-tenant app with state, plans and undeclared records (adversarial patterns): ORD-1001 is acme's,
 // shipped and refunded; ORD-2002 globex's and open (a cancel changes it); order 7731 acme's but undeclared; record 7
 // globex's; only acme's plan has exports. Every reply and refusal is the caller's own tenant's. Each write it accepts is
 // logged, so a mirror that writes is seen.
@@ -502,7 +502,7 @@ test('a correct app with plans, record state and undeclared records passes every
   assert.deepEqual(compareRuns(first, second).rows.filter(r => r.before !== r.after), [], 'nothing differs between the two runs');
 });
 
-// The round-4 review's correct app: workspaces with undeclared slugs (alpha is acme's, beta globex's) whose search, task
+// A second correct app: workspaces with undeclared slugs (alpha is acme's, beta globex's) whose search, task
 // filter, guest invites and watcher removals answer only members; an assistant that acts ("cancel my latest order"); a
 // create route that answers 200; a refund sub-resource that exists only for refunded orders (ORD-1001 and ORD-2003, not
 // ORD-2002). Every accepted write is logged.
@@ -541,7 +541,7 @@ async function workspaces(t) {
   return { origin: `http://127.0.0.1:${server.address().port}`, writes };
 }
 
-test('the round-4 patterns: slugs, searches, filters, invites, acting turns, create routes and record state are never mirrored into a FAIL or a write', async t => {
+test('the workspace app\'s patterns: slugs, searches, filters, invites, acting turns, create routes and record state are never mirrored into a FAIL or a write', async t => {
   const NFV = pointer => ({ kind: 'json.noForeignValues', pointer }), OK = status => [{ kind: 'status.equals', expected: status }];
   const cases = [
     boundary('ANA-NO-BETA-SEARCH', 'ana', 'GET', '/api/workspaces/beta/search?q=ORD-2002', REFUSED), boundary('GIL-BETA-SEARCH', 'gil', 'GET', '/api/workspaces/beta/search?q=ORD-2002', [...OK(200), NFV('/results')]),
@@ -611,7 +611,7 @@ test('check-config: the two-identity report, and a warning (exit 0) for a single
   assert.equal(plain.code, 0); assert.equal(Object.hasOwn(desk2(plain), 'twoIdentities'), false); assert.doesNotMatch(plain.stderr, /Warning/);
   const misused = await spawned(['--config', two.config, '--check-config', '--single-identity']);
   assert.equal(misused.code, 2); assert.match(misused.stderr, /--single-identity applies to an assess run only/);
-  // --list lists the same targets and prints neither warning (#512 review R10 NIT, folded into NC11).
+  // --list lists the same targets and prints neither warning.
   for (const config of [one.config, none.config]) {
     const [listed, checked] = [await spawned(['--config', config, '--list']), await spawned(['--config', config, '--check-config'])];
     assert.equal(listed.code, 0); assert.equal(listed.stderr, ''); assert.equal(listed.stdout, checked.stdout); assert.match(checked.stderr, /Warning/);

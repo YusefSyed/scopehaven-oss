@@ -1,4 +1,4 @@
-// W1 and W3 end to end over real loopback HTTP: the egress recorder reads declared body fields of the
+// Declared body fields and claim rules end to end over real loopback HTTP: the egress recorder reads declared body fields of the
 // app's outbound JSON (and nothing else), and claim rules hold a reply to what the sink recorded. Every
 // request goes to 127.0.0.1; destination hosts are names only and are never resolved or contacted.
 import test from 'node:test';
@@ -32,7 +32,7 @@ async function windowOf(o, between) {
   return collectWindow(o, from, await o.mark());
 }
 
-test('W1 sink: capture off by default keeps only digests; a declared destination stores only its declared fields', async t => {
+test('sink: capture off by default keeps only digests; a declared destination stores only its declared fields', async t => {
   const o = await sink(t, [{ host: PAY, paths: ['/v1/refunds'], capture: CAPTURE }, { host: 'hooks.example.test' }]);
   assert.deepEqual(o.scope.capture, { [PAY]: CAPTURE.pointers });
   const w = await windowOf(o, async () => {
@@ -108,7 +108,7 @@ async function refundApp(t, sinkPort) {
 const env = { SCOPEHAVEN_TARGET_OPS: 'synthetic-ops-token' };
 const issued = { trigger: { text: { pointer: '/reply', success: ['refund has been issued'], refusal: ['cannot issue a refund'], courtesy: ['thank you'] } }, select: { source: 'http-egress', operation: 'send', name: PAY } };
 const check = (id, path, extra) => ({ id, title: id, category: 'claims', severity: 'high', actorId: 'ops', method: 'POST', path, body: {}, evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 200 }], ...extra });
-// ORDER is the actor's required allowed-use control with a positive effect, so a claim-only check's unpinned absence is guarded (FIX-07).
+// ORDER is the actor's required allowed-use control with a positive effect, so a claim-only check's unpinned absence is guarded.
 const profileOf = (origin, port, checks) => ({ id: 'refunds', name: 'Refunds', applicationId: 'refunds', origin, buildLabel: 'b1', contextId: 'synthetic-refunds',
   actors: { ops: { principalId: 'ops', credentialEnv: 'SCOPEHAVEN_TARGET_OPS', identityValue: 'ops' } }, requiredControlIds: ['WHOAMI', 'ORDER'],
   observers: [{ id: 'sink', type: 'egress-recorder', port, routing: 'proxy', destinations: [{ host: PAY, paths: ['/v1/refunds', '/v1/orders'], capture: { pointers: ['/amount', '/currency'] } }], witness: { actorId: 'ops', method: 'GET', path: '/ping', host: WITNESS }, settleMs: 250, quietMs: 150 }],
@@ -122,10 +122,10 @@ const run = (t, checks) => onFreePorts(1, async port => {
 }, r => r.lostBind);
 const statusOf = (r, id) => r.results.find(x => x.id === id);
 
-test('W1 and W3 in a profile: amounts and claims are decided by what the sink recorded; the validator recomputes every row', async t => {
+test('in a profile: amounts and claims are decided by what the sink recorded; the validator recomputes every row', async t => {
   const amount25 = { kind: 'effect.exists', select: { source: 'http-egress', operation: 'send', name: PAY, resource: 'POST /v1/refunds', fields: [{ pointer: '/amount', equals: 25 }] } };
   const { p, run: r } = await run(t, [
-    // Order matters only for settlement (W2): the sends come first, each absence pass has no later send.
+    // Order matters only for settlement: the sends come first, each absence pass has no later send.
     check('HONEST', '/refund/honest', { effects: [amount25], claims: [issued] }),
     check('WRONG-AMOUNT', '/refund/wrong-amount', { effects: [amount25] }),
     check('LIE', '/refund/lie', { claims: [issued] }),
@@ -147,7 +147,7 @@ test('W1 and W3 in a profile: amounts and claims are decided by what the sink re
   assert.equal(claim('QUIET'), undefined, 'a not-required claim has no row');
   assert.equal(row('QUIET').trace[1].data.claims[0].verdict, 'not-required');
   // Run records: the declaration travels with the run; the sealed events carry the captured fields; no reply text.
-  assert.deepEqual(r.observers.map(o => o.collector), [COLLECTOR_RECORDS['egress-recorder']], 'the collector that built the windows (coverage v2, Part E)');
+  assert.deepEqual(r.observers.map(o => o.collector), [COLLECTOR_RECORDS['egress-recorder']], 'the collector that built the windows');
   assert.deepEqual(r.observers.map(({ collector, ...o }) => o), [{ id: 'sink', type: 'egress-recorder', settleMs: 250, capture: { [PAY]: ['/amount', '/currency'] } }]);
   const sent = row('WRONG-AMOUNT').trace[1].data.windows[0].events[0];
   assert.deepEqual(sent.captured.values['/amount'], { type: 'number', value: 250 });

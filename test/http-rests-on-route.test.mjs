@@ -1,7 +1,6 @@
 // Identity option B (src/http-rests-on.mjs): the route reader, the anchor conditions and the served-record allowlist, lifted
-// with their tests from an earlier review (branch claude/fix-allowed-use-scope-2026-10-10 at e364c02, test/http-control-scope.test.mjs,
-// tests PU-1 and PU-2). Only #275's own reach rule (control-refused, control-unbounded, paired-control-not-passed, routeLinked)
-// is left out; every reading below is #275's, unchanged. Pure: no I/O.
+// with their tests from an earlier control-scope design. Only that design's own reach rule (control-refused, control-unbounded,
+// paired-control-not-passed, routeLinked) is left out; every reading below is the same as there. Pure: no I/O.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { identityRulesOf } from '../src/contracts.mjs';
@@ -9,7 +8,7 @@ import { pathSegments, routeSegments, recordedRouteShape, singular, stemKeys, se
   requestTexts, cleanObject, sentRoute, controlScopeEvidence, controlScopeShape, recordForm, outcomeText, OUTCOME_WORDS, SHORT_OUTCOME_WORDS, SENT_HEADER_TEXTS } from '../src/http-rests-on.mjs';
 import { digest } from '../src/domain.mjs';
 
-test('an earlier review PU-1: route segments, the anchor and refusal-like statuses', () => {
+test('route segments, the anchor and refusal-like statuses', () => {
   const lit = (exact, keys) => ({ exact, keys }), rec = (record, id = false) => ({ record, id });
   // Capture types for the placeholders below: only an integer capture can fill the last record position of an anchored route.
   const TYPES = new Map([['own', 'integer'], ['other', 'integer'], ['id', 'integer'], ['i', 'integer'], ['o', 'integer'], ['repo', 'integer'], ['a', 'integer'], ['r', 'integer'], ['r2', 'integer'], ['me', 'integer'],
@@ -32,16 +31,16 @@ test('an earlier review PU-1: route segments, the anchor and refusal-like status
   assert.equal(pathSegments(`/${Array.from({ length: 49 }, () => '1'.repeat(40)).join('/')}`).length, 49, 'the adjacent allowed path (2009 characters) is read');
   assert.deepEqual(stemKeys('mice'), ['mic', 'mice', 'mou', 'mous', 'ouse'], 'an irregular plural also gives its singular keys');
   assert.deepEqual(stemKeys('api_keys2v'), ['api', 'key', 'keys', 'kys', 'v'], 'runs of letters split at every other character');
-  // Review round 5: an abbreviation shares a key with the word it shortens (the first three letters, or of the consonant outline).
+  // An abbreviation shares a key with the word it shortens (the first three letters, or of the consonant outline).
   for (const [a, b, key] of [['orgs', 'organizations', 'org'], ['docs', 'documents', 'doc'], ['msgs', 'messages', 'msg'], ['invoices', 'inventory', 'inv']]) assert.ok(stemKeys(a).includes(key) && stemKeys(b).includes(key), `${a} ${b}`);
-  // Review round 4, HIGH: case never hides a shared window (the camel-case split is gone; lower-casing comes first).
+  // Case never hides a shared window (the camel-case split is gone; lower-casing comes first).
   const keys = p => pathSegments(p)[1].keys;
   assert.deepEqual(keys('/api/customerNotes'), keys('/api/customernotes'));
   assert.deepEqual(keys('/api/CUSTOMERNOTES'), keys('/api/customernotes'));
   for (const p of ['/api/userinvoicenotes', '/api/userInvoiceNotes', '/api/user_invoice_notes', '/api/USERINVOICENOTES']) assert.ok(keys(p).includes('invo') && keys(p).includes('user') && keys(p).includes('note'), p);
   assert.deepEqual(['/api', '/APIS', '/v1', '/v2.1', '/rest', '/v1beta'].map(p => pathSegments(p)[0].keys.length > 0), [false, false, false, false, true, true], 'only api, apis and versions are key-free namespaces');
-  // Opaque paths (one record position at the root with no stem key): anything that cannot be read without guessing. Review
-  // round 4, MEDIUM: any query or fragment is opaque, since it may select or route the resource.
+  // Opaque paths (one record position at the root with no stem key): anything that cannot be read without guessing. Any
+  // query or fragment is opaque, since it may select or route the resource.
   for (const p of ['/api//notes/{{id}}', '/api/./notes/{{id}}', '/api/invoices/../notes/{{id}}', '/api/%2e%2e/notes/{{id}}', '/api/Notes%2F/{{id}}', '/api/notes%5C/{{id}}', '/api/notes;v=1/{{id}}',
     '/api/n%D0%BEtes/{{id}}', '/api/nоtes/{{id}}', '/api/notes%20/{{id}}', '/api/%25252565notes/{{id}}', '/api/%E0%A4%A/{{id}}', '/api/notes-{{id}}/x', `/api/${'a'.repeat(129)}/{{id}}`,
     `/${Array.from({ length: 65 }, (_, i) => `s${i}`).join('/')}`, `/api/${'n'.repeat(2050)}`, 'api/notes/{{id}}', '', '/api/notes/{{id}}?x=1', '/api/notes?', '/api/invoices/7?as=notes', '/graphql?op=notes',
@@ -67,7 +66,7 @@ test('an earlier review PU-1: route segments, the anchor and refusal-like status
   sep('/api/notes/{{id}}', '/api/invoices/{{id}}', 'no shared key');
   sep('/api/CUSTOMERNOTES/{{c}}', '/api/invoices/{{id}}', 'no shared key, whatever the case');
   sep('/api/invoices/7/', '/api/notes/{{id}}/', 'a trailing slash on both');
-  share('/api/userinvoicenotes/{{c}}', '/api/invoices/{{id}}', 'review round 4: invo, nvoi, voic and oice are shared without a case change');
+  share('/api/userinvoicenotes/{{c}}', '/api/invoices/{{id}}', 'invo, nvoi, voic and oice are shared without a case change');
   share('/api/note/{{id}}', '/api/notes/{{id}}', 'singular beside plural');
   share('/api/notes/{{id}}', '/api/%256Eotes/{{id}}', 'double encoding');
   share('/api/notes/{{id}}', '/api/notebooks/{{id}}', 'a shared window (compound)');
@@ -80,21 +79,21 @@ test('an earlier review PU-1: route segments, the anchor and refusal-like status
   share('/api/notes/{{id}}', '/api/7/{{id}}', 'a route with no stem key');
   share('/api/notes/{{id}}', '/api/invoices/{{id}}?x=1', 'an opaque route');
   share('/', '/api/invoices/7', 'the root has no stem key');
-  // Review round 5, MEDIUM: an abbreviation pairs with the word it shortens.
+  // An abbreviation pairs with the word it shortens.
   share('/api/organizations/{{id}}', '/api/orgs/{{id}}', 'orgs abbreviates organizations');
   share('/api/documents/{{id}}', '/api/docs/{{id}}', 'docs abbreviates documents');
   share('/api/messages/{{id}}', '/api/msgs/{{id}}', 'msgs abbreviates messages (consonant outline)');
   share('/api/invoices/{{id}}', '/api/inventory/{{id}}', 'a shared first three letters over-pairs (only withholds more)');
-  // Review round 5, MEDIUM: a route whose record position may hide the collection name (at the root, right after a
+  // A route whose record position may hide the collection name (at the root, right after a
   // namespace or right after another record position) is never separated from anything, whatever its literals say.
   for (const c of ['/api/{{coll}}/{{id}}/history', '/api/12/{{id}}/history', '/{{coll}}/{{id}}/export', '/api/v2/{{coll}}/{{id}}/summary', '/api/notes/{{id}}/{{id}}/export'])
     share('/api/invoices/{{other}}', c, c);
   sep('/api/invoices/{{other}}', '/api/reports/{{id}}/history', 'the adjacent allowed route: every record position after a word');
   assert.equal(separated(undefined, s('/a/b/7')), false, 'missing segments never separate');
   assert.equal(separated([{ exact: 'notes', keys: ['note'] }, 'x'], s('/invoices/7')), false, 'malformed segments never separate');
-  // The anchor (review rounds 4 and 5): a required control of the check's actor, with its method, on its exact route; every
+  // The anchor: a required control of the check's actor, with its method, on its exact route; every
   // record position but the last the same; the last an identifier literal or an integer capture in both.
-  // Review round 6: an anchor's path as sent must differ from the check's (here the template text stands in for it).
+  // An anchor's path as sent must differ from the check's (here the template text stands in for it).
   const route = (p, method = 'GET') => ({ method, routeSegments: s(p), sentRoute: sentRoute(p, 'k') });
   const anchoredBy = (b, a, method) => anchored(route(b), [route(a, method)]);
   assert.equal(anchoredBy('/api/invoices/7', '/api/invoices/3'), true, 'two records of one template');
@@ -102,7 +101,7 @@ test('an earlier review PU-1: route segments, the anchor and refusal-like status
   assert.equal(anchoredBy('/api/v1/orgs/{{o}}/invoices/{{i}}', '/api/v1/orgs/{{o}}/invoices/2'), true, 'several record positions, the parent the same');
   assert.equal(anchoredBy('/api/v1/orgs/1/invoices/{{i}}', '/api/v1/orgs/1/invoices/{{own}}'), true, 'the same parent literal');
   assert.equal(anchoredBy('/thomas/{{repo}}', '/thomas/9'), true, 'an owner slug with a record after it: the same slug');
-  // Review round 6: another record only. An identical route, or one whose path as sent reads the same after
+  // Another record only. An identical route, or one whose path as sent reads the same after
   // percent-decoding, lower-casing and dropping leading zeros, never anchors.
   for (const [b, a, why] of [['/api/invoices/7', '/api/invoices/7', 'an identical route'], ['/api/invoices/{{own}}', '/api/invoices/{{own}}', 'an identical placeholder'],
     ['/api/invoices/7', '/api/invoices/007', 'a leading zero'], ['/api/invoices/deadbeefdeadbeef', '/api/invoices/DEADBEEFDEADBEEF', 'upper-case hexadecimal'], ['/api/invoices/7', '/api/invoices/%37', 'a percent-encoded digit']])
@@ -115,7 +114,7 @@ test('an earlier review PU-1: route segments, the anchor and refusal-like status
     ['/api/invoices/mine', '/api/invoices/mine', 'GET', 'no record position'], ['/thomas/6', '/charles/9', 'GET', 'another owner slug'], ['/api/7/invoices', '/api/3/invoices', 'GET', 'a record right after a namespace'],
     ['/7/invoices', '/3/invoices', 'GET', 'a record at the root'], ['/api/invoices/7/8', '/api/invoices/3/4', 'GET', 'a record right after a record'], ['/2024-01/7', '/2024-01/3', 'GET', 'a record after a literal with no stem key'],
     ['/api/invoices/7?x=1', '/api/invoices/7?x=1', 'GET', 'an opaque route, even an identical one'], ['/api/notes/{{a}}', '/api/notes', 'GET', 'a shorter route'],
-    // Review round 5, MEDIUM: a different parent never anchors (the PocketBase, NocoDB and table shapes); a last record
+    // A different parent never anchors (the PocketBase, NocoDB and table shapes); a last record
     // position filled by an "id" or "string" capture never anchors (the RPC shape), in the check or in the control.
     ['/api/collections/{{invColl}}/records/{{otherInv}}', '/api/collections/{{usersColl}}/records/{{me}}', 'GET', 'another collection (PocketBase)'],
     ['/api/v2/tables/9/records/7', '/api/v2/tables/4/records/3', 'GET', 'another table (NocoDB)'], ['/api/collections/2/records/7', '/api/collections/1/records/3', 'GET', 'another collection by number'],
@@ -140,7 +139,7 @@ test('an earlier review PU-1: route segments, the anchor and refusal-like status
   const anchors = Array.from({ length: 64 }, (_, i) => ({ method: 'GET', routeSegments: pathSegments(wideOther, wideTypes), sentRoute: sentRoute(`${wideOther}${i}`, 'k') }));
   const wideCheck = { method: 'GET', routeSegments: pathSegments(wide, wideTypes), sentRoute: sentRoute(wide, 'k') };
   assert.equal(anchored(wideCheck, anchors), true, 'the widest readable route anchors on another record');
-  assert.equal(anchored(wideCheck, [{ ...wideCheck }]), false, 'review round 6: never itself');
+  assert.equal(anchored(wideCheck, [{ ...wideCheck }]), false, 'never itself');
   for (let i = 0; i < 2000; i++) { separated(s(wide), s(fat)); anchored(wideCheck, anchors); }
   assert.ok(Date.now() - started < 10000, `adversarial routes took ${Date.now() - started} ms`);
   // Refusal-like: the actor's statuses, any 3xx, and any non-2xx a boundary check of the actor accepts.
@@ -155,7 +154,7 @@ test('an earlier review PU-1: route segments, the anchor and refusal-like status
   assert.deepEqual(['actor-identity/6', 'actor-identity/5', 'actor-identity/4', 'actor-identity/3'].map(identityRulesOf), [6, 5, 4, 3]);
 });
 
-test('an earlier review PU-2: review rounds 6 and 9, the served-record allowlist: record predicates, clean objects, the sent route and its record', () => {
+test('the served-record allowlist: record predicates, clean objects, the sent route and its record', () => {
   const eq = (pointer, expected) => ({ kind: 'json.equals', pointer, expected }), ORIGIN = 'http://127.0.0.1:9';
   const ACTORS = { member: { principalId: 'member-1', credentialEnv: 'SCOPEHAVEN_TARGET_MEMBER', credentialCookie: 'sid', identityValue: 'Alice@Example.com', signInRedirectStatus: 302, tenantId: 'acme', role: 'editor', refusesWith401: true },
     owner: { principalId: 'owner-1' } };
@@ -163,13 +162,13 @@ test('an earlier review PU-2: review rounds 6 and 9, the served-record allowlist
   const target = (expected, { path = '/api/invoices/3', body, method = 'GET', actors = ACTORS, origin = ORIGIN, others = [], correlation, observers, pointer = '/v' } = {}) => ({ actors, origin, ...(correlation ? { correlation } : {}), ...(observers ? { observers } : {}),
     checks: [{ id: 'X', method, path, ...(body === undefined ? {} : { body }), assertions: [{ kind: 'status.equals', expected: 200 }, eq(pointer, expected)] }, ...others] });
   const counts = (expected, options) => { const t = target(expected, options); return recordPredicates(t.checks[0], t).length === 1; };
-  // Review round 9: the record text form. A string that, after NFKC, holds no digit of any script and two runs of three
+  // The record text form. A string that, after NFKC, holds no digit of any script and two runs of three
   // letters or more. So no number, no record id (the example rule's /id equal to the route's id), no single word (the
   // string forms of true, false and null, and a status word), no superscript or full-width digit.
   for (const v of ['March rent', 'Été dernier', 'Alpha-ledger', 'Ωμέγα λίστα', 'the big one']) assert.equal(recordText(v), true, v);
   for (const v of ['n1', 'Q3 report', 'Report ³ final', 'Report ３ final', 'Report ٣ final', 'March', 'true', 'false', 'null', 'granted', '0', '3', '', ' ', 'ab cd', 'a-b-c', 3, 7, -1, 0.5, 0, null, true, false, ['a b c'], { a: 'March rent' }])
     assert.equal(recordText(v), false, JSON.stringify(v));
-  // Review round 9, adversarial round 1: a value that names an outcome is no record text (an in-band refusal message
+  // A value that names an outcome is no record text (an in-band refusal message
   // under the record's own field), read like a key (outcomeText below).
   for (const v of ['Access denied', 'Status report', 'Request failed', 'Invalid ledger', 'Login error page', 'Forbidden zone', 'Not OK here', 'Unauthorised visit']) assert.equal(recordText(v), false, v);
   assert.equal(recordText('Okay ledger'), true, 'okay is not ok');
@@ -184,9 +183,9 @@ test('an earlier review PU-2: review rounds 6 and 9, the served-record allowlist
   assert.equal(recordPredicate(eq('/title', 'March rent'), new Set()), false, 'texts of another shape never count');
   for (const broken of [{ ...target('March rent'), actors: undefined }, { ...target('March rent'), actors: [] }, { ...target('March rent'), origin: '' }, { ...target('March rent'), origin: 7 }, { ...target('March rent'), checks: null }, null])
     assert.equal(requestTexts(broken), null, `without actors, an origin or checks no predicate counts (${JSON.stringify(broken)})`);
-  // Review round 9 (the open finding on headers): every header name and constant value the connector sends is a text a
+  // Every header name and constant value the connector sends is a text a
   // request carries, so an in-band refusal that echoes one never shows a record. So are every other request text of the
-  // profile (review rounds 7 and 8 kept): the path's words, singulars and parts, the method, the origin, every actor
+  // profile: the path's words, singulars and parts, the method, the origin, every actor
   // value, any check's body or path or query, and the declared correlation header's name.
   assert.deepEqual([...SENT_HEADER_TEXTS], ['Accept', 'application/json', 'Connection', 'close', 'Authorization', 'Bearer', 'Cookie', 'Content-Type', 'Content-Length', 'Host']);
   for (const [value, why, options] of [['application/json', 'the Accept and Content-Type value'], ['Application JSON', 'its words'], ['Bearer token', 'the Authorization scheme'], ['Close call', 'the Connection value'],
@@ -202,7 +201,7 @@ test('an earlier review PU-2: review rounds 6 and 9, the served-record allowlist
     ['Folder ledger', 'the singular of another check\'s segment', { others: [{ id: 'F', method: 'GET', path: '/api/folders/7' }] }],
     ['Summer sale', 'a decoded query value of another check', { others: [{ id: 'Q', method: 'GET', path: '/api/search?q=summer%20sale' }] }],
     ['Spring sale', 'a fragment part', { others: [{ id: 'Q', method: 'GET', path: '/api/search#spring%20sale' }] }],
-    ['Ping pong', 'adversarial round 1: an observer\'s witness path', { observers: [{ witness: { actorId: 'owner', method: 'GET', path: '/ping?pong=1', host: 'witness.scopehaven.invalid' } }] }],
+    ['Ping pong', 'an observer\'s witness path', { observers: [{ witness: { actorId: 'owner', method: 'GET', path: '/ping?pong=1', host: 'witness.scopehaven.invalid' } }] }],
     ['Witness stand', 'the witness tag', { observers: [{ witness: { actorId: 'owner', method: 'GET', path: '/x' } }] }],
     ['March rent', 'a placeholder in the check\'s own path', { path: '/api/invoices/{{own}}' }], ['March rent', 'a placeholder in the check\'s own body', { method: 'POST', body: { note: '{{noteId}}' } }]])
     assert.equal(counts(value, options), false, why);
@@ -210,9 +209,9 @@ test('an earlier review PU-2: review rounds 6 and 9, the served-record allowlist
   assert.equal(counts('March rent', { others: [{ id: 'W', method: 'POST', path: '/api/notes', body: { title: 'April rent' } }] }), false, 'shares a word (rent) with another check\'s body');
   for (const [value, options] of [['Alpha ledger', {}], ['Alpha ledger', { others: [{ id: 'W', method: 'POST', path: '/api/notes', body: { title: 'Bravo folder' } }] }], ['Summer fair', { others: [{ id: 'Q', method: 'GET', path: '/api/search?q=winter' }] }]])
     assert.equal(counts(value, options), true, value);
-  // Review round 9, adversarial round 2 (MEDIUM): an accent-free slug or a full case fold of a request text is that text
+  // An accent-free slug or a full case fold of a request text is that text
   // (texts are compared folded: NFKD without combining marks, upper-cased then lower-cased, and by their letters and
-  // digits alone), and (adversarial round 3) a check that sends a body other than an empty object or array has no record
+  // digits alone), and a check that sends a body other than an empty object or array has no record
   // predicate at all, since any key or value can carry text, so the only text that differs between two partners'
   // requests is their record identifier.
   for (const [value, why, options] of [['cafe-creme', 'a slug of another check\'s body', { others: [{ id: 'W', method: 'POST', path: '/api/notes', body: { name: 'Café crème' } }] }],
@@ -223,7 +222,7 @@ test('an earlier review PU-2: review rounds 6 and 9, the served-record allowlist
     assert.equal(counts(value, options), false, why);
   for (const body of [{}, []]) assert.equal(counts('Alpha ledger', { method: 'POST', body }), true, `an empty body: ${JSON.stringify(body)}`);
   for (const body of [{ draft: true, archived: false, parent: null }, { flags: [true, false] }, { 'Søren Øster': true }, [null], null])
-    assert.equal(counts('Alpha ledger', { method: 'POST', body }), false, `adversarial round 3: any other body, keys included: ${JSON.stringify(body)}`);
+    assert.equal(counts('Alpha ledger', { method: 'POST', body }), false, `any other body, keys included: ${JSON.stringify(body)}`);
   // recordClasses: [index, field, value], the index among the check's JSON predicates (status skipped), field and value the
   // ranks of the pointer and the expected value among every record predicate of the profile; two checks on one field
   // with different values get one field rank and two value ranks.
@@ -231,8 +230,8 @@ test('an earlier review PU-2: review rounds 6 and 9, the served-record allowlist
     { id: 'B', method: 'GET', path: '/api/invoices/4', assertions: [{ kind: 'status.equals', expected: 200 }, eq('/title', 'Alpha ledger')] }, { id: 'C', method: 'GET', path: '/api/invoices/{{x}}', assertions: [eq('/title', 'Charlie ledger')] }] };
   assert.deepEqual([...recordClasses(ranked)], [['A', [[1, 1, 1], [2, 0, 0]]], ['B', [[0, 1, 0]]], ['C', []]]);
   assert.deepEqual([recordPredicates(ranked.checks[1], ranked), recordPredicates({ ...ranked.checks[1] }, ranked), recordPredicates(null, ranked), recordPredicates(ranked.checks[0], null)], [[[0, 1, 0]], [], [], []], 'only a check the profile holds');
-  // Review round 9: a clean JSON object has no top-level key that names an outcome: error, errors, status, success, ok and
-  // message in any letter case (the list), and (adversarial round 1) any key whose text holds an outcome word
+  // A clean JSON object has no top-level key that names an outcome: error, errors, status, success, ok and
+  // message in any letter case (the list), and any key whose text holds an outcome word
   // anywhere or ok, err, msg or fail as a word, so statusCode, error_message, isError, HTTPStatus, a padded or full-width
   // error key are envelopes too. An error or status envelope is never read as a record.
   assert.deepEqual([[...OUTCOME_WORDS], [...SHORT_OUTCOME_WORDS]], [['error', 'status', 'success', 'message', 'fault', 'failure', 'failed', 'denied', 'deny', 'forbidden', 'unauthorized', 'unauthorised', 'unauthenticated', 'refused', 'rejected', 'invalid',
@@ -246,7 +245,7 @@ test('an earlier review PU-2: review rounds 6 and 9, the served-record allowlist
   for (const o of [obs({ data: null, errors: [{ message: 'forbidden' }] }), obs({ id: 'n1', error: 'x' }), obs({ Error: 'x' }), obs({ ERRORS: [] }), obs({ title: 'March rent', status: 'denied' }), obs({ title: 'March rent', Status: 403 }),
     obs({ title: 'March rent', success: false }), obs({ title: 'March rent', ok: false }), obs({ title: 'March rent', OK: true }), obs({ title: 'March rent', message: 'access denied' }), obs({ MESSAGE: '' }),
     obs({ title: 'March rent', statusCode: 403 }), obs({ title: 'March rent', error_message: 'denied' }), obs({ title: 'March rent', 'error ': 'x' }), obs({ title: 'March rent', messages: [] }),
-    // Adversarial round 2: a refusal stated in a top-level string value, or under an access-decision key.
+    // A refusal stated in a top-level string value, or under an access-decision key.
     obs({ title: 'March rent', access: 'denied' }), obs({ title: 'March rent', detail: 'forbidden' }), obs({ title: 'March rent', allowed: false, reason: 'not permitted' }), obs({ title: 'March rent', authorized: false }),
     obs({ title: 'March rent', note: 'Insufficient permissions' }), obs({ title: 'Access denied' }),
     obs([{ id: 'n1' }]), obs(null), obs('n1'), obs(7), { ...obs({ id: 'n1' }), complete: false }, { ...obs({ id: 'n1' }), jsonParsed: false }, { ...obs({ id: 'n1' }), error: 'invalid-json' }, null, undefined])
@@ -255,7 +254,7 @@ test('an earlier review PU-2: review rounds 6 and 9, the served-record allowlist
   const same = (a, b) => assert.equal(sentRoute(a, 'k'), sentRoute(b, 'k'), `${a} ${b}`), apart = (a, b) => assert.notEqual(sentRoute(a, 'k'), sentRoute(b, 'k'), `${a} ${b}`);
   same('/api/invoices/7', '/api/invoices/007'); same('/api/invoices/7', '/api/invoices/%37'); same('/api/invoices/7', '/api/invoices/%2537'); same('/api/invoices/ABCDEF0123456789', '/api/invoices/abcdef0123456789');
   same('/api/invoices/7', '/API/Invoices/7/'); same('/api/invoices/0', '/api/invoices/000');
-  // Adversarial round 2: a UUID with and without its dashes, and a long hexadecimal id with leading zeros, are one record.
+  // A UUID with and without its dashes, and a long hexadecimal id with leading zeros, are one record.
   same('/api/invoices/0f8fad5b-d9cb-469f-a165-70867728950e', '/api/invoices/0f8fad5bd9cb469fa16570867728950e'); same('/api/invoices/0F8FAD5B-D9CB-469F-A165-70867728950E', '/api/invoices/f8fad5bd9cb469fa16570867728950e');
   same('/api/invoices/00deadbeefdeadbeef', '/api/invoices/deadbeefdeadbeef'); apart('/api/invoices/deadbeefdeadbeef', '/api/invoices/deadbeefdeadbee0');
   apart('/api/invoices/7', '/api/invoices/3'); apart('/api/invoices/7', '/api/invoices/70'); apart('/api/invoices/7', '/api/notes/7');
@@ -267,7 +266,7 @@ test('an earlier review PU-2: review rounds 6 and 9, the served-record allowlist
   assert.deepEqual(recorded, { cleanObject: true, recordPredicates: [[0, 2, 5]], sentRoute: sentRoute('/api/invoices/7', 'k'), bodyKeys: digest({ key: 'k', bodyKeys: ['saved', 'title'] }) });
   assert.deepEqual(controlScopeEvidence({ id: 'X' }, null, null, 'k', classes), { cleanObject: false, recordPredicates: [[0, 2, 5]], sentRoute: null, bodyKeys: null }, 'a row that was not sent');
   assert.deepEqual(controlScopeEvidence({ id: 'Y' }, obs({}), '/x', 'k', classes).recordPredicates, [], 'a check without record predicates');
-  // Adversarial round 2: the key set is keyed, read in sorted order, and recorded only for a clean object.
+  // The key set is keyed, read in sorted order, and recorded only for a clean object.
   assert.equal(controlScopeEvidence({ id: 'X' }, obs({ saved: false, title: 'Other' }), '/a/1', 'k', classes).bodyKeys, recorded.bodyKeys, 'the same keys in any order and with any values');
   assert.notEqual(controlScopeEvidence({ id: 'X' }, obs({ title: 'March rent' }), '/a/1', 'k', classes).bodyKeys, recorded.bodyKeys, 'another key set');
   assert.notEqual(controlScopeEvidence({ id: 'X' }, obs({ title: 'March rent', saved: true }), '/a/1', 'k2', classes).bodyKeys, recorded.bodyKeys, 'keyed');
@@ -280,7 +279,7 @@ test('an earlier review PU-2: review rounds 6 and 9, the served-record allowlist
     [{ ...recorded, sentRoute: null }, preds, ok, 'sent without a route'], [recorded, preds, { ...ok, sent: false }, 'not sent with a route'], [{ ...recorded, sentRoute: 'x' }, preds, ok, 'not a digest'],
     [{ ...recorded, recordPredicates: [[2, 0, 0]] }, preds, ok, 'an index past the predicates'], [{ ...recorded, recordPredicates: [[1, 0, 0], [0, 0, 0]] }, preds, ok, 'unsorted'], [{ ...recorded, recordPredicates: [[0, 0, 0], [0, 0, 1]] }, preds, ok, 'repeated'],
     [{ ...recorded, recordPredicates: [[0, 0, 0]] }, [{ kind: 'json.exists' }], ok, 'an index of another kind'], [{ ...recorded, recordPredicates: [[-1, 0, 0]] }, preds, ok, 'negative'], [{ ...recorded, recordPredicates: [['0', 0, 0]] }, preds, ok, 'not an integer'],
-    [{ ...recorded, recordPredicates: [0] }, preds, ok, 'review round 9: a bare index'], [{ ...recorded, recordPredicates: [[0, 0]] }, preds, ok, 'two numbers'], [{ ...recorded, recordPredicates: [[0, 0, 0, 0]] }, preds, ok, 'four numbers'],
+    [{ ...recorded, recordPredicates: [0] }, preds, ok, 'a bare index'], [{ ...recorded, recordPredicates: [[0, 0]] }, preds, ok, 'two numbers'], [{ ...recorded, recordPredicates: [[0, 0, 0, 0]] }, preds, ok, 'four numbers'],
     [{ ...recorded, recordPredicates: [[0, 500, 0]] }, preds, ok, 'a field rank past the limit'], [{ ...recorded, recordPredicates: [[0, 0, 1.5]] }, preds, ok, 'a value rank that is not an integer'],
     [{ ...recorded, cleanObject: 'yes' }, preds, ok, 'not a boolean'], [{ ...recorded, extra: 1 }, preds, ok, 'a fifth field'], [{ cleanObject: true, recordPredicates: [[0, 0, 0]], sentRoute: recorded.sentRoute }, preds, ok, 'a field missing'], [null, preds, ok, 'not an object'],
     [{ ...recorded, bodyKeys: null }, preds, ok, 'a clean object without its key set'], [{ ...recorded, cleanObject: false }, preds, ok, 'a key set without a clean object'], [{ ...recorded, bodyKeys: 'x' }, preds, ok, 'a key set that is not a digest'],

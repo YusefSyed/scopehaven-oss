@@ -1,4 +1,4 @@
-// DR16b (claims register v124): #220 made check-config and assess --list refuse a target whose http-audit observer has
+// check-config and assess --list refused a target whose http-audit observer has
 // no usable credential, but the dashboard (registry.list, served by /api/bootstrap) still read such a target ready.
 // The dashboard now reads readiness through the same rule. Offline only: nothing connects, and a reason names the
 // environment reference, never its value. Synthetic profile and an explicit environment, never local credentials.

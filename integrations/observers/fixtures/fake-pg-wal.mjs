@@ -1,4 +1,4 @@
-// pg-wal's scripted session (moved unchanged from ../pg-wal.test.mjs, NC9 item 4, so a connector-level test can drive a pg-wal
+// pg-wal's scripted session (moved unchanged from ../pg-wal.test.mjs, so a connector-level test can drive a pg-wal
 // profile too): no server, no socket. The fake answers the observer's tagged statements (/* sh:... */) from a model of the WAL, the
 // slot and the catalog. connect is the observer's connect seam.
 import { PgError } from '../pg-wire.mjs';
@@ -30,19 +30,19 @@ export function fakeServer({ walLevel = 'logical', version = '170000', recovery 
     if (/get_changes/.test(statement)) throw new Error('get_changes is never used');
     if (tag === 'set') return { rows: [], command: 'SET' };
     if (tag === 'session' || tag === 'drainsession') return { rows: [], command: 'SET' };
-    // The run lease (N12): always granted; other runs' leases as the test sets them.
+    // The run lease: always granted; other runs' leases as the test sets them.
     if (tag === 'lease') return { rows: [['true']] };
     if (tag === 'shared') return { rows: [[String(s.otherRuns ?? 0)]] };
-    // The end barrier's drain read (N12), on its own session: P0, the queue write locks, the pending counts, the names.
+    // The end barrier's drain read, on its own session: P0, the queue write locks, the pending counts, the names.
     if (tag === 'drainlsn') return { rows: [[lsnText(s.lsn)]] };
     if (tag === 'queuelocks') return { rows: [[String(s.queueLocks ?? 0)]] };
     if (tag === 'queuecount') { if (s.queueError) throw s.queueError; s.onQueueCount?.(); return { rows: [(typeof s.pending === 'function' ? s.pending() : s.pending ?? []).map(String)] }; }
     if (tag === 'queuenames') return { rows: (s.queueNames ?? []).map(n => [n, s.queuePersistence?.[n] ?? 'pr']) };
-    // The tables whose writes the WAL never carries (unlogged and foreign), as the mark lists them (N12).
+    // The tables whose writes the WAL never carries (unlogged and foreign), as the mark lists them.
     if (tag === 'notinwal') return { rows: (s.notInWal ?? []).map(n => [n]) };
     if (tag === 'server') return { rows: [[walLevel, version, recovery, '8192', '16777216']] };
     if (tag === 'create') { const name = /replication_slot\('([a-z0-9_]+)'/.exec(statement)[1]; s.slots.set(name, { confirmed: s.lsn }); return { rows: [[lsnText(s.lsn)]] }; }
-    // The database's catalog fingerprint (N13, ./catalog.mjs): one unchanging catalog unless a test sets s.dbCatalog.
+    // The database's catalog fingerprint (./catalog.mjs): one unchanging catalog unless a test sets s.dbCatalog.
     if (tag === 'dbcatalog' || tag === 'dbversions') { const out = { rows: catalogAnswer(statement, s.dbCatalog) }; if (tag === 'dbversions') s.onDbCatalog?.(); return out; }
     if (tag === 'catalog') { const out = { rows: catalogRows() }; if (s.driftDuringMark) { s.drift += 1; s.driftDuringMark = false; } return out; }
     // The mark reads the write locks twice, before and after the position.

@@ -1,4 +1,4 @@
-// The actor join inside pg-snapshot and pg-wal (NC2 item 2's proposal for their owners), against a local Supabase stack
+// The actor join inside pg-snapshot and pg-wal, against a local Supabase stack
 // through its PostgREST and auth services with synthetic users; the capture is installed by the stack's superuser, the
 // tables are the postgres role's. Skipped unless the pg-actor.live.test.mjs variables name a
 // local supabase start stack (never a hosted project; its Postgres has wal_level = logical). Each test creates its own
@@ -97,7 +97,7 @@ test('pg-wal joins each write on its own transaction; pg-snapshot attributes a r
   assert.deepEqual(shape(snap), [['delete', 'ORD-2', 'gil'], ['update', 'ORD-1', null]]);
   assert.deepEqual([snap.scope.actorAttribution, plain.scope.actorAttribution, wal.scope.actorAttribution], ['principal', 'none', 'principal']);
   const select = (operation, id, actor) => ({ source: 'sql-snapshot', operation, name: f.table, resource: `${f.table}/${id}`, actor });
-  // Each observer's own source (pg-wal's is sql-wal since NC9 item 4).
+  // Each observer's own source (pg-wal's is sql-wal).
   const verdict = (kind, sel, windows) => evaluateEffectAssertion({ kind, select: { ...sel, source: windows[0].source } }, windows).verdict;
   assert.equal(verdict('effect.exists', select('update', 'ORD-1', 'ana'), [wal]), 'pass');
   assert.equal(verdict('effect.none', select('update', 'ORD-2', 'ana'), [wal]), 'pass', 'her filtered update changed nothing, and every ORD-2 write was gil\'s');

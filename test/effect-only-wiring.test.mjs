@@ -65,7 +65,7 @@ const OBSERVERS = {
 const transport = async (origin, check) => ({ status: check.path === '/me' ? 200 : 201, complete: true, jsonParsed: true, json: { ok: true }, bytes: 10 });
 // One profile: a control without effects, and the TASK check (a refund) declaring `effects`. guard: CHECKOUT, a required
 // allowed-use control of the same actor with a positive effect (an order sent to the payments host), comes first, so a boundary
-// TASK whose effect.only pins nothing is guarded (FIX-07); without it such a pass reads inconclusive (allowed-use-not-declared).
+// TASK whose effect.only pins nothing is guarded; without it such a pass reads inconclusive (allowed-use-not-declared).
 const CHECKOUT = { id: 'CHECKOUT', title: 'An allowed order', category: 'allowed-use', severity: 'control', actorId: 'member', method: 'POST', path: '/checkout', body: {}, evidenceRequirement: 'response',
   assertions: [{ kind: 'status.equals', expected: 201 }], effects: [{ kind: 'effect.exists', select: { source: 'http-egress', operation: 'send', name: PAY, resource: 'POST /v1/orders' } }] };
 const ordered = { operation: 'send', name: PAY, resource: 'POST /v1/orders' };
@@ -145,7 +145,7 @@ test('allowed: a pass takes the weakest custody of the windows that decided it; 
   assert.deepEqual([both.assertion.custody, both.assertion.custodyReason, both.assertion.custodyUpgrade], ['subject-writable', CUSTODY_REASON, both.clause.custodyUpgrade]);
   assert.equal(both.row.backendEvidence, 'observed', 'coverage, not custody: authoritative observers decided it');
   // The same refund judged only through the egress recorder: an independent observer decides, and, with the actor's allowed-use
-  // control guarding it (FIX-07), the pass stands. Unguarded, the same pass reads inconclusive (allowed-use-not-declared).
+  // control guarding it, the pass stands. Unguarded, the same pass reads inconclusive (allowed-use-not-declared).
   const sends = await runOne(['audit', 'sink'], [only([EXPECT_SEND], { sources: ['http-egress'] })], { 'app-audit': { windows: [[], [auditRefund()]] }, sink: { windows: [[ordered], [sentRefund]] } }, { guard: true });
   assert.deepEqual([sends.row.status, sends.clause.verdict, sends.clause.custody, sends.clause.custodyReason], ['pass', 'pass', 'independent', undefined]);
   const unguarded = await runOne(['audit', 'sink'], [only([EXPECT_SEND], { sources: ['http-egress'] })], { 'app-audit': [auditRefund()], sink: [sentRefund] });
@@ -413,10 +413,10 @@ test('practice (gate, independent observer): the egress recorder decides, so the
 });
 
 // ---------------------------------------------------------------------------
-// Core batch v2, CUSTODY-01 (effect.only v2 review, Low): above the 20-offender detail cap, a failing row's custody
+// Above the 20-offender detail cap, a failing row's custody
 // tag and its backend-evidence flag depended on which window came first. Both now rest on every offender
 // (judgeOnly's offendingObservers), so the order of the windows changes nothing but the listed details.
-test('CUSTODY-01: with more than 20 offenders, a fail\'s custody and backend evidence do not depend on the windows\' order', () => {
+test('with more than 20 offenders, a fail\'s custody and backend evidence do not depend on the windows\' order', () => {
   const offender = (source, instanceId, n, operation, name) => makeEffect({ source, observer: { kind: 'synthetic-cap', instanceId }, seq: n, operation, name, actor: null, outcome: 'committed' });
   const window = (source, instanceId, operation, name, count, evidence = 'authoritative') => ({ source, instanceId, coverage: 'complete', reason: null,
     events: Array.from({ length: count }, (_, i) => offender(source, instanceId, i + 1, operation, name)), scope: { operations: [operation], names: evidence === 'authoritative' ? [name] : null, actorAttribution: 'none', evidence } });
@@ -427,7 +427,7 @@ test('CUSTODY-01: with more than 20 offenders, a fail\'s custody and backend evi
     assert.equal(wired.custody, held.custody);
     return { result, held, wired };
   };
-  // 20 offenders in the application's own audit table and one in an independent egress recorder (C14), and 25 + 25.
+  // 20 offenders in the application's own audit table and one in an independent egress recorder, and 25 + 25.
   for (const [appCount, sinkCount] of [[20, 1], [25, 25], [21, 1]]) {
     const app = window('sql-audit-table', 'audit', 'insert', 'discount.create', appCount), sink = window('http-egress', 'sink', 'send', 'coupon.example', sinkCount);
     const appFirst = judge([app, sink]), sinkFirst = judge([sink, app]);

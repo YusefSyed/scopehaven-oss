@@ -1,9 +1,9 @@
 // effect.only: a send whose fields could not be read under a fields-pinned expected selector is undecided, never absorbed by an
-// allowed selector without that pin (integrations/collateral/only.mjs). an earlier review closed this for provider-feed templates; here it holds
+// allowed selector without that pin (integrations/collateral/only.mjs). The provider-feed template rule closed this for feed sends; here it holds
 // for every source, egress body fields first. Each newly undecided case sits beside the decided case next to it: pure decisions over
-// synthetic windows, settlement's judged re-judge, the fix C and LATE-FIELDS lift, a differential against main's only.mjs (frozen at
-// cddb4be: only previously absorbed sends change, and no pass is created), and one connector run over real loopback HTTP (destination
-// hosts are names only and are never resolved or contacted).
+// synthetic windows, settlement's judged re-judge, the late-entry lift, a differential against an earlier only.mjs (frozen in
+// test/fixtures/only-cddb4be.mjs: only previously absorbed sends change, and no pass is created), and one connector run over
+// real loopback HTTP (destination hosts are names only and are never resolved or contacted).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { request, createServer } from 'node:http';
@@ -19,7 +19,7 @@ import { validateHttpRunEvidence, validateTargetFile } from '../src/contracts.mj
 import { createRegistry } from '../src/registry.mjs';
 import { fileURLToPath } from 'node:url';
 
-// main before this change (cddb4be): the same judge with the unknown-field rule gated on provider-feed sends.
+// The judge before this change: the same judge with the unknown-field rule gated on provider-feed sends.
 const frozen = await import(fileURLToPath(new URL('./fixtures/only-cddb4be.mjs', import.meta.url)));
 
 const DESK = 'desk.example.test', BILL = 'billing.example.test', INST = 'egress-recorder-sink';
@@ -65,7 +65,7 @@ const UNKNOWN_KIND = Object.freeze([
 ]);
 
 // ---------------------------------------------------------------------------
-test('1. egress twin of feed v2 B1: two known cancels fail; a second cancel whose kind reads unknown is never absorbed by the path-only allow', () => {
+test('1. egress twin of the provider-feed template case: two known cancels fail; a second cancel whose kind reads unknown is never absorbed by the path-only allow', () => {
   const clause = only();
   const known = [win([note(fields('cancel')), note(fields('cancel'))])];
   assert.equal(verdictOf(clause, known), 'fail', 'the second known cancel is beyond count, and the allow never absorbs a beyond-count send');
@@ -76,7 +76,7 @@ test('1. egress twin of feed v2 B1: two known cancels fail; a second cancel whos
     assert.equal(r.verdict, 'missing', `${why}: ${r.basis}`);
     assert.match(r.basis, /body fields that could not be read/);
     assert.equal(r.counts.offending, 0, why);
-    assert.equal(mainJudged(clause, windows).verdict, 'pass', `${why}: main read it pass (the hole)`);
+    assert.equal(mainJudged(clause, windows).verdict, 'pass', `${why}: the earlier judge read it pass (the hole)`);
     assert.equal(verdictOf(clause, windows), 'missing', `${why}: the HTTP evaluator`);
   }
   // Adjacent: a known update reads "no" under the pin, so the allow still takes it; a lone known cancel is expected.
@@ -95,11 +95,11 @@ test('2. an actor pin: a send whose actor is unknown or undeclared and whose kin
   for (const actor of [null, 'unlisted:svc-x']) {
     const windows = [win([...base(), note(fields(undefined), { actor })])];
     assert.equal(judged(clause, windows).verdict, 'missing', String(actor));
-    assert.equal(mainJudged(clause, windows).verdict, 'pass', `${actor}: main read it pass`);
+    assert.equal(mainJudged(clause, windows).verdict, 'pass', `${actor}: the earlier judge read it pass`);
   }
   // A declared other actor is not the expected one whatever its kind: the allow takes it.
   assert.equal(judged(clause, [win([...base(), note(fields(undefined), { actor: 'svc-other' })])]).verdict, 'pass');
-  // An unknown actor on a known cancel stays unattributable (main's rule, unchanged).
+  // An unknown actor on a known cancel stays unattributable (the earlier judge's rule, unchanged).
   const unattributed = judged(clause, [win([note(fields('cancel'), { actor: null })])]);
   assert.deepEqual([unattributed.verdict, unattributed.counts.unattributable], ['missing', 1]);
 });
@@ -112,7 +112,7 @@ test('3. beyond count stays a fail: a note matching a path-only expect beyond it
   assert.match(over.basis, /beyond-count/);
 });
 
-test('4. provider feed keeps feed v2\'s rule, and a feed send under an actor-pinned template expect is undecided too', () => {
+test('4. provider feed keeps its template rule, and a feed send under an actor-pinned template expect is undecided too', () => {
   const feed = (template, extra = {}) => makeEffect({ source: 'provider-feed', observer: { kind: 'provider-feed-reader', instanceId: FEED_INST }, seq: ++seq, observedAt: '2026-10-13T00:00:00.000Z',
     operation: 'send', name: FEED, resource: VIP, outcome: 'committed', captured: { status: 'captured', values: { '/template': template } }, ...extra });
   const fwin = events => ({ source: 'provider-feed', instanceId: FEED_INST, scope: FEED_SCOPE, coverage: 'complete', reason: null, events });
@@ -122,10 +122,10 @@ test('4. provider feed keeps feed v2\'s rule, and a feed send under an actor-pin
   for (const t of [{ type: 'absent' }, { type: 'unusable', reason: 'undeclared' }]) {
     const windows = [fwin([feed(order), feed(t)])];
     assert.equal(judged(clause, windows).verdict, 'missing');
-    assert.equal(mainJudged(clause, windows).verdict, 'missing', 'feed v2 already held it');
+    assert.equal(mainJudged(clause, windows).verdict, 'missing', 'the feed template rule already held it');
   }
   assert.equal(judged(clause, [fwin([feed(order), feed({ type: 'string', value: 'ticket_update' })])]).verdict, 'pass');
-  // A feed record names no actor: under an actor-pinned template expect, an unknown template is undecided (main absorbed it).
+  // A feed record names no actor: under an actor-pinned template expect, an unknown template is undecided (the earlier judge absorbed it).
   const pinned = { ...clause, expect: [{ select: fsel({ actor: 'mailer', fields: [{ pointer: '/template', equals: 'order_cancelled' }] }), count: 1 }] };
   const windows = [fwin([feed({ type: 'absent' })])];
   assert.equal(judged(pinned, windows).verdict, 'missing');
@@ -143,7 +143,7 @@ test('5. settlement judge: a late send whose kind reads unknown withholds the pa
   for (const [captured, why] of UNKNOWN_KIND) {
     const row = rowWith(), late = [note(captured)];
     assert.equal(settlementFindings([row], [[win([])], [win(late)]], undefined, { judge: true })[0][0], 'effect-outside-window', why);
-    // main's judgement of the same augmented window read pass, so the judged note stood there.
+    // The earlier judge's judgement of the same augmented window read pass, so the judged note stood there.
     assert.equal(mainJudged(clause, [win([...row.windows[0].events, ...late])]).verdict, 'pass', why);
   }
   // Without the declaration any later judged send withholds, as before.
@@ -152,7 +152,7 @@ test('5. settlement judge: a late send whose kind reads unknown withholds the pa
 });
 
 // ---------------------------------------------------------------------------
-// Fix C and LATE-FIELDS: a late scoped entry lifts toward a pass only when it fits no expected selector on source, operation, name and
+// The late-entry lift: a late scoped entry lifts toward a pass only when it fits no expected selector on source, operation, name and
 // resource (fields-blind), so an entry whose send this rule would hold undecided never lifts.
 const late = (captured, { name = DESK, resource = NOTE } = {}) => ({ name, resource, codes: [AFTER], ...(captured === undefined ? {} : { seq: 1000 + ++seq, captured }) });
 const scoped = (events, entries, { followed = true, scope = SCOPE } = {}) => {
@@ -207,10 +207,10 @@ test('7. property: every lifted window passes with each entry\'s send seen in it
 
 // ---------------------------------------------------------------------------
 // The differential: over a grid of clauses and windows (egress body fields, actors, provider-feed templates, mail, a scoped window),
-// this judge against main's (cddb4be). Its claim: a result changes only where a judged send that no expected selector matches reads
+// this judge against the earlier one. Its claim: a result changes only where a judged send that no expected selector matches reads
 // unknown under a fields-pinned expected selector (the rule's own condition); every change is to missing from a verdict that was not
 // a fail, the offenders are the same, a fail is a fail in both, and no pass is created.
-test('8. differential against cddb4be: only previously absorbed or unattributed unknown-field sends change, toward missing; no pass is created', () => {
+test('8. differential against the earlier judge: only previously absorbed or unattributed unknown-field sends change, toward missing; no pass is created', () => {
   const rand = (() => { let state = 20261013; return n => { state = (state + 0x6d2b79f5) | 0; let t = Math.imul(state ^ (state >>> 15), 1 | state); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return (((t ^ (t >>> 14)) >>> 0) % n); }; })();
   const FEED_SEL = (extra = {}) => ({ source: 'provider-feed', operation: 'send', name: FEED, ...extra });
   const TEMPLATE = [{ pointer: '/template', equals: 'order_cancelled' }];
@@ -253,7 +253,7 @@ test('8. differential against cddb4be: only previously absorbed or unattributed 
     const now = judged(clause, windows), before = mainJudged(clause, windows);
     tally.compared++;
     const inScope = windows.filter(w => !clause.sources || clause.sources.includes(w.source)).flatMap(w => w.events);
-    // Newly gated: main already held a provider-feed send undecided when it read unknown under a fields-pinned expect itself.
+    // Newly gated: the earlier judge already held a provider-feed send undecided when it read unknown under a fields-pinned expect itself.
     const mainGated = e => e.source === 'provider-feed' && clause.expect.some(x => x.select.fields !== undefined && matchState(e, x.select) === 'unknown');
     const g = inScope.filter(e => gated(clause, e) && !mainGated(e));
     assert.ok(!(now.verdict === 'pass' && before.verdict !== 'pass'), 'no pass is created');
@@ -275,7 +275,7 @@ test('8. differential against cddb4be: only previously absorbed or unattributed 
       assert.ok(['pass', 'missing', 'unobservable', 'observer-failure'].includes(before.verdict), before.verdict);
       if (before.verdict === 'pass') tally.passToMissing++; else { tally.otherToMissing++; tally.from[before.verdict] = (tally.from[before.verdict] ?? 0) + 1; }
     }
-    // Each change is a send main absorbed into an allowed selector or read unattributable, now undecided.
+    // Each change is a send the earlier judge absorbed into an allowed selector or read unattributable, now undecided.
     const allow = clause.allow;
     const absorbed = g.filter(e => allow.some(s => matches(e, s))).length, unattributed = g.length - absorbed;
     assert.equal(before.counts.allowed - now.counts.allowed + before.counts.unattributable - now.counts.unattributable > 0, true, 'a change moves a send out of allowed or unattributable');
@@ -287,7 +287,7 @@ test('8. differential against cddb4be: only previously absorbed or unattributed 
 
 // ---------------------------------------------------------------------------
 // End to end: a check whose app sends two ticket notes through a real egress recorder, the second one written so its kind reads
-// unknown. Main passed it; now it reads inconclusive. Two known cancels fail, a cancel and an update pass, and the validator agrees.
+// unknown. The earlier judge passed it; now it reads inconclusive. Two known cancels fail, a cancel and an update pass, and the validator agrees.
 async function noteApp(t, sinkPort) {
   const outbound = (host, path, body, type) => new Promise(resolve => { const req = request({ host: '127.0.0.1', port: sinkPort, method: body === undefined ? 'GET' : 'POST', path: `http://${host}${path}`,
     headers: { host, ...(body === undefined ? {} : { 'content-type': type }) } }, res => { res.resume(); res.on('end', resolve); }); req.on('error', resolve); req.end(body); });
@@ -329,7 +329,7 @@ const run = t => onFreePorts(1, async port => {
   return { p, run: await runHttpAssessment(p, { env, observerFactory: watch.factory }), lostBind: watch.state.lostBind };
 }, r => r.lostBind);
 
-test('9. end to end: through a real egress recorder, the clause over an unreadable second cancel decides missing (main: pass); the run validates', async t => {
+test('9. end to end: through a real egress recorder, the clause over an unreadable second cancel decides missing (the earlier judge: pass); the run validates', async t => {
   const r = await run(t);
   const rowOf = id => r.run.results.find(x => x.id === id);
   const statusOf = id => rowOf(id).assertions.find(a => a.name === 'Observed effect 1 (effect.only)').status;
@@ -340,11 +340,11 @@ test('9. end to end: through a real egress recorder, the clause over an unreadab
   assert.deepEqual(kindsOf('ABSENT'), [{ type: 'string', value: 'cancel' }, { type: 'absent' }]);
   assert.deepEqual(kindsOf('UPDATE'), [{ type: 'string', value: 'cancel' }, { type: 'string', value: 'update' }]);
   assert.deepEqual(['TWICE', 'FORM', 'ABSENT', 'UPDATE'].map(statusOf), ['fail', 'inconclusive', 'inconclusive', 'pass'], JSON.stringify(rowOf('FORM').assertions));
-  // The clause's own decision, before settlement: FORM and ABSENT read missing. On main they read pass, and only settlement withheld
+  // The clause's own decision, before settlement: FORM and ABSENT read missing. Under the earlier judge they read pass, and only settlement withheld
   // them here (effect-outside-window: a later check's note could be theirs), so their status alone would not tell the two apart.
   const decided = id => { const d = rowOf(id).trace[1].data.effects[0]; return [d.verdict, d.settlement ?? null]; };
   assert.deepEqual(['TWICE', 'FORM', 'ABSENT', 'UPDATE'].map(decided), [['fail', null], ['missing', null], ['missing', null], ['pass', null]]);
-  // main's judge over the same sealed windows: the unreadable second cancel was absorbed, so FORM and ABSENT read pass there.
+  // The earlier judge, over the same sealed windows: the unreadable second cancel was absorbed, so FORM and ABSENT read pass there.
   assert.deepEqual(['TWICE', 'FORM', 'ABSENT', 'UPDATE'].map(id => mainJudged(CLAUSE, windowsOf(id)).verdict), ['fail', 'pass', 'pass', 'pass']);
   validateHttpRunEvidence(r.run, { expectedSuite: createRegistry({ profiles: [r.p], env }).exportSuite(r.p.id) });
 });

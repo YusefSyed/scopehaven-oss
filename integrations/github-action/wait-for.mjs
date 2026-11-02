@@ -5,7 +5,7 @@
 // localhost is always dialled as the literal 127.0.0.1, with a fresh agent (no
 // proxy, no keep-alive) and no redirect following. Ready means any HTTP
 // response with a status from 100 to 499; 5xx and connection errors retry.
-// --until ISO_INSTANT: the end of the authorization record's window (CMP-ROE-01). It is checked before every probe,
+// --until ISO_INSTANT: the end of the authorization record's window. It is checked before every probe,
 // and once it has passed no further probe is sent: the wait stops with authorization-window-ended.
 // Exit codes: 0 ready, 1 timed out, 2 invalid options, non-loopback URL or the authorization window ended.
 import { Agent, request } from 'node:http';

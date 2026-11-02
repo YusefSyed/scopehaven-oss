@@ -1,4 +1,4 @@
-// Reviewer sign-off (CMP-HUMAN-VERIFY-01): a person's agreement or dispute with one finding,
+// Reviewer sign-off: a person's agreement or dispute with one finding,
 // recorded beside the verdict and never inside it.
 //
 // A review (scopehaven-review/1) is { reviewer, at, runId, findingId, decision: agree |

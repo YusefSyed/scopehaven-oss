@@ -102,7 +102,7 @@ export function createWorld() {
     emit(instance, spec) { events.push({ at: now, instance, seq: nextSeq(instance), spec }); },
     // The next window of this observer that covers now reads with this coverage (a missing snapshot, a partial window).
     degrade(instance, coverage, reason) { degraded.push({ at: now, instance, coverage, reason }); },
-    // The window of this observer that covers now carries a scoped entry (coverage v2): a send it could not place.
+    // The window of this observer that covers now carries a scoped entry: a send it could not place.
     carry(instance, entry) { late.push({ at: now, instance, entry }); },
     windowOf(instance, from, to) {
       const inside = e => e.instance === instance && e.at > from.at && e.at <= to.at;

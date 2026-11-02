@@ -1,4 +1,4 @@
-// SURPASS-FORGE-01: the forgery corpus against every observer configuration.
+// The forgery corpus against every observer configuration.
 // Owned synthetic stores and loopback services only (see ./corpus.mjs); every
 // connection and listener in this file is asserted to be on 127.0.0.1.
 import test from 'node:test';
@@ -33,7 +33,7 @@ const MATRIX = {
   'decoy-rows': 'fail>fail pass>inconclusive fail>fail fail>fail fail>fail fail>fail n/a',
   'write-then-revert': 'fail>fail pass>inconclusive fail>fail fail>fail fail>fail fail>fail n/a',
   'file-swap': 'pass>inconclusive pass>inconclusive observer-failure>observer-failure pass>inconclusive pass>inconclusive fail>fail n/a',
-  // A: the audit table renamed and recreated mid-run is a schema change (N13, integrations/observers/catalog.mjs), so the
+  // A: the audit table renamed and recreated mid-run is a schema change (integrations/observers/catalog.mjs), so the
   // SQL audit-table observer's window reads schema-drift and the naive false pass is gone (it was pass>inconclusive).
   'log-rotation': 'missing>missing fail>fail pass>inconclusive missing>missing pass>inconclusive fail>fail n/a',
   'spoof-principal': 'pass>inconclusive fail>fail pass>inconclusive pass>inconclusive pass>inconclusive fail>fail n/a',
@@ -162,6 +162,6 @@ test('corpus run: every mode makes a naive configuration pass, custody-gated rul
   // Loopback only.
   assert.ok(connections.length > 0 && listeners.length > 0);
   assert.deepEqual([...new Set(connections)], ['127.0.0.1']);
-  // The payments double holds its port on both loopback addresses (FIX-02): 127.0.0.1 and [::1].
+  // The payments double holds its port on both loopback addresses: 127.0.0.1 and [::1].
   assert.deepEqual([...new Set(listeners)].sort(), ['127.0.0.1', '::1']);
 });

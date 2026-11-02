@@ -23,7 +23,7 @@ export const BUILDS = Object.freeze([
   // Narrow builds, one defect each, so the mutation sweep can isolate a clause.
   'late-validation',      // claims honestly; commits before the step runs
   'inflated-precedent',   // correct order; only the claimed count lies
-  // Ordinary bugs from the review rounds. Each passed in some earlier version.
+  // Ordinary bugs found by earlier probes. Each passed in some earlier version.
   'spurious-validate',    // asks twice, hoping the second stands in for work
   'count-from-own-tally', // counts its own writes instead of real validations
   'trusts-any-recalled',  // acts on any recalled entry

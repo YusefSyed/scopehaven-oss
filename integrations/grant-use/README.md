@@ -72,7 +72,7 @@ Attribution is conservative. Only a record that names the principal, or the acto
 
 An actor's excess is `inconclusive` when its records could have missed a use. It then carries `notSeen` (what the records did not show), `undetermined` (each entry with its reasons) and `reasons`, and never an `entries` or `qualified` list, so no consumer can read a least-privilege statement off it. The reasons:
 - **A partial or failed window,** a missing snapshot among them.
-  - A scoped window (coverage v2) is partial only because of its entries: late, in-flight, ambiguous-path or sibling-host. It casts doubt only on the grant entry each of those entries could be (same name, and for an egress path the same path).
+  - A scoped window is partial only because of its entries: late, in-flight, ambiguous-path or sibling-host. It casts doubt only on the grant entry each of those entries could be (same name, and for an egress path the same path).
   - A late entry that no later row window of the same observer, and no quiescent run-end drain, follows is read window-wide, as `src` reads it (`unfollowedLate`, `followedDrains`).
 - **A recorder that did not drain** at the run end (`settlement.drains`).
 - **A sequence request no window spans.** A window spans a request when the request was sent after the window's first mark and answered (or, in the background, awaited) before its end mark.

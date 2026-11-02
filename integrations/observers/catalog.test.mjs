@@ -1,4 +1,4 @@
-// The catalog fingerprint (N13, ./catalog.mjs): its reader, its rule and its record, then pg-snapshot against a scripted
+// The catalog fingerprint (./catalog.mjs): its reader, its rule and its record, then pg-snapshot against a scripted
 // server and the SQLite observers against real database files (in a spaced temp folder). pg-wal's use of it is in
 // pg-wal.test.mjs; the definitions a real server prints, and the data operations and reverted DDL it must tell apart, are in
 // catalog.live.test.mjs.
@@ -148,7 +148,7 @@ test('catalogRecord: counts and digests only, the baseline\'s and the last mark\
 
 test('compareCatalogRecords: a retest across changed definitions is migration-between-runs, naming the kinds; anything it cannot compare says so', () => {
   const rec = (over, extra = {}) => ({ instanceId: 'db', ...catalogRecord({ engine: 'postgres', baseline: read(over), latest: read(over), drifted: false, excluded: { schemas: [], tables: [] } }), ...extra });
-  assert.deepEqual(compareCatalogRecords(undefined, []), { state: 'not-recorded', flags: [], duringRun: [] }, 'runs from before N13 read as before');
+  assert.deepEqual(compareCatalogRecords(undefined, []), { state: 'not-recorded', flags: [], duringRun: [] }, 'runs from before the catalog fingerprint read as before');
   assert.deepEqual(compareCatalogRecords([rec()], [rec()]).state, 'unchanged');
   assert.deepEqual(compareCatalogRecords([rec()], [rec()]).flags, []);
   const migrated = compareCatalogRecords([rec()], [rec({ policy: ['added'], function: ['replaced'] })]);

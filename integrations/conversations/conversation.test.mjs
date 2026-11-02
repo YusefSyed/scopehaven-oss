@@ -200,7 +200,7 @@ test('CLI writes a private report and returns 0 clean, 1 on a failure, 2 on a se
   await drill('crossCustomer', true); out = '';
   assert.equal(await main(['--spec', specFile, '--out', join(dir, 'reports'), ...authorization], { env, stdout }), 1);
   await assert.rejects(main(['--spec', specFile, '--out', join(dir, 'reports'), ...authorization], { env: {}, stdout }), /no credential/);
-  // CMP-ROE-01: without the record nothing is sent (test/authorization.test.mjs pins every refusal).
+  // Without the authorization record nothing is sent (test/authorization.test.mjs pins every refusal).
   await assert.rejects(main(['--spec', specFile, '--out', join(dir, 'reports')], { env, stdout }), error => error.code === 'authorization-missing');
 });
 
@@ -212,7 +212,7 @@ test('shipped profiles validate and hold no literal secrets: the generic JSON-ch
   }
 });
 
-// Review probes (conv-probe/probe.mjs): each must now give the safe result.
+// Adversarial probes: each must now give the safe result.
 async function probeServer(t, routes) {
   const hits = [];
   const server = createServer((req, res) => { hits.push(req.url); let b = ''; req.on('data', c => { b += c; }); req.on('end', () => {
@@ -256,7 +256,7 @@ const pconv = (id, turn, extra = {}) => ({ id, title: id, severity: 'critical', 
 const sseTurn = path => ({ path, mode: 'sse', sse: { deltaEvent: 'delta', textPointer: '/text', doneEvent: 'done' } });
 const asyncTurn = path => ({ path, mode: 'async', replyPointer: '/reply', async: { pollPointer: '/poll', statusPointer: '/status', completeValue: 'complete', intervalMs: 20, maxPolls: 3 } });
 
-test('H2: a canary is caught through case changes, zero-width characters, HTML entities and fullwidth forms', async t => {
+test('a canary is caught through case changes, zero-width characters, HTML entities and fullwidth forms', async t => {
   const { origin } = await probeServer(t, probeRoutes());
   assert.equal(foldForMatch('&#83;F\u200bＣＡＮＡＲＹ'), 'sfcanary');
   const report = await runConversations(probeSpec(origin, ['/case', '/zw', '/ent', '/fw'].map(path => pconv(`P1${path.replace('/', '-')}`, { path, mode: 'json', replyPointer: '/reply' }))), { env: probeEnv });
@@ -275,7 +275,7 @@ test('coverage: notContains covers the whole body, every stream event (including
   assert.equal(report.conversations.at(-1).trialRecords[0].turns[0].transport, 'stream-malformed', 'A malformed stream that leaked is a fail, not just an error.');
 });
 
-test('H1 and H3: a missing observer pointer is unavailable, and zero predicates or presence-only evidence alone is inconclusive, never a pass', async t => {
+test('a missing observer pointer is unavailable, and zero predicates or presence-only evidence alone is inconclusive, never a pass', async t => {
   const { origin } = await probeServer(t, probeRoutes());
   const report = await runConversations(probeSpec(origin, [
     pconv('P4-authoritative-missing-pointer', { path: '/chat', mode: 'json', replyPointer: '/reply', expect: [] }, { victimUnchanged: ['victim-auth'] }),
@@ -294,7 +294,7 @@ test('H1 and H3: a missing observer pointer is unavailable, and zero predicates 
   assert.deepEqual([only.conversations[0].trialRecords[0].victim[0].outcome, only.conversations[0].status], ['not-observed', 'inconclusive']);
 });
 
-test('L1 and L5: an unusable target poll path or an oversized captured body is a per-turn error, the run keeps earlier evidence, and a missed capture is never sent', async t => {
+test('an unusable target poll path or an oversized captured body is a per-turn error, the run keeps earlier evidence, and a missed capture is never sent', async t => {
   const { origin, hits } = await probeServer(t, probeRoutes());
   const report = await runConversations(probeSpec(origin, [
     pconv('earlier-leak', { path: '/leak', mode: 'json', replyPointer: '/reply' }),
@@ -311,7 +311,7 @@ test('L1 and L5: an unusable target poll path or an oversized captured body is a
   assert.equal(hits.some(h => h.includes('evil')), false); assert.equal(hits.includes('/second'), false, 'The turn that needed the missing capture was never sent.');
 });
 
-test('L2, L3 and L4: backtracking patterns and rate policies on canaries are refused; SSE comments, [DONE] and content-free deltas are accepted', async t => {
+test('backtracking patterns and rate policies on canaries are refused; SSE comments, [DONE] and content-free deltas are accepted', async t => {
   assert.equal(patternSafe('^(a|a)*$'), false); assert.equal(patternSafe('(a+)+b'), false); assert.equal(patternSafe('(x)\\1'), false);
   assert.equal(patternSafe('refund of \\$[0-9.]+ (issued|sent)'), true); assert.equal(patternSafe('(applied|added|approved).{0,40}50 ?%'), true);
   const base = probeSpec('http://127.0.0.1:4460', [pconv('c', { path: '/chat', mode: 'json', replyPointer: '/reply', expect: [{ kind: 'reply.notMatches', pattern: '^(a|a)*$' }] })]);

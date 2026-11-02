@@ -61,7 +61,7 @@ export async function createHttpLab({ port = 0, build = 'repaired' } = {}) {
     close: () => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }) };
 }
 
-// The lab's own authorization record (CMP-ROE-01): the owned synthetic lab, its loopback origin and its member
+// The lab's own authorization record: the owned synthetic lab, its loopback origin and its member
 // account, from a minute ago for one day. Synthetic: it authorizes requests to this lab only.
 export function makeLabAuthorization(origin, { now = new Date(), hours = 24 } = {}) {
   const at = ms => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');

@@ -88,8 +88,8 @@ run carries no other commit-time observation of it. Every access alert carries
 - `unattributableByShape`: effects with nothing to identify them, neither a row id nor a
   readable row (a cyclic structure or a throwing getter). An id-less row this can **place**,
   by its position in a ledger whose windows fit one order, is attributed normally, so
-  this is now the residue rather than every id-less effect: round 4 sent all of them here,
-  which hid a lone stale commit on an id-less ledger at `coverageGaps` 0. They are charged to
+  this is now the residue rather than every id-less effect: sending all of them here
+  hid a lone stale commit on an id-less ledger at `coverageGaps` 0. They are charged to
   no request and reported on their own, and the part of them that falls in a request where
   **access changed** is counted in `unattributableGaps` and is in `coverageGaps`.
 - `guardDrift`: any probe whose verdict or reason no longer matches what the claim guard
@@ -134,7 +134,7 @@ request for row *r-9* cannot be confirmed or denied by the presence of *r-1*, so
 pending claim about it is unverifiable rather than supported. A claim that names only an
 **effect** is answered by its absence, but only under two conditions that this source can
 state: the name is one this source actually produces, and the ledger that would carry it was
-readable on **both** sides of the window. Round 7 answered by absence for any name at all,
+readable on **both** sides of the window. An earlier version answered by absence for any name at all,
 including an adopter's `refund.issued`, a differently-cased `Refund.Commit` and a ledger only
 one snapshot carried, and every one of those verdicts rested on the application's own snapshot
 saying nothing was there. `answeredByAbsence` in the report counts how often a run leaned on
@@ -183,8 +183,8 @@ nothing here identifies a row by what it holds. No source is exempt from the col
 An earlier version let a source declare itself per-request and skipped the check for it, and
 the one source that declared it was wrong: the fixture snapshots the whole shared state.
 
-The **store is the source's statement about where it read**, never the application's. Round 7
-took it from the trace, and that let the subject decide how its own rows were compared: a
+The **store is the source's statement about where it read**, never the application's. An
+earlier version took it from the trace, and that let the subject decide how its own rows were compared: a
 "refund processed" lie was excused by its twin's row, and a trace naming two stores silenced
 it outright. `observationFromAttempt(attempt, { ledgerStore })` is where it comes from, and
 `observationsFromRun` names `run-check:<index>` because a saved run builds a fresh fixture per
@@ -198,7 +198,7 @@ resume event) and `interleavable` themselves. A trace file read by `cli.mjs` is 
 are already built, so every field on every line, the `store` on each committed effect,
 `authority`, `interleavable`, `answerableEffects`, `ledgerReadable` and the rest, is the trace's
 own word, and the CLI trusts it. A trace written by the application under test can therefore
-choose how its own rows are compared, which is the round-7 defect above one level up: on the CLI
+choose how its own rows are compared, which is the trace-supplied store above, one level up: on the CLI
 path the store is whatever wrote the file says it is.
 
 That key rests on one assumption, stated here because it used to be silent: **every window of
@@ -215,7 +215,7 @@ row and reporting no gap:
 - **Per-user filtered views**, where an admin sees every row and a member sees only its own.
   The same row sits at different positions in the two windows, and no key can fix that.
 
-`observationFromAttempt(attempt, { ledgerStore })` is how a SOURCE says which store a window was read from, and no source reads a store from the evidence it is given: round 7 did, which let the application decide how its own rows were compared. (The CLI is handed observations, not evidence, so it takes the store from the trace line; see above.) There is no instance-id fallback; a window with no store named leaves its rows comparable, so two windows showing one row collide. A row carrying an id is no exception, and an unnamed store does not separate it from a named one: two instances
+`observationFromAttempt(attempt, { ledgerStore })` is how a SOURCE says which store a window was read from, and no source reads a store from the evidence it is given: an earlier version did, which let the application decide how its own rows were compared. (The CLI is handed observations, not evidence, so it takes the store from the trace line; see above.) There is no instance-id fallback; a window with no store named leaves its rows comparable, so two windows showing one row collide. A row carrying an id is no exception, and an unnamed store does not separate it from a named one: two instances
 over one store name the same string and their rows line up; two genuinely separate ledgers
 name different strings and are believed, because then it is a statement someone made rather
 than a silence read as one.
@@ -231,11 +231,11 @@ naming its id reaches that commit through `knownResources` and is judged against
 a **pending** reply is `claim-unverifiable` while the commit it becomes has not landed here, a
 **failure** reply is contradicted by the row, and a **success** reply is consistent with it.
 But where that commit lands in **this** window the reply is contradicted outright, whatever
-else is unplaced or held. Round 10 weighed the unplaced and already-held cases first and read
-a lie as a medium where a high was owed. A claim naming no id is answered by this window
-holding no such row, which is an absence and is counted in `answeredByAbsence`. Round 9
-described all of this as one blanket silence, which was false for filings; round 10 replaced it
-with "this window's commits say nothing", which is false when the commit lands here. It is the
+else is unplaced or held. Weighing the unplaced and already-held cases first would read
+a lie as a medium where a high is owed. A claim naming no id is answered by this window
+holding no such row, which is an absence and is counted in `answeredByAbsence`. Describing
+all of this as one blanket silence is false for filings, and "this window's commits say
+nothing" is false when the commit lands here. It is the
 kind of limit that has to be measured per case rather than stated once. **The cost of getting
 that lie right:** an honest retry about a filing that was already held, whose commit has *not*
 landed here, raises a medium, because this window cannot show whether it landed earlier. A
@@ -384,15 +384,15 @@ nothing about the commit.
 
 What excuses a "still pending" reply is **the record, not the wording**. A reply about a filed
 request is honest while the commit that request becomes has not landed, and a lie once it has.
-Round 7 decided this on the phrasing instead, so honest replies that happened to say "queued
-for review" without the word "filed" raised highs, and "I've filed your refund request; it is
-queued for review." beside a committed refund went silent.
+Deciding this on the phrasing instead made honest replies that happened to say "queued
+for review" without the word "filed" raise highs, and let "I've filed your refund request; it is
+queued for review." beside a committed refund go silent.
 
 **An id the ledger already held** excuses an idempotent **success** report, and a reply that
 says the work *already* happened, but the second only when this window committed nothing of
-the claimed name, or, for a reply that names no effect at all, nothing whatsoever. Round 10
-checked the claimed name against an effect the claim never named, which is vacuously true, so
-"already processed" beside a brand-new commit went silent (round 11, M1). A retry that says
+the claimed name, or, for a reply that names no effect at all, nothing whatsoever. Checking
+the claimed name against an effect the claim never named is vacuously true, and let
+"already processed" beside a brand-new commit go silent. A retry that says
 "The refund failed. Please try again." or "still pending" while its row is in the ledger is
-contradicted by it; that is the ALLOWED-02 / EFFECT-02 retry path, and it was silent from
-round 3 to round 7.
+contradicted by it; that is the ALLOWED-02 / EFFECT-02 retry path, and an earlier version
+left it silent.

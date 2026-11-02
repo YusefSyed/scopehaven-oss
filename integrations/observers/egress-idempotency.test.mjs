@@ -1,4 +1,4 @@
-// Gap 3 (W6) end to end over real loopback HTTP: an egress destination that declares an idempotency header records a
+// Keyed retries end to end over real loopback HTTP: an egress destination that declares an idempotency header records a
 // salted key record on each send, and an effect.count clause with countBy "idempotency-key" counts an exact keyed replay
 // once. Every request goes to 127.0.0.1; destination hosts are names only and are never resolved or contacted.
 import test from 'node:test';
@@ -137,7 +137,7 @@ async function keyedApp(t, sinkPort) {
 const env = { SCOPEHAVEN_TARGET_OPS: 'synthetic-ops-token' };
 const check = (id, path, effects) => ({ id, title: id, category: 'refunds', severity: 'high', actorId: 'ops', method: 'POST', path, body: {}, evidenceRequirement: 'response', assertions: [{ kind: 'status.equals', expected: 200 }], effects });
 // ORDER is the actor's required allowed-use control with a positive effect (one keyed order on its own path), so an unpinned
-// effect.only is guarded (FIX-07).
+// effect.only is guarded.
 const profileOf = (origin, port, checks) => ({ id: 'keyed-refunds', name: 'Keyed refunds', applicationId: 'keyed-refunds', origin, buildLabel: 'b1', contextId: 'synthetic-keyed-refunds',
   actors: { ops: { principalId: 'ops', credentialEnv: 'SCOPEHAVEN_TARGET_OPS', identityValue: 'ops' } }, requiredControlIds: ['WHOAMI', 'ORDER'],
   observers: [{ id: 'sink', type: 'egress-recorder', port, routing: 'proxy', destinations: [{ host: PAY, paths: ['/v1/retry', '/v1/double', '/v1/once', '/v1/reuse', '/v1/orders'], idempotency: { header: 'idempotency-key' } }], witness: { actorId: 'ops', method: 'GET', path: '/ping', host: WITNESS }, settleMs: 250, quietMs: 150 }],
@@ -160,7 +160,7 @@ test('connector run: countBy counts applications, the run binds the declaration,
   assert.equal(row('ONCE').status, 'pass');
   assert.equal(row('REUSE-B').status, 'inconclusive', 'a key the app already used in an earlier check');
   assert.match(row('RETRY').assertions.find(a => a.name === 'Observed effect 1 (effect.count)').expected, /application/);
-  assert.deepEqual(r.observers.map(o => o.collector), [COLLECTOR_RECORDS['egress-recorder']], 'the collector that built the windows (coverage v2, Part E)');
+  assert.deepEqual(r.observers.map(o => o.collector), [COLLECTOR_RECORDS['egress-recorder']], 'the collector that built the windows');
   assert.deepEqual(r.observers.map(({ collector, ...o }) => o), [{ id: 'sink', type: 'egress-recorder', settleMs: 250, idempotency: { [PAY]: { header: 'idempotency-key', pointer: null, methods: ['POST'], volatile: [], maxBytes: null } } }]);
   assert.ok(r.limitations.includes(IDEMPOTENCY_LIMITATION));
   const suite = createRegistry({ profiles: [p], env }).exportSuite(p.id);
@@ -191,7 +191,7 @@ test('connector run: countBy counts applications, the run binds the declaration,
   assert.throws(() => validateTargetFile({ schemaVersion: 1, targets: [{ ...p, observers: [{ ...p.observers[0], destinations: [{ host: PAY, paths: ['/v1/retry', '/v1/double', '/v1/once', '/v1/reuse'] }] }] }] }), /effect-count-by-unrecorded/);
 });
 
-// effect.only with countBy "idempotency-key" (DP2 practice product gap a), end to end. The pass is the last check with sends: a
+// effect.only with countBy "idempotency-key", end to end. The pass is the last check with sends: a
 // later committed send would withhold an effect.only pass (settlement), whatever its key.
 test('connector run: an effect.only countBy clause counts an exact keyed retry once; without countBy it is a second send', async t => {
   const onlyAt = (path, extra = {}) => ({ kind: 'effect.only', expect: [{ source: 'http-egress', operation: 'send', name: PAY, resource: `POST ${path}` }], allow: [], operations: ['send'], ...extra });

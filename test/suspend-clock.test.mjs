@@ -1,5 +1,5 @@
-// Suspend-aware custody time, first slice (src/suspend-clock.mjs; a review record outside this repository section 7.3,
-// F4; the DP5 case R65-123). Fake clocks for the detector; synthetic windows for the coverage label and the property that the label
+// Suspend-aware custody time (src/suspend-clock.mjs). Fake clocks for the detector; synthetic windows for the coverage label and
+// the property that the label
 // never moves a verdict; a virtual clock with an injected transport and observer for the settle, horizon, barrier and final waits;
 // and runs over real loopback HTTP (an egress recorder with proxy routing and a witness) for the label and for the wait extension
 // end to end. Destination hosts are names only and are never resolved or contacted: no database, no model, no provider.
@@ -108,7 +108,7 @@ test('detector: several suspends (a lid-closed sleep with maintenance DarkWakes)
 
 test('detector: an unusable reading decides nothing across it, a monotonic clock that went back is ignored, and the record stays bounded', () => {
   // Where the timers do not count sleep. Where they do, an unusable reading on an awake clock already seen to move is a suspend of the
-  // pair (F4d, test/suspend-f4d.test.mjs item 5).
+  // pair (test/suspend-f4d.test.mjs).
   const h = fakeHost();
   let broken = false;
   const d = createSuspendDetector({ ...h.clocks, awake: () => { if (broken) throw new Error('EPERM'); return h.awake; } });
@@ -293,7 +293,7 @@ test('coverage: a window a host suspend overlapped names it, specifically and fi
   const [presence] = effectAssertionRows(decideEffects([{ kind: 'effect.exists', select: sel(PAY) }], [sent]));
   assert.equal(presence.status, 'pass');
   assert.doesNotMatch(presence.actual, /suspended/, 'a recorded match does not rest on coverage');
-  // Minor 2 of the final review: a later stage's reason in the basis comes before the note, so the 600-character cap cuts the note.
+  // A later stage's reason in the basis comes before the note, so the 600-character cap cuts the note.
   const reasoned = { ...quiet[0], basis: `${quiet[0].basis} ${'A later stage gave its reason here. '.repeat(10)}END-OF-REASON.` };
   const [cut] = effectAssertionRows([reasoned]);
   assert.equal(cut.actual.length, 600);
@@ -308,13 +308,13 @@ test('coverage: a window a host suspend overlapped names it, specifically and fi
   for (const bad of [{ ...RECORD, cause: 'nap' }, { ...RECORD, ms: -1 }, 'host-sleep', null]) assert.throws(() => validateWindow({ ...plainWindow, suspend: bad }), /suspend/);
 });
 
-// With absent fields (#339): an absent-field fail rests on the window's coverage (a field absent from a body the recorder read in
+// With absent fields: an absent-field fail rests on the window's coverage (a field absent from a body the recorder read in
 // full reads "no"), so on a window a host suspend overlapped its basis names the suspend; the verdict, the count and the absenceDecided
 // tag (which compareRuns never credits as a repair) are unchanged.
 test('with absent fields: an absent-field fail on a window a host suspend overlapped names the suspend and keeps its verdict and absenceDecided tag', () => {
   const BILL = 'billing.example.test', instanceId = 'egress-recorder-sink';
   const scope = { operations: ['send'], names: [BILL], actorAttribution: 'none', evidence: 'authoritative', capture: { [BILL]: ['/amount', '/amount_cents'] }, captureForm: [BILL] };
-  // R65-012's shape: the refund was captured in full as a form, amount=43, and the pinned /amount_cents is absent.
+  // The refund was captured in full as a form, amount=43, and the pinned /amount_cents is absent.
   const refund = makeEffect({ source: 'http-egress', observer: { kind: 'http-egress-recorder', instanceId }, seq: 1, operation: 'send', name: BILL, resource: 'POST /billing/v1/orders/QTN-6207/refunds',
     outcome: 'committed', content: { seq: 1 }, captured: { status: 'captured', values: { '/amount': { type: 'text', value: '43' }, '/amount_cents': { type: 'absent' } } } });
   const window = { source: 'http-egress', instanceId, scope, coverage: 'complete', reason: null, events: [refund] };
@@ -519,7 +519,7 @@ test('horizon (declared timing): the extension is never past the wait deadline, 
   validateHttpRunEvidence(run, { expectedSuite: suiteOf(p) });
   const deadline = 1000 + p.timing.runBudgetMs;
   const windowOf = r => r.results.find(x => x.id === 'REFUND').trace[1].data.windows[0];
-  // `before`: main's behaviour (the suspend is recorded but nothing is extended or sealed short), which seals H whatever was lost.
+  // `before`: the earlier behaviour (the suspend is recorded but nothing is extended or sealed short), which seals H whatever was lost.
   const pair = async asleep => {
     const onSleep = (ms, n) => (ms === H && n === 1 ? [1000, asleep] : null);
     const now = virtualHost({ delay, onSleep }), old = virtualHost({ delay, onSleep });
@@ -581,9 +581,9 @@ test('barrier and final settle: a suspend in either is extended the same way, an
   assert.deepEqual(roomless.v.sleeps, [5000, 5000]);
 });
 
-// PR340-REVIEW-FINAL.md finding 1, the reviewer's probe: a GET control, then a high-severity check whose app refuses (403) yet makes
+// A GET control, then a high-severity check whose app refuses (403) yet makes
 // the forbidden send `delay` ms of awake time after its reply; an effect.none clause forbids it. A suspend the extension cannot
-// restore used to leave the window complete, so the clause passed on missing evidence (main does, silently).
+// restore used to leave the window complete, so the clause passed on missing evidence (the earlier behaviour does, silently).
 function forbidProfile({ timing = null, settleMs = 5000 } = {}) {
   const p = { id: 'suspend-forbid', name: 'Suspend forbid', applicationId: 'suspend-forbid', origin: 'http://127.0.0.1:9', buildLabel: 'b', contextId: 'synthetic',
     actors: { owner: { principalId: 'owner-1' } }, requiredControlIds: ['ME'],
@@ -604,7 +604,7 @@ const forbidRun = async (p, { delay, onSleep, detectorOf }) => {
   return { v, run };
 };
 
-test('finding 1 sweep (declared timing): a horizon the sleep cut short beyond what the budget restores is sealed short and reads partial; no absence passes on missing evidence', async t => {
+test('sweep (declared timing): a horizon the sleep cut short beyond what the budget restores is sealed short and reads partial; no absence passes on missing evidence', async t => {
   const H = 30000, p = forbidProfile({ timing: { H } });
   // The suspend lands 1 s into the FORBID horizon (the first H-long wait after its POST; the earlier one is its lead-in).
   const inHorizon = asleep => (ms, n, v) => (asleep && v.posts === 1 && ms === H && !v.cut ? (v.cut = true, [1000, asleep]) : null);
@@ -621,13 +621,13 @@ test('finding 1 sweep (declared timing): a horizon the sleep cut short beyond wh
       assert.match(forbidEffect(now.run).actual, /host suspended \(sleep\) about \d+ s between .*effect-horizon-truncated/);
     } else assert.equal(status, 'fail', `${seconds} s: the horizon held in full, so the forbidden send is in its window`);
   }
-  // Not vacuous: the sweep covers held-in-full and held-short horizons, and main's behaviour still passes where this one is short.
+  // Not vacuous: the sweep covers held-in-full and held-short horizons, and the earlier behaviour still passes where this one is short.
   assert.ok(table.some(r => r.held === H && r.seconds > 0) && table.some(r => r.held < H), JSON.stringify(table));
-  assert.ok(table.some(r => r.seconds >= 80 && r.held < H && r.main === 'pass'), `main passes wrongly where the horizon is short: ${JSON.stringify(table)}`);
-  t.diagnostic(`timing sweep (seconds asleep, status, awake ms held of ${H}, main): ${table.map(r => `${r.seconds}:${r.status}/${r.held}/${r.main}`).join(' ')}`);
+  assert.ok(table.some(r => r.seconds >= 80 && r.held < H && r.main === 'pass'), `the earlier behaviour passes wrongly where the horizon is short: ${JSON.stringify(table)}`);
+  t.diagnostic(`timing sweep (seconds asleep, status, awake ms held of ${H}, the earlier behaviour): ${table.map(r => `${r.seconds}:${r.status}/${r.held}/${r.main}`).join(' ')}`);
 });
 
-test('finding 1 sweep (no timing plan): a settle the sleep cut short beyond the spare budget reads partial (host-suspend-wait-short), and so does the run-end window; no absence passes', async t => {
+test('sweep (no timing plan): a settle the sleep cut short beyond the spare budget reads partial (host-suspend-wait-short), and so does the run-end window; no absence passes', async t => {
   const p = forbidProfile();
   // The suspend lands in the FORBID settle (the first 5000 ms wait after its POST) and again in the final settle (the next one: with
   // the default 60 s budget these sleeps leave less than 5000 ms of room, so no extension is ever exactly 5000 ms).
@@ -645,8 +645,8 @@ test('finding 1 sweep (no timing plan): a settle the sleep cut short beyond the 
     assert.equal(status, window.events.length ? 'fail' : 'inconclusive');
     if (status === 'inconclusive') assert.match(forbidEffect(now.run).actual, /and its wait held about \d+ s less awake time than declared, host-suspend-wait-short\)/);
   }
-  assert.ok(table.some(r => r.main === 'pass'), `main passes wrongly in this sweep: ${JSON.stringify(table)}`);
-  t.diagnostic(`no-plan sweep (seconds asleep, status, settle shortMs, tail shortMs, main): ${table.map(r => `${r.seconds}:${r.status}/${r.shortMs}/${r.tailShortMs}/${r.main}`).join(' ')}`);
+  assert.ok(table.some(r => r.main === 'pass'), `the earlier behaviour passes wrongly in this sweep: ${JSON.stringify(table)}`);
+  t.diagnostic(`no-plan sweep (seconds asleep, status, settle shortMs, tail shortMs, the earlier behaviour): ${table.map(r => `${r.seconds}:${r.status}/${r.shortMs}/${r.tailShortMs}/${r.main}`).join(' ')}`);
   // The shortfall is sealed evidence: dropped from the record, or the window stored complete with it, the run is refused.
   const { run } = await forbidRun(p, { delay: 4800, onSleep: inBoth(80000), detectorOf: v => v.detector() });
   const reseal = edit => {
@@ -660,22 +660,22 @@ test('finding 1 sweep (no timing plan): a settle the sleep cut short beyond the 
     assert.throws(() => validateHttpRunEvidence(reseal(edit)), error => error.code === 'invalid-run-evidence', String(edit));
 });
 
-test('inert: where the timers count sleep but no awake clock can be read, every verdict is exactly main\'s, and every coverage-decided row says host sleep could not be checked', async () => {
+test('inert: where the timers count sleep but no awake clock can be read, every verdict is exactly the earlier behaviour\'s, and every coverage-decided row says host sleep could not be checked', async () => {
   const p = forbidProfile();
   const inBoth = (ms, n, v) => (v.posts === 1 && ms === 5000 && (v.cuts ?? 0) < 2 ? (v.cuts = (v.cuts ?? 0) + 1, [v.cuts === 1 ? 500 : 100, 70000]) : null);
-  // inert: the timers count sleep, no awake clock. main: exactly main's behaviour, which neither sees nor records a suspend.
+  // inert: the timers count sleep, no awake clock. The second run: a detector that reads no clock, which neither sees nor records a suspend.
   const inert = await forbidRun(p, { delay: 4800, onSleep: inBoth, detectorOf: v => v.detector(true, null) });
   const main = await forbidRun(p, { delay: 4800, onSleep: inBoth, detectorOf: v => v.detector(false, null) });
   assert.deepEqual(inert.v.sleeps, main.v.sleeps, 'nothing extended');
   assert.deepEqual(inert.run.results.map(r => [r.id, r.status, r.assertions.map(a => a.status)]), main.run.results.map(r => [r.id, r.status, r.assertions.map(a => a.status)]));
   const window = forbidRow(inert.run).trace[1].data.windows[0];
   assert.deepEqual([window.suspendUnchecked, Object.hasOwn(window, 'suspend'), window.coverage], [true, false, 'complete']);
-  assert.equal(forbidEffect(main.run).status, 'pass', 'main passes this case on missing evidence; inert is never more lenient than that');
+  assert.equal(forbidEffect(main.run).status, 'pass', 'the earlier behaviour passes this case on missing evidence; inert is never more lenient than that');
   assert.equal(forbidEffect(inert.run).actual, `${forbidEffect(main.run).actual} ${SUSPEND_UNCHECKED_NOTE}`.slice(0, 600));
   assert.ok(!Object.hasOwn(forbidRow(main.run).trace[1].data.windows[0], 'suspendUnchecked'), 'where the timers do not count sleep, nothing is said');
 });
 
-// R65-123, end to end over loopback: a check whose app makes a send after the witness request, with nothing after it to follow it,
+// End to end over loopback: a check whose app makes a send after the witness request, with nothing after it to follow it,
 // reads inconclusive. With a host suspend injected during the check (fake clocks over the real ones; the run's waits are not
 // extended here), the same verdict now names the suspend; the run validates, and the record cannot be edited or dropped.
 async function lateApp(t, sinkPort, onLate) {
@@ -710,7 +710,7 @@ const lateRun = (t, suspendMs) => onFreePorts(1, async port => {
   return { p, run: await runHttpAssessment(p, { env: opsEnv, observerFactory: watch.factory, suspendClock }), lostBind: watch.state.lostBind };
 }, r => r.lostBind);
 
-test('R65-123 end to end: the partial window that made a clean case abstain now says the host was suspended; the verdict is the same, and the record is sealed', async t => {
+test('late send end to end: the partial window that made a clean case abstain now says the host was suspended; the verdict is the same, and the record is sealed', async t => {
   const plainRun = await lateRun(t, 0), slept = await lateRun(t, 112000);
   const rowOf = r => r.run.results.find(x => x.id === 'LATE'), effectOf = row => row.assertions.find(a => a.name === 'Observed effect 1 (effect.none)');
   const a = rowOf(plainRun), b = rowOf(slept);
@@ -735,11 +735,11 @@ test('R65-123 end to end: the partial window that made a clean case abstain now 
     assert.throws(() => validateHttpRunEvidence(reseal(edit)), error => error.code === 'invalid-run-evidence', String(edit));
 });
 
-// R65-123's mechanism, end to end over loopback: the host sleeps during the check's settle; the run's timer, counting the sleep, ends
+// The mechanism, end to end over loopback: the host sleeps during the check's settle; the run's timer, counting the sleep, ends
 // the settle at wake, and the app's requests made after wake (its wake burst) arrive after the witness request, so the window reads
 // partial and the clean case inconclusive. Here the app answers at once and makes its send to HOOK burstMs later (or, when the witness
-// ping comes first, just before answering it, after the witness request, as R65-123's did); the sleep is injected into the detector's
-// clocks 100 ms into the settle, as lost awake time. Main's behaviour (a detector that reads no clock: no record, no extension) is
+// ping comes first, just before answering it, after the witness request, as in the case above); the sleep is injected into the detector's
+// clocks 100 ms into the settle, as lost awake time. The earlier behaviour (a detector that reads no clock: no record, no extension) is
 // partial and inconclusive; with the extension the settle covers the burst, the recorder sees it inside the window, and the window
 // is complete, so the clause decides on what the recorder saw.
 async function wakeApp(t, sinkPort, { burstMs, onReply }) {
@@ -773,10 +773,10 @@ const wakeRun = (t, detectorOf) => onFreePorts(1, async port => {
   return { p, run: await runHttpAssessment(p, { env: opsEnv, observerFactory: watch.factory, suspendClock: detectorOf(host) }), lostBind: watch.state.lostBind };
 }, r => r.lostBind);
 
-test('R65-123 end to end, the wait: a settle the host slept through is extended in awake time, so the wake burst lands inside the window, the window is complete and the clean case decides', async t => {
+test('late send end to end, the wait: a settle the host slept through is extended in awake time, so the wake burst lands inside the window, the window is complete and the clean case decides', async t => {
   const rowOf = r => r.run.results.find(x => x.id === 'LATE'), effectOf = row => row.assertions.find(a => a.name === 'Observed effect 1 (effect.none)');
   const validated = r => validateHttpRunEvidence(r.run, { expectedSuite: createRegistry({ profiles: [r.p], env: opsEnv }).exportSuite(r.p.id) });
-  // Main's behaviour: no suspend is seen, the settle ends on its timer, the burst comes after the witness request.
+  // The earlier behaviour: no suspend is seen, the settle ends on its timer, the burst comes after the witness request.
   const main = await wakeRun(t, () => createSuspendDetector({ awake: null, elapsed: null }));
   const before = rowOf(main), beforeWindow = before.trace[1].data.windows[0];
   assert.deepEqual([beforeWindow.coverage, beforeWindow.reason], ['partial', 'egress-request-after-witness-request']);

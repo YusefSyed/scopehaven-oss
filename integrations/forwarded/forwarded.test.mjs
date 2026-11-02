@@ -1,8 +1,8 @@
-// SURPASS-REMOTE-01: the operator-forwarded mode through a forwarder that can be misconfigured.
+// The operator-forwarded mode through a forwarder that can be misconfigured.
 // A loopback notes app stands in for staging; a loopback forwarder in front of it plays the
 // operator's proxy, in four modes applied to every request (clean, cookie-rewrite,
-// strip-authorization, redirect-signin) and, from round 2, two that answer requests themselves
-// (deny-admin on one route, deny-all): the limits the integrator's review K found, and their mitigations.
+// strip-authorization, redirect-signin) and two that answer requests themselves
+// (deny-admin on one route, deny-all): the limits those expose, and their mitigations.
 // One bearer actor, one cookie actor, one anonymous actor. No network beyond 127.0.0.1, no model,
 // provider or customer system. The live run against a TLS staging copy of the Open WebUI practice
 // app is recorded in README.md; this file pins the same behaviour without Docker.
@@ -106,7 +106,7 @@ async function assess(t, { mode = 'clean', app = 'secure', forwarded = true, adm
 }
 
 test('through a clean forwarder: both logins are proven (bearer and cookie), every check holds, and the run says it was forwarded', async t => {
-  // H1 step 2: each boundary pass needs a passing required control on the same route, so OWNER-ADMIN needs the administrator's.
+  // Each boundary pass needs a passing required control on the same route, so OWNER-ADMIN needs the administrator's.
   const { run, gate } = await assess(t, { adminControl: true });
   assert.ok(Object.values(statuses(run)).every(s => s === 'pass'), JSON.stringify(statuses(run)));
   assert.deepEqual(identity(run), { member: 'established', owner: 'established', admin: 'established' });
@@ -115,10 +115,10 @@ test('through a clean forwarder: both logins are proven (bearer and cookie), eve
   assert.ok(run.scopeLabel.startsWith(PREFIX));
   assert.ok(renderReport(run).includes(PREFIX)); assert.ok(JSON.stringify(renderSarif(run)).includes(PREFIX));
   assert.deepEqual([gate.exitCode, gate.current.targetContext, gate.current.targetLabel], [0, 'operator-forwarded', LABEL]);
-  assert.ok(gate.current.interpretation.startsWith(PREFIX), 'the gate states the forwarded target first (K3)');
+  assert.ok(gate.current.interpretation.startsWith(PREFIX), 'the gate states the forwarded target first');
 });
 
-test('H1 step 2: a forwarded boundary pass with no passing same-route required control keeps the gate from reading clean; a local-app run is unaffected', async t => {
+test('a forwarded boundary pass with no passing same-route required control keeps the gate from reading clean; a local-app run is unaffected', async t => {
   // OWNER-ADMIN (GET /admin/settings) has no required control on its route: check-config names it before any run.
   assert.deepEqual(forwardedPairingGaps(profile('http://127.0.0.1:1')), ['OWNER-ADMIN']);
   assert.deepEqual(forwardedPairingGaps(profile('http://127.0.0.1:1', { adminControl: true })), []);
@@ -154,7 +154,7 @@ test('H1 step 2: a forwarded boundary pass with no passing same-route required c
     { id: 'C', severity: 'control', method: 'GET', path: '/search?q=own' }, { id: 'B', severity: 'high', method: 'GET', path: '/search?q=other' }, { id: 'S', severity: 'high', method: 'GET', path: '/search?q=own' }] }), ['B']);
 });
 
-test('F8: through the forwarder, a build that refuses everything and one that answers everything both fail the gate', async t => {
+test('through the forwarder, a build that refuses everything and one that answers everything both fail the gate', async t => {
   const nothing = await assess(t, { app: 'do-nothing' });
   assert.deepEqual([statuses(nothing.run)['OWN-NOTES'], statuses(nothing.run)['OWNER-NOTE']], ['fail', 'fail']);
   // The logins work, but each actor's required allowed-use control failed: its refusals are not read as holds.
@@ -206,19 +206,19 @@ test('a forwarded run is never compared with a local-app run of the same app, an
   assert.equal(gate.comparison.compatibility, 'incompatible');
 });
 
-// Round 2 (review FORWARDED-REMOTE-REVIEW-2026-10-07). Identity proof covers the identity route only:
+// Identity proof covers the identity route only:
 // a forwarder that answers or alters one route itself, and leaves /me alone, is not seen by it.
-test('K1, closed at the gate: a forwarder that denies /admin/* itself makes OWNER-ADMIN read pass on a build that leaks it, and the gate is not clean', async t => {
+test('a forwarder that denies /admin/* itself makes OWNER-ADMIN read pass on a build that leaks it, and the gate is not clean', async t => {
   const through = await assess(t, { app: 'owner-admin' });
   assert.equal(statuses(through.run)['OWNER-ADMIN'], 'fail', 'through a clean forwarder the leak shows');
   const denied = await assess(t, { app: 'owner-admin', mode: 'deny-admin' });
   assert.deepEqual(identity(denied.run), { member: 'established', owner: 'established' });
   assert.equal(statuses(denied.run)['OWNER-ADMIN'], 'pass', 'the row: the forwarder’s own 403 reads as a hold');
-  // Before H1 step 2 this gate exited 0. No required control passed on that route, so the pass does not count.
+  // Before same-route pairing this gate exited 0. No required control passed on that route, so the pass does not count.
   assert.deepEqual([denied.gate.exitCode, denied.gate.reasons], [1, ['forwarded-pass-unpaired']]);
 });
 
-test('PR453-REVIEW m1: the comparison and SARIF read the forwarder\'s own answer the way the gate does, never as a repair', async t => {
+test('the comparison and SARIF read the forwarder\'s own answer the way the gate does, never as a repair', async t => {
   // One forwarder in front of the leaking build: the baseline passes /admin/* through, the candidate denies it in the forwarder.
   const state = { mode: 'clean' };
   const origin = await forwarder(t, await notesApp(t, 'owner-admin'), () => state.mode);
@@ -256,7 +256,7 @@ test('PR453-REVIEW m1: the comparison and SARIF read the forwarder\'s own answer
   assert.ok(gate.reasons.includes('forwarded-pass-unpaired') && gate.reasons.includes('comparison-incomplete'), JSON.stringify(gate.reasons));
 });
 
-test('K1 mitigation: a required positive control on the same route turns the gate red when the forwarder answers that route itself', async t => {
+test('a required positive control on the same route turns the gate red when the forwarder answers that route itself', async t => {
   const clean = await assess(t, { adminControl: true });
   assert.deepEqual([statuses(clean.run)['ADMIN-SETTINGS'], clean.gate.exitCode], ['pass', 0], 'the control passes through a clean forwarder');
   const denied = await assess(t, { app: 'owner-admin', mode: 'deny-admin', adminControl: true });
@@ -267,7 +267,7 @@ test('K1 mitigation: a required positive control on the same route turns the gat
   assert.equal(statuses(denied.run)['OWNER-ADMIN'], 'pass');
 });
 
-test('K2: a forwarder that answers everything with 401 reads the signed-out forbidden row as pass without an anonymous control, and never with one', async t => {
+test('a forwarder that answers everything with 401 reads the signed-out forbidden row as pass without an anonymous control, and never with one', async t => {
   const without = await assess(t, { mode: 'deny-all', anonymousControl: false });
   assert.equal(statuses(without.run)['ANON-NOTES'], 'pass', 'the known limit: nothing reached the app');
   assert.equal(without.gate.exitCode, 1, 'the gate is red for the unproven logins');

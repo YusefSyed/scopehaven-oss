@@ -61,7 +61,7 @@ test('the gate holds the model tap itself: strict passes an unchanged model and 
   const { state, target, env, tapPort } = await modelServedApp(t);
   const dir = await scratch(t), outputDirectory = join(dir, 'gate');
   const config = async build => { const path = join(dir, `targets-${build}.json`); await writeFile(path, JSON.stringify({ schemaVersion: 1, targets: [target(build)] })); return path; };
-  // CMP-ROE-01: the record covers the app and the owned tap's model upstream, which the gate forwards to.
+  // The authorization record covers the app and the owned tap's model upstream, which the gate forwards to.
   const authorizationFile = writeTestAuthorization(join(dir, 'authorization.json'), target('any'), { origins: [env[OWNED_TAP_ENV.upstream]] });
   const gate = async (build, extra = {}) => runGate({ targetId: 'owned-stub', configFile: await config(build), outputDirectory, authorizationFile, ...extra }, { env });
   // Baseline: the unrepaired build fails its boundary check. No strict switch without a baseline.

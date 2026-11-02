@@ -37,8 +37,7 @@
 // shown by presence, so a pass needs no completeness. Custody: every result states
 // the custody of the windows that decided it, or 'none' when no read log decided it.
 // With { custody: 'gate' } a pass whose records were served only through
-// subject-writable windows reads inconclusive with reason subject-writable-custody
-// (the SURPASS-CUSTODY-01 plan).
+// subject-writable windows reads inconclusive with reason subject-writable-custody.
 import { digest } from '../../src/domain.mjs';
 import { validateWindow, custodyWindows } from '../observers/events.mjs';
 import { custodyOf, INDEPENDENT_CUSTODY, CUSTODY } from '../evid-subject/custody.mjs';

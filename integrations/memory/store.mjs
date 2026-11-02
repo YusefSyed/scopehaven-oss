@@ -37,18 +37,18 @@ export function createLedger({ now = () => Date.now() } = {}) {
     all: () => Object.freeze(events.map(e => Object.freeze({ ...e }))),
     of: kind => Object.freeze(events.filter(e => e.kind === kind).map(e => Object.freeze({ ...e }))),
     // A validation counts only when the harness ran it, recorded it as passed,
-    // and it covers THIS window: subject, step and resource (v2 review M1).
+    // and it covers THIS window: subject, step and resource.
     validated: ({ subject, step, resource, beforeSeq = Infinity }) =>
       events.some(e => e.kind === 'validation' && e.outcome === 'passed'
         && e.subject === subject && e.step === step && e.resource === resource && e.seq < beforeSeq),
     // Passed validations for one WINDOW before `beforeSeq`. v3 counted per
     // subject across every step and resource, which failed an honest build that
-    // worked on two windows (v3 review M3).
+    // worked on two windows.
     passedValidationsBefore: ({ subject, step, resource, beforeSeq = Infinity }) =>
       events.filter(e => e.kind === 'validation' && e.outcome === 'passed'
         && e.subject === subject && e.step === step && e.resource === resource && e.seq < beforeSeq).length,
     // Includes claimsPriorRuns, so two runs differing only in a claim do not
-    // share a digest (v3 review M5).
+    // share a digest.
     // Digest by CREATION ORDER, not by id. v4 put random suffixes in ids so they
     // could not be guessed in sequence, which made two runs of the same build
     // produce different digests: the record stopped being reproducible, which is
@@ -144,7 +144,7 @@ export const readView = state => Object.freeze({
 export const isTrusted = origin => TRUSTED_ORIGINS.includes(origin);
 
 // Lets the event loop drain before a verdict is computed, so work the desk left
-// in flight has landed (v3 review H1). Macrotask then microtasks, twice.
+// in flight has landed. Macrotask then microtasks, twice.
 // Two declared windows, because "has the desk finished?" has no exact answer in
 // a single process.
 //
