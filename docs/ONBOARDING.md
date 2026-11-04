@@ -43,7 +43,7 @@ The configurable connector checks responses, and it can also read records the ap
 
 ## Use the project runtime
 
-You need Node.js 22.23.4 or newer in the 22 line, or 24.22.1 or newer in the 24 line; nothing else is required for the owned examples. From the repository root, in a terminal:
+You need Node.js 22 LTS (22.16.0 or newer) or 24 LTS (24.0.0 or newer); 22.23.4 or 24.22.1 or newer is recommended, and below those the launcher warns. Nothing else is required for the owned examples. From the repository root, in a terminal:
 
 ```sh
 cd scopehaven-oss
@@ -54,7 +54,7 @@ cd scopehaven-oss
 
 `doctor` checks, locally and without installing anything, which Node the launcher selected and where it came from, whether the workbench modules load, the evidence directory and the loopback port. Fix any `[fail]` line before continuing.
 
-The launcher uses `SCOPEHAVEN_NODE` if set, then the project-local `.runtime/node-v24.22.2-darwin-arm64/bin/node` if present, then `node` on `PATH`. If the selected Node is outside `>=22.23.4 <23 || >=24.22.1 <25` (for example a global `24.18.0`), every action except `doctor` stops with exit code 2 and explains how to get Node 24 LTS from [nodejs.org](https://nodejs.org/en/download). Plain `node` or `npm` bypass that check. No `npm install` is needed. See [DEPENDENCIES.md](DEPENDENCIES.md).
+The launcher uses `SCOPEHAVEN_NODE` if set, then the project-local `.runtime/node-v24.22.2-darwin-arm64/bin/node` if present, then `node` on `PATH`. If the selected Node is outside `>=22.16.0 <23 || >=24.0.0 <25` (for example a global `20.20.2`), every action except `doctor` stops with exit code 2 and explains how to get Node 24 LTS from [nodejs.org](https://nodejs.org/en/download). Inside that range but below the line's October 2026 security release (for example a global `24.18.0`), it warns and runs. Plain `node` or `npm` bypass that check. No `npm install` is needed. See [DEPENDENCIES.md](DEPENDENCIES.md).
 
 `check-config` and `assess --list` show configuration, registered targets and readiness without running an assessment. `configurationValid: true` does not mean every target is available or that a requirement passed. The demos can be listed without an HTTP profile. Inspect `available` and `readinessReason`; HTTP targets separately report credential readiness. `connectionTested: false` remains correct for these setup checks.
 

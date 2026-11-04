@@ -5,7 +5,7 @@
 # the action was fetched from), not to whatever is checked out in the caller's workspace, which a `./` path would use.
 # `$/` is not available on GitHub Enterprise Server; there, use `uses: YusefSyed/scopehaven-oss/integrations/github-action@<ref>`.
 # test/root-action.test.mjs checks that this file and the inner action agree.
-name: ScopeHaven assessment
+name: ScopeHaven - check what an AI agent did
 description: 'Assess what an AI agent did in an app you start on the runner''s loopback, gate it against a saved baseline run and export SARIF.'
 author: YusefSyed
 branding:

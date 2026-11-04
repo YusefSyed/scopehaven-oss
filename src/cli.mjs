@@ -12,6 +12,7 @@ import { unpairedForwardedPasses, forwardedPairingGaps } from './forwarded-pairi
 import { channelReadings } from './channels.mjs';
 import { identityCoverage, mirrorReport } from './two-identities.mjs';
 import { identityControlPlan } from './contracts.mjs';
+import { assessSummary } from './assess-summary.mjs';
 
 const args = process.argv.slice(2), options = {};
 const unpairedKey = target => target?.targetContext === 'operator-remote' ? 'remoteUnpaired' : 'forwardedUnpaired';
@@ -144,6 +145,10 @@ else try {
     // neither is a run with a check the self-test found broken, or an absence pass its declared channels do not support
     // (src/channels.mjs).
     const refused = selfTest ? broken(selfTest) : false;
+    process.stderr.write(assessSummary(run, { directory, defaultData: fileURLToPath(new URL('../data/', import.meta.url)), ...(import.meta.url.includes('/node_modules/') ? { command: 'npx scopehaven' } : {}), notClean: [
+      ...(unpaired.length ? [`${unpaired.length} boundary pass(es) have no same-route control behind them.`] : []),
+      ...(refused ? ['The self-test found a broken check.'] : []),
+      ...(withheld.length ? [`${withheld.length} absence pass(es) are not supported by the declared channels.`] : [])] }));
     process.exitCode = run.counts.fail || run.counts.error || run.counts.inconclusive || unpaired.length || refused || withheld.length ? 1 : 0;
     }
   }

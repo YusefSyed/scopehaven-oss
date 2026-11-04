@@ -23,7 +23,7 @@ To time this onboarding, run this first, before anything else on this page:
    ./scopehaven doctor
    ```
 
-   If `doctor` says your Node is outside `>=22.23.4 <23 || >=24.22.1 <25`, install Node 22 LTS (22.23.4 or newer) or 24 LTS (24.22.1 or newer) from https://nodejs.org/en/download, or set `SCOPEHAVEN_NODE` to one; the launcher picks it up without any PATH change.
+   If `doctor` says your Node is outside `>=22.16.0 <23 || >=24.0.0 <25`, or warns that it is below the October 2026 security release, install Node 22 LTS (22.23.4 or newer) or 24 LTS (24.22.1 or newer) from https://nodejs.org/en/download, or set `SCOPEHAVEN_NODE` to one; the launcher picks it up without any PATH change.
 
 3. **Sign in two test users in two different tenants** (two orgs, two workspaces, or two plain accounts). Copy each session token or session cookie value from the browser's developer tools, or from your app's login route.
 4. **Put both values in a private env file.** The names must start with `SCOPEHAVEN_TARGET_`:

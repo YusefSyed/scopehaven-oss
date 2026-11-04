@@ -6,7 +6,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { NODE_ENGINES, SUPPORTED_NODE_LINES, assertRuntime } from '../src/runtime.mjs';
+import { NODE_ENGINES, SECURITY_NODE_LINES, SUPPORTED_NODE_LINES, assertRuntime } from '../src/runtime.mjs';
 
 // Local launcher checks only: fake Node scripts in private temp directories,
 // loopback port probes and read-only doctor runs. No install, network or provider.
@@ -60,8 +60,9 @@ test('launcher is POSIX sh and its pins match package.json engines and the runti
   const pkg = JSON.parse(await readFile(join(PROJECT, 'package.json'), 'utf8'));
   assert.equal(/^scopehaven_engines='([^']+)'$/m.exec(launcherText)?.[1], pkg.engines.node);
   assert.equal(/^scopehaven_min_nodes='([^']+)'$/m.exec(launcherText)?.[1], Object.values(SUPPORTED_NODE_LINES).join(' '));
+  assert.equal(/^scopehaven_security_nodes='([^']+)'$/m.exec(launcherText)?.[1], Object.values(SECURITY_NODE_LINES).join(' '));
   assert.equal(pkg.engines.node, NODE_ENGINES);
-  assert.equal(NODE_ENGINES, '>=22.23.4 <23 || >=24.22.1 <25', 'the 22 and 24 LTS lines, each at its October 2026 security release');
+  assert.equal(NODE_ENGINES, '>=22.16.0 <23 || >=24.0.0 <25', 'the 22 and 24 LTS lines, each from its first release whose node:sqlite needs no flag and honours the open timeout');
   // The pinned download, .nvmrc and .node-version name one version, at or above the minimum.
   const pinned = /^scopehaven_pinned_node="\$scopehaven_root\/\.runtime\/node-v(\S+)-darwin-arm64\/bin\/node"$/m.exec(launcherText)?.[1];
   for (const file of ['.nvmrc', '.node-version']) assert.equal((await readFile(join(PROJECT, file), 'utf8')).trim(), pinned, file);
@@ -71,14 +72,17 @@ test('launcher is POSIX sh and its pins match package.json engines and the runti
 
 test('version gate accepts only the engines range (22 and 24 LTS at their floors) and explains how to get a supported Node', async t => {
   const directory = await privateDirectory(t);
-  for (const [version, accepted] of [['24.22.1', true], ['24.22.2', true], ['24.23.0', true], ['24.30.1', true], ['22.23.4', true], ['22.23.10', true], ['22.24.0', true],
-    ['24.22.0', false], ['24.21.9', false], ['24.21.0', false], ['24.18.0', false], ['22.23.3', false], ['22.22.9', false], ['22.0.0', false], ['23.0.0', false], ['23.99.0', false],
+  for (const [version, accepted, warned] of [['24.22.1', true], ['24.22.2', true], ['24.23.0', true], ['24.30.1', true], ['22.23.4', true], ['22.23.10', true], ['22.24.0', true],
+    ['24.22.0', true, true], ['24.21.9', true, true], ['24.21.0', true, true], ['24.18.0', true, true], ['24.0.0', true, true], ['22.23.3', true, true], ['22.22.9', true, true], ['22.16.0', true, true],
+    ['22.15.9', false], ['22.13.0', false], ['22.0.0', false], ['23.0.0', false], ['23.99.0', false],
     ['20.20.2', false], ['25.0.0', false], ['18.20.4', false], ['24.22.1-rc.1', false], ['24.22', false], ['', false]]) {
     const node = await fakeNode(directory, version);
     const result = await launch(['check-config'], { env: { SCOPEHAVEN_NODE: node } });
     if (accepted) {
       assert.equal(result.code, 0, version);
       assert.equal(result.stdout, 'EXEC src/cli.mjs --check-config\n', version);
+      if (warned) assert.ok(result.stderr.includes(`Warning: Node v${version} is below the October 2026 security release`), `${version}: ${result.stderr}`);
+      else assert.equal(result.stderr, '', version);
       continue;
     }
     assert.equal(result.code, 2, version);
@@ -158,7 +162,7 @@ test('in an npm install the caller keeps its folder, every entry is named by its
 
   const usage = await launch(['help'], { launcher: bin, env: { SCOPEHAVEN_NODE: node } });
   assert.match(usage.stdout, /^Usage: npx scopehaven doctor\|start\|test/);
-  const old = await launch(['assess'], { launcher: bin, env: { SCOPEHAVEN_NODE: await fakeNode(directory, '24.18.0') } });
+  const old = await launch(['assess'], { launcher: bin, env: { SCOPEHAVEN_NODE: await fakeNode(directory, '20.20.2') } });
   assert.equal(old.code, 2);
   assert.equal(old.stdout, '', 'nothing may run');
   assert.match(old.stderr, /SCOPEHAVEN_NODE=\/absolute\/path\/to\/node npx scopehaven doctor/);
@@ -174,13 +178,20 @@ test('the test action and npm test run node --test through the bounded runner, s
 
 test('doctor reports an unsupported Node as a failure and skips Node-based checks', async t => {
   const directory = await privateDirectory(t);
-  const result = await launch(['doctor'], { env: { SCOPEHAVEN_NODE: await fakeNode(directory, '24.18.0') } });
+  const result = await launch(['doctor'], { env: { SCOPEHAVEN_NODE: await fakeNode(directory, '20.20.2') } });
   assert.equal(result.code, 1);
-  assert.ok(result.stdout.split('\n').some(line => /^\[fail\] Node v24\.18\.0 from SCOPEHAVEN_NODE .* is outside /.test(line) && line.endsWith(` is outside ${NODE_ENGINES}`)), result.stdout);
+  assert.ok(result.stdout.split('\n').some(line => /^\[fail\] Node v20\.20\.2 from SCOPEHAVEN_NODE .* is outside /.test(line) && line.endsWith(` is outside ${NODE_ENGINES}`)), result.stdout);
   assert.match(result.stdout, /^ {7}Get Node\.js 22 LTS \(22\.23\.4 or newer\) or 24 LTS \(24\.22\.1 or newer\) from https:\/\/nodejs\.org\/en\/download, then put it first on PATH or set SCOPEHAVEN_NODE=\/absolute\/path\/to\/node\.$/m);
   assert.match(result.stdout, /^\[skip\] Module, data directory and port checks need a supported Node runtime first$/m);
   assert.match(result.stdout, /^Result: not ready\./m);
   assert.doesNotMatch(result.stdout, /EXEC/);
+});
+
+test('doctor warns on a Node below the October 2026 security release and does not call it a failure', async t => {
+  const directory = await privateDirectory(t);
+  const result = await launch(['doctor'], { env: { SCOPEHAVEN_NODE: await fakeNode(directory, '24.18.0') } });
+  assert.match(result.stdout, /^\[warn\] Node v24\.18\.0 from SCOPEHAVEN_NODE .* runs, but is below the October 2026 security release for its line$/m);
+  assert.doesNotMatch(result.stdout, /^\[fail\] Node/m);
 });
 
 test('doctor is read-only and reports Node source, data directory and a busy loopback port, and no target it cannot run', async t => {
