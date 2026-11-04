@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/YusefSyed/scopehaven-oss/actions/workflows/test.yml/badge.svg)](https://github.com/YusefSyed/scopehaven-oss/actions/workflows/test.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Node 22 or 24 LTS](https://img.shields.io/badge/node-22.23%2B%20%7C%2024.22%2B-brightgreen.svg)](.node-version)
+[![Node 22 or 24 LTS](https://img.shields.io/badge/node-22%20%7C%2024%20LTS-brightgreen.svg)](.node-version)
 
 **ScopeHaven checks what an AI agent actually did in your app, not what it said.**
 
@@ -22,9 +22,9 @@ reply still says it was processed: ScopeHaven flags the false success, then comp
 
 ## Sixty seconds
 
-You need Node.js 22 or 24 LTS (`>=22.23.4 <23 || >=24.22.1 <25`) and nothing else: there are no npm packages to install.
+You need Node.js 22 or 24 LTS (`>=22.13.0 <23 || >=24.0.0 <25`) and nothing else: there are no npm packages to install.
 
-Already on Node 22 LTS (22.23.4 or newer) or Node 24 LTS (24.22.1 or newer)? Nothing to add: clone and run.
+Already on Node 22 or 24 LTS? Nothing to add: clone and run. Below that line's October 2026 security release (22.23.4 or 24.22.1) it runs and prints a warning, so update before pointing it at anything you care about.
 
 ```sh
 git clone https://github.com/YusefSyed/scopehaven-oss.git && cd scopehaven-oss

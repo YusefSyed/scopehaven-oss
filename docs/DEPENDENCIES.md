@@ -4,7 +4,7 @@ Scopehaven currently has **zero external npm runtime dependencies**. The Support
 
 ## Runtime
 
-`package.json` requires Node `>=22.23.4 <23 || >=24.22.1 <25`: the 22 LTS line from 22.23.4, or the 24 LTS line from 24.22.1, each that line's October 2026 security release. The server, CLI and HTTP assessment runtime gate (`src/runtime.mjs`) enforce the same two floors; Node 23 and the end-of-life 20 line are refused (20 has no `node:sqlite`, which the SQLite observers and fixtures use). The pinned download is 24.22.2 and the full suite runs on it; the 22 line was checked with the runner, HTTP connector, storage, SQLite observer, sequence, evidence-pack and launcher test files. On 22, `node:sqlite` needs no flag, but Node prints one `ExperimentalWarning: SQLite` line per process that loads it; that is Node's notice, not a result. Run everything through `./scopehaven`, which selects one Node binary in this order:
+`package.json` requires Node `>=22.13.0 <23 || >=24.0.0 <25`: the 22 LTS line from 22.13.0, or the 24 LTS line from 24.0.0, each that line's first release with `node:sqlite` and no flag. The server, CLI and HTTP assessment runtime gate (`src/runtime.mjs`) enforce the same two floors; Node 23 and the end-of-life 20 line are refused (20 has no `node:sqlite`, which the SQLite observers and fixtures use). Below a line's October 2026 security release (22.23.4 or 24.22.1) the launcher prints a warning and `doctor` shows `[warn]`, and it still runs; those floors are the recommendation. The pinned download is 24.22.2 and the full suite runs on it; the 22 line was checked with the runner, HTTP connector, storage, SQLite observer, sequence, evidence-pack and launcher test files. On 22, `node:sqlite` needs no flag, but Node prints one `ExperimentalWarning: SQLite` line per process that loads it; that is Node's notice, not a result. Run everything through `./scopehaven`, which selects one Node binary in this order:
 
 1. `SCOPEHAVEN_NODE`, if set (a relative path is resolved from your current directory). There is no fallback when it is set.
 2. The project-local `.runtime/node-v24.22.2-darwin-arm64/bin/node`, if present and runnable on this machine. It is an Apple Silicon macOS build and is not in git.
@@ -24,7 +24,7 @@ To get a supported runtime, download Node.js 22 LTS at 22.23.4 or newer, or 24 L
 
 | Check | Fails when | Effect |
 | --- | --- | --- |
-| Node | No runnable binary, or its version is outside `>=22.23.4 <23 || >=24.22.1 <25`. Also shows a `PATH` node that is not used. | `[fail]`; later Node-based checks are skipped. |
+| Node | No runnable binary, or its version is outside `>=22.13.0 <23 || >=24.0.0 <25`. Also shows a `PATH` node that is not used. | `[fail]`; later Node-based checks are skipped. Below the October 2026 security release: `[warn]`, and the checks continue. |
 | Workbench modules | `src/registry.mjs` or a target adapter cannot load, for example when a target adapter's files are missing. | `[fail]`: start, assess, check-config and most tests would stop. |
 | Data directory | It exists but is a symlink, not owned by you, not mode `0700` or not writable; or it is absent and its parent is not writable. | `[fail]` with the fix. |
 | Loopback port | `127.0.0.1:<port>` is taken (`[warn]`) or invalid (`[fail]`). | `start` would fail; tests use ephemeral ports. |

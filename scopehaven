@@ -15,10 +15,12 @@ scopehaven_at=''; scopehaven_cmd='./scopehaven'
 case $scopehaven_root in */node_modules/*)
   scopehaven_root=$(CDPATH= cd -- "$scopehaven_root" && pwd -P); scopehaven_at="$scopehaven_root/"; scopehaven_cmd='npx scopehaven' ;;
 esac
-# Keep equal to package.json "engines" and src/runtime.mjs SUPPORTED_NODE_LINES: each LTS line at or above its
-# October 2026 security release (22.23.4 and 24.22.1). Node 23 and the end-of-life 20 line are not supported.
-scopehaven_engines='>=22.23.4 <23 || >=24.22.1 <25'
-scopehaven_min_nodes='22.23.4 24.22.1'
+# Keep equal to package.json "engines" and src/runtime.mjs SUPPORTED_NODE_LINES: each LTS line from its first release
+# with node:sqlite and no flag. Node 23 and the end-of-life 20 line are not supported.
+scopehaven_engines='>=22.13.0 <23 || >=24.0.0 <25'
+scopehaven_min_nodes='22.13.0 24.0.0'
+# Keep equal to src/runtime.mjs SECURITY_NODE_LINES: each line's October 2026 security release. Below it, warn and run.
+scopehaven_security_nodes='22.23.4 24.22.1'
 scopehaven_get_node='Node.js 22 LTS (22.23.4 or newer) or 24 LTS (24.22.1 or newer)'
 scopehaven_pinned_node="$scopehaven_root/.runtime/node-v24.22.2-darwin-arm64/bin/node"
 scopehaven_usage='Usage: ./scopehaven doctor|start|test|assess|check-config|lab|connector-demo|gate|gate-demo|import-evaluation|export|evidence-pack|sequence|attest|policy|monitor|payments|watch-first|pack|init'
@@ -28,10 +30,10 @@ scopehaven_version_of() { # Prints the Node version of $1, or fails if it cannot
   [ -n "$1" ] && [ -f "$1" ] && [ -x "$1" ] || return 1
   "$1" -e 'process.stdout.write(process.versions.node)' 2>/dev/null
 }
-scopehaven_supported() { # $1 = x.y.z; true when it satisfies the engines range: a supported line, at or above that line's floor.
+scopehaven_at_floor() { # $1 = x.y.z, $2 = floors; true when $1 is on a listed line, at or above that line's floor.
   case $1 in ''|.*|*.|*..*|*[!0-9.]*|*.*.*.*) return 1 ;; *.*.*) ;; *) return 1 ;; esac
   sv_major=${1%%.*}; sv_rest=${1#*.}; sv_minor=${sv_rest%%.*}; sv_patch=${sv_rest#*.}
-  for sv_floor in $scopehaven_min_nodes; do
+  for sv_floor in $2; do
     [ "$sv_major" -eq "${sv_floor%%.*}" ] || continue
     sv_need_rest=${sv_floor#*.}
     [ "$sv_minor" -gt "${sv_need_rest%%.*}" ] && return 0
@@ -63,7 +65,9 @@ else
   fi
 fi
 scopehaven_node_ok=0
-if scopehaven_supported "$scopehaven_node_version"; then scopehaven_node_ok=1; fi
+if scopehaven_at_floor "$scopehaven_node_version" "$scopehaven_min_nodes"; then scopehaven_node_ok=1; fi
+scopehaven_node_old=0
+if [ "$scopehaven_node_ok" = 1 ] && ! scopehaven_at_floor "$scopehaven_node_version" "$scopehaven_security_nodes"; then scopehaven_node_old=1; fi
 
 scopehaven_unsupported() {
   if [ -z "$scopehaven_node" ]; then
@@ -96,7 +100,10 @@ scopehaven_doctor() {
   dr_fail=0
   printf '%s\n' "Scopehaven doctor: local checks only. Nothing is installed, downloaded, started or sent." \
     "Project: $scopehaven_root ($(uname -s) $(uname -m))"
-  if [ "$scopehaven_node_ok" = 1 ]; then
+  if [ "$scopehaven_node_old" = 1 ]; then
+    printf '%s\n' "[warn] Node v$scopehaven_node_version from $scopehaven_node_source ($scopehaven_node) runs, but is below the October 2026 security release for its line" \
+      "       Get $scopehaven_get_node from https://nodejs.org/en/download, then put it first on PATH or set SCOPEHAVEN_NODE=/absolute/path/to/node."
+  elif [ "$scopehaven_node_ok" = 1 ]; then
     printf '%s\n' "[ok]   Node v$scopehaven_node_version from $scopehaven_node_source ($scopehaven_node) satisfies $scopehaven_engines"
   else
     dr_fail=1
@@ -213,7 +220,10 @@ case "$scopehaven_action" in
   doctor) scopehaven_doctor "$@" ;;
   help|-h|--help) printf '%s\n' "$scopehaven_usage"; exit 0 ;;
   start|test|assess|check-config|lab|connector-demo|gate|gate-demo|import-evaluation|export|evidence-pack|sequence|attest|policy|monitor|payments|watch-first|pack|init)
-    if [ "$scopehaven_node_ok" != 1 ]; then scopehaven_unsupported; fi ;;
+    if [ "$scopehaven_node_ok" != 1 ]; then scopehaven_unsupported; fi
+    if [ "$scopehaven_node_old" = 1 ]; then
+      printf '%s\n' "Warning: Node v$scopehaven_node_version is below the October 2026 security release for its line. Scopehaven will run; update to 22.23.4 or 24.22.1 or newer before pointing it at anything you care about: https://nodejs.org/en/download" >&2
+    fi ;;
   *) printf '%s\n' "$scopehaven_usage" >&2; exit 2 ;;
 esac
 if [ "$scopehaven_action" = test ] && [ -f "$scopehaven_root/RELEASE-MANIFEST.json" ]; then

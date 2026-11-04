@@ -12,6 +12,7 @@ import { unpairedForwardedPasses, forwardedPairingGaps } from './forwarded-pairi
 import { channelReadings } from './channels.mjs';
 import { identityCoverage, mirrorReport } from './two-identities.mjs';
 import { identityControlPlan } from './contracts.mjs';
+import { assessSummary } from './assess-summary.mjs';
 
 const args = process.argv.slice(2), options = {};
 const unpairedKey = target => target?.targetContext === 'operator-remote' ? 'remoteUnpaired' : 'forwardedUnpaired';
@@ -143,6 +144,7 @@ else try {
     // A forwarded run with a boundary pass no same-route control backs is not clean (src/forwarded-pairing.mjs), and
     // neither is a run with a check the self-test found broken, or an absence pass its declared channels do not support
     // (src/channels.mjs).
+    process.stderr.write(assessSummary(run, { directory, defaultData: fileURLToPath(new URL('../data/', import.meta.url)), ...(import.meta.url.includes('/node_modules/') ? { command: 'npx scopehaven' } : {}) }));
     const refused = selfTest ? broken(selfTest) : false;
     process.exitCode = run.counts.fail || run.counts.error || run.counts.inconclusive || unpaired.length || refused || withheld.length ? 1 : 0;
     }

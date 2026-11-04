@@ -33,7 +33,7 @@ test('required permitted-use controls cannot be excluded and every scope exclusi
   assert.throws(() => validateTargetFile({ schemaVersion: 1, targets: [p] }), /applicability/);
 });
 test('runtime guard refuses versions below each supported line (and lines 20, 23, 25+) and accepts the 22 and 24 LTS floors', () => {
-  const refusal = /requires Node\.js 22 LTS at 22\.23\.4 or newer, or Node\.js 24 LTS at 24\.22\.1 or newer \(engines >=22\.23\.4 <23 \|\| >=24\.22\.1 <25\); this runtime is /;
-  for (const version of ['24.18.0', '24.18.1', '24.20.0', '24.21.0', '24.21.9', '24.22.0', '22.0.0', '22.22.9', '22.23.3', '23.0.0', '23.99.0', '20.20.2', '25.0.0', '26.0.0', '24.22', '22.23.4-rc.1', '']) assert.throws(() => assertRuntime(version), refusal, version);
-  for (const version of ['22.23.4', '22.23.5', '22.24.0', '24.22.1', '24.22.2', '24.23.0']) assert.doesNotThrow(() => assertRuntime(version), version);
+  const refusal = /requires Node\.js 22 LTS at 22\.13\.0 or newer, or Node\.js 24 LTS at 24\.0\.0 or newer \(engines >=22\.13\.0 <23 \|\| >=24\.0\.0 <25\); this runtime is /;
+  for (const version of ['22.0.0', '22.12.9', '23.0.0', '23.99.0', '20.20.2', '25.0.0', '26.0.0', '24.22', '22.23.4-rc.1', '']) assert.throws(() => assertRuntime(version), refusal, version);
+  for (const version of ['22.13.0', '22.23.3', '22.23.4', '22.24.0', '24.0.0', '24.18.0', '24.22.1', '24.22.2', '24.23.0']) assert.doesNotThrow(() => assertRuntime(version), version);
 });
