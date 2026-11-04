@@ -5,7 +5,7 @@
 import { join } from 'node:path';
 
 const SYNTHETIC_ORIGIN = 'synthetic-local-http';
-const clean = text => String(text ?? '').replace(/[\u0000-\u001f\u007f-\u009f  ]+/g, ' ').trim().slice(0, 160);
+const clean = text => String(text ?? '').replace(/[\p{Cc}\p{Zl}\p{Zp}]+/gu, ' ').trim().slice(0, 160);
 const quoted = text => `'${String(text).replaceAll("'", `'\\''`)}'`;
 
 export function assessSummary(run, { directory, defaultData, command = './scopehaven', notClean = [] } = {}) {
