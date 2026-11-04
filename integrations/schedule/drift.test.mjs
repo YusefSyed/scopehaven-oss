@@ -75,7 +75,7 @@ test('the scheduled workflow and the launchd template: schedule and dispatch, re
   assert.match(workflow, /\n  schedule:\n    - cron: '[0-9*, ]+'\n/);
   assert.match(workflow, /\n  workflow_dispatch:\n/);
   assert.match(workflow, /\npermissions:\n  contents: read\n\n/);
-  for (const uses of workflow.match(/uses: [^\n]+/g)) assert.match(uses, /@[0-9a-f]{40} # v\d+$/, uses);
+  for (const uses of workflow.match(/uses: [^\n]+/g)) assert.match(uses, /@[0-9a-f]{40} # v\d+(\.\d+){0,2}$/, uses);
   assert.doesNotMatch(workflow, /secrets\.|curl|wget|sendmail|smtp|slack|webhook|discord|https?:\/\//i);
   // Inputs reach the run step only through env, never interpolated into the script.
   const runBlock = workflow.slice(workflow.indexOf('        run: |'), workflow.indexOf('      - name: Keep this run'));
