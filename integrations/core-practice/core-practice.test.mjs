@@ -42,12 +42,11 @@ for (const [kind, name, build, observers, assessExit, gateExit, reasons, rows] o
   });
 }
 
-// An exit that was not expected says why: the CLI's stderr, or every row that did not pass with the reasons its effect
-// windows were not complete (a bare "1 !== 0" cannot tell a verdict change from a disturbed run).
+// An exit that was not expected says why: every row that did not pass with the reasons its effect windows were not
+// complete (a bare "1 !== 0" cannot tell a verdict change from a disturbed run), or the CLI's stderr when no row explains it.
 function why(result) {
-  if (result.stderr) return result.stderr;
   return (result.run?.results ?? []).filter(r => r.status !== 'pass').map(r => {
     const reasons = [...new Set((r.trace ?? []).flatMap(t => t.data?.windows ?? []).map(w => w.reason).filter(Boolean))];
     return `${r.id} ${r.status}${reasons.length ? ` (${reasons.join(', ')})` : ''}`;
-  }).join('; ') || 'no run was saved';
+  }).join('; ') || result.stderr || 'no run was saved';
 }

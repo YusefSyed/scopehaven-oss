@@ -7,7 +7,7 @@ All notable changes to the open edition of ScopeHaven are recorded here. The for
 
 ### Changed
 
-- The launcher and runtime guard accept Node 22 from 22.13.0 and Node 24 from 24.0.0 (`>=22.13.0 <23 || >=24.0.0 <25`). Below a line's October 2026 security release (22.23.4 or 24.22.1) the launcher warns and runs instead of refusing, and `doctor` shows `[warn]`.
+- The launcher and runtime guard accept Node 22 from 22.16.0 and Node 24 from 24.0.0 (`>=22.16.0 <23 || >=24.0.0 <25`). Below a line's October 2026 security release (22.23.4 or 24.22.1) the launcher warns and runs instead of refusing, and `doctor` shows `[warn]`.
 - `assess` prints a summary to stderr: each failing check and how to see the findings. The JSON on stdout is unchanged. Observed values appear only for synthetic runs.
 
 ## [0.7.0] - 2026-11-01

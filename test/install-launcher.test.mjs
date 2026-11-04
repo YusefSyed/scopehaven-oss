@@ -62,7 +62,7 @@ test('launcher is POSIX sh and its pins match package.json engines and the runti
   assert.equal(/^scopehaven_min_nodes='([^']+)'$/m.exec(launcherText)?.[1], Object.values(SUPPORTED_NODE_LINES).join(' '));
   assert.equal(/^scopehaven_security_nodes='([^']+)'$/m.exec(launcherText)?.[1], Object.values(SECURITY_NODE_LINES).join(' '));
   assert.equal(pkg.engines.node, NODE_ENGINES);
-  assert.equal(NODE_ENGINES, '>=22.13.0 <23 || >=24.0.0 <25', 'the 22 and 24 LTS lines, each from its first release with node:sqlite and no flag');
+  assert.equal(NODE_ENGINES, '>=22.16.0 <23 || >=24.0.0 <25', 'the 22 and 24 LTS lines, each from its first release whose node:sqlite needs no flag and honours the open timeout');
   // The pinned download, .nvmrc and .node-version name one version, at or above the minimum.
   const pinned = /^scopehaven_pinned_node="\$scopehaven_root\/\.runtime\/node-v(\S+)-darwin-arm64\/bin\/node"$/m.exec(launcherText)?.[1];
   for (const file of ['.nvmrc', '.node-version']) assert.equal((await readFile(join(PROJECT, file), 'utf8')).trim(), pinned, file);
@@ -73,8 +73,8 @@ test('launcher is POSIX sh and its pins match package.json engines and the runti
 test('version gate accepts only the engines range (22 and 24 LTS at their floors) and explains how to get a supported Node', async t => {
   const directory = await privateDirectory(t);
   for (const [version, accepted, warned] of [['24.22.1', true], ['24.22.2', true], ['24.23.0', true], ['24.30.1', true], ['22.23.4', true], ['22.23.10', true], ['22.24.0', true],
-    ['24.22.0', true, true], ['24.21.9', true, true], ['24.21.0', true, true], ['24.18.0', true, true], ['24.0.0', true, true], ['22.23.3', true, true], ['22.22.9', true, true], ['22.13.0', true, true],
-    ['22.12.9', false], ['22.0.0', false], ['23.0.0', false], ['23.99.0', false],
+    ['24.22.0', true, true], ['24.21.9', true, true], ['24.21.0', true, true], ['24.18.0', true, true], ['24.0.0', true, true], ['22.23.3', true, true], ['22.22.9', true, true], ['22.16.0', true, true],
+    ['22.15.9', false], ['22.13.0', false], ['22.0.0', false], ['23.0.0', false], ['23.99.0', false],
     ['20.20.2', false], ['25.0.0', false], ['18.20.4', false], ['24.22.1-rc.1', false], ['24.22', false], ['', false]]) {
     const node = await fakeNode(directory, version);
     const result = await launch(['check-config'], { env: { SCOPEHAVEN_NODE: node } });

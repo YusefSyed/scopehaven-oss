@@ -13,7 +13,7 @@ test('lists each check that did not pass and each distinct observed value once, 
   assert.equal(text.match(/^ {7}same$/gm).length, 1);
   assert.match(text, /^ {7}other$/m);
   assert.doesNotMatch(text, /OK-1/);
-  assert.match(text, /\.\/scopehaven start/);
+  assert.match(text, /\.\/scopehaven export --run run-1 --format html --out '\/data\/report-run-1\.html'$/m);
 });
 
 test('never prints observed values from a target that is not the synthetic fixture', () => {
@@ -28,9 +28,17 @@ test('strips control characters that a target could use to rewrite the terminal,
   assert.ok(text.split('\n').every(line => line.length < 200));
 });
 
+test('a run that exits 1 with every check passed says why, and counts not-applicable rows', () => {
+  const results = [{ id: 'OK-1', title: 't', status: 'pass' }, { id: 'NA-1', title: 't', status: 'not_applicable' }];
+  const text = assessSummary(run('http', results, { pass: 1 }), { directory: '/data/', defaultData: '/data/', notClean: ['The self-test found a broken check.'] });
+  assert.match(text, /^\n1 of 2 checks passed on demo: 0 failed, 0 inconclusive, 0 error, 1 not applicable\.$/m);
+  assert.match(text, /^Not clean: The self-test found a broken check\.$/m);
+  assert.match(text, /See every finding/);
+});
+
 test('a run outside the default data directory names an export command that quotes the folder', () => {
   const text = assessSummary(run('http', [failed('A-1', 'v')], { pass: 0, fail: 1 }), { directory: "/my evidence/it's", defaultData: '/data/' });
-  assert.match(text, /export --run run-1 --format html --out \/absolute\/new\/report\.html --data '\/my evidence\/it'\\''s'/);
+  assert.ok(text.includes(`export --run run-1 --format html --out '/my evidence/it'\\''s/report-run-1.html' --data '/my evidence/it'\\''s'`), text);
 });
 
 test('a clean run says so and points nowhere', () => {

@@ -22,7 +22,7 @@ reply still says it was processed: ScopeHaven flags the false success, then comp
 
 ## Sixty seconds
 
-You need Node.js 22 or 24 LTS (`>=22.13.0 <23 || >=24.0.0 <25`) and nothing else: there are no npm packages to install.
+You need Node.js 22 or 24 LTS (`>=22.16.0 <23 || >=24.0.0 <25`) and nothing else: there are no npm packages to install.
 
 Already on Node 22 or 24 LTS? Nothing to add: clone and run. Below that line's October 2026 security release (22.23.4 or 24.22.1) it runs and prints a warning, so update before pointing it at anything you care about.
 

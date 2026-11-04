@@ -12,7 +12,7 @@ Thanks for looking. This file says how to set up, what a good change looks like,
 
 ## Set up
 
-ScopeHaven has no npm dependencies. You need Node.js 22 or 24 LTS in the range `package.json` states (`>=22.13.0 <23 || >=24.0.0 <25`); the suite is run on the pinned 24.22.2.
+ScopeHaven has no npm dependencies. You need Node.js 22 or 24 LTS in the range `package.json` states (`>=22.16.0 <23 || >=24.0.0 <25`); the suite is run on the pinned 24.22.2.
 
 ```sh
 git clone https://github.com/YusefSyed/scopehaven-oss.git
