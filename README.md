@@ -225,6 +225,7 @@ The launcher selects Node from `SCOPEHAVEN_NODE`, then a project-local `.runtime
 
 ## Contributing, security, licence
 
+Maintained by [Yusef Syed](https://github.com/YusefSyed); questions or work opportunities go to the email on that profile.
 Read [CONTRIBUTING.md](CONTRIBUTING.md) (DCO sign-off, no dependencies, every check needs its failing case).
 Report security problems in ScopeHaven itself through [SECURITY.md](SECURITY.md), never in a public issue.
 Licensed under the [Apache License 2.0](LICENSE); third-party notices are in [NOTICE](NOTICE).
