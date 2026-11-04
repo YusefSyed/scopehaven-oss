@@ -68,6 +68,8 @@ Profile entry:
 
 ## Postgres snapshot observer (`pg-snapshot`)
 
+To try a disposable Docker server, the live tests and a SELECT-only profile role, follow [Trying the observers against a local Postgres](../../docs/POSTGRES-LOCAL.md).
+
 It reads the application's own Postgres tables at each mark, in one `REPEATABLE READ READ ONLY` transaction: for every row, its key, its `xmin` (the transaction that wrote this row version) and `md5(row::text)`. The hash is computed in the database, so no non-key values leave it (each row's key does). The client (`pg-wire.mjs`) has no npm dependency. By default it speaks SCRAM-SHA-256 only: it verifies the server's signature, requires at least 4096 iterations and a server nonce that extends the client's, and refuses md5 (operator code can opt in with `allowMd5`; a profile cannot), cleartext and unchallenged (trust) logins. It connects only to the literal `127.0.0.1`, and drops the password after the handshake.
 
 ```json

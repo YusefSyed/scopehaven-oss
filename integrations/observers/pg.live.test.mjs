@@ -18,7 +18,7 @@ import { collectWindow, evaluateEffectAssertion } from './events.mjs';
 import { judgeReadBack } from '../../src/pg-readback.mjs';
 
 const live = /^([^:@/]+):([^@]+)@127\.0\.0\.1:(\d+)\/([A-Za-z_][A-Za-z0-9_]*)$/.exec(process.env.SCOPEHAVEN_PG_LIVE ?? '');
-const skip = live ? false : 'set SCOPEHAVEN_PG_LIVE=user:password@127.0.0.1:port/db (a disposable test database) to run';
+const skip = live ? false : 'see docs/POSTGRES-LOCAL.md; set SCOPEHAVEN_PG_LIVE=user:password@127.0.0.1:port/db (a disposable test database) to run';
 
 async function fixture(t) {
   const [, adminUser, adminPassword, port, database] = live;
