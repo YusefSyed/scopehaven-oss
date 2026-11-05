@@ -1,4 +1,4 @@
-// Lane D hook: inference that drafts more of the profile from the app's own declarations.
+// Inference hook: inference that drafts more of the profile from the app's own declarations.
 //
 // Today: with --openapi, init calls the existing importer (integrations/policy-import/openapi.mjs importOpenApi) and
 // drafter (draft.mjs draftChecks), binding the document's anonymous role to the anonymous actor and every authenticated
