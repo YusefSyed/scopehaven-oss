@@ -103,7 +103,7 @@ Every run appends one line per stage to `init-stamps.jsonl` in its output folder
 - **No pass wording.** The output names FAIL, INCONCLUSIVE and "not exercised" rows only. The workbench's reason texts that say a control "did not pass" are shown as "did not hold". Rows that met their contract are in the run file, not in the summary.
 - **Loopback only.** The base URL must be `127.0.0.1` or `localhost` over http. A remote or https target uses the full setup in `docs/ONBOARDING.md`.
 
-## Lane D hook
+## Inference hook
 
 With `--openapi FILE`, init calls `importOpenApi` and `draftChecks` from `integrations/policy-import`, binds the anonymous role to the anonymous actor and every authenticated requirement to identity A, and writes the draft unconfirmed. Confirming it stays a named person's step (`./scopehaven policy confirm ...`).
 

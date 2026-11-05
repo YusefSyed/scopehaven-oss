@@ -392,13 +392,13 @@ async function steps(argv, { stdout = process.stdout, stdin = process.stdin, env
     if (swapped) say('      The session file changed while the hooks read it, so no proposal or hook error is shown or written.');
     // A hook's error text can quote the input it failed on: the full text is checked, then a shortened form printed.
     const errorText = m => (swapped || holdsSecret(m.error, secrets) ? 'error withheld: it may hold a credential value' : m.error.slice(0, 300));
-    say(`      Lane D inference: ${available.length ? available.map(m => `${m.module} ${m.error ? `failed (${errorText(m)})` : `${m.checks.length} drafted`}`).join('; ') : 'not available yet (hook left in integrations/init/hooks.mjs)'}.`);
+    say(`      Inference: ${available.length ? available.map(m => `${m.module} ${m.error ? `failed (${errorText(m)})` : `${m.checks.length} drafted`}`).join('; ') : 'not available yet (hook left in integrations/init/hooks.mjs)'}.`);
     // Proposals are written only when they hold no credential value from the env file or the session file.
     const proposals = available.filter(m => !m.error).map(m => swapped ? { module: m.module, withheld: 'the session file changed after init checked it, so it was not written' } : holdsSecret(m, secrets)
       ? { module: m.module, withheld: 'its output held a credential value or the path from the env file or the session file, so it was not written' }
       : { module: m.module, confirmed: false, checks: m.checks, notDrafted: m.notDrafted, warnings: m.warnings, ...(m.draft !== undefined ? { draft: m.draft } : {}), ...(m.binding !== undefined ? { binding: m.binding } : {}), ...(m.confirm ? { confirm: m.confirm } : {}) });
     for (const p of proposals.filter(p => p.withheld)) say(`      ${p.module}: not written (${p.withheld}).`);
-    if (proposals.some(p => !p.withheld && p.checks.length)) say(`      Lane D proposals, unconfirmed: ${shown(files.inference)} (a named person confirms them; init never merges them).`);
+    if (proposals.some(p => !p.withheld && p.checks.length)) say(`      Inference proposals, unconfirmed: ${shown(files.inference)} (a named person confirms them; init never merges them).`);
     if (proposals.length) await writePrivate(files.inference, `${JSON.stringify({ schema: 'scopehaven-init-inference/0', session: session ? 'given (path not recorded)' : 'none', proposals }, null, 2)}\n`, o['--force']);
     const report = { schema: 'scopehaven-init-report/0', target: id, origin, credentialSlot: slotLabel(whoami.slot), whoami: { path: whoami.path, pointer: whoami.pointer }, loginRoutes: login.found,
       identities: identities.map(i => ({ alias: i.alias, principalId: i.principalId, credentialEnv: i.credentialEnv })),
